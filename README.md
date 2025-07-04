@@ -1,8 +1,6 @@
 # SWS-AIoT-Project
 This is the repository of AIoT Group7, NUS SOC SWS 2025. Please create your own branch when working.
 
----
-
 ## Description of Proposed Solution
 ### IoT Hardware Prototype
 #### 1. Sensors
@@ -38,3 +36,19 @@ The AI component includes:
 - Stores IoT sensor data, video metadata, player information, and AI analysis results.
 Includes **MySQL** to manage structured data such as match records, score logs, and user profiles.
 - Runs the Machine Learning program, collecting data from the microcontrollers.
+
+#### Frontend System
+- Developed using **HTML + CSS + JS**
+- A web application is developed for users to:
+  - Start or stop a match
+  - View live scores (streamed from microcontroller input)
+  - Watch segmented replays linked to AI-generated feedback
+  - View end-of-match reports including:
+    - Mistakes made
+    - Repetition frequency
+    - Suggested improvements
+    - Final score with player name + winner status
+
+#### Summary
+**The whole system works as follow:**
+Sensors -> ESP32/micro:bit -> Backend <-> Frontend
