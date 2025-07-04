@@ -8,13 +8,13 @@ This is the repository of AIoT Group7, NUS SOC SWS 2025. Please create your own 
 - **Touch Sensor**: A touch sensor for starting/ending the match
 - **Force Sensor**: Detect the force of pushers hitting the puck
 
-#### Microcontroller
+#### 2. Microcontroller
 - A **micro:bit** or **ESP32** board is used to interface with the sensors, collect scoring data, and communicate with the fog processor.
 
-#### Actuators
+#### 3. Actuators
 - LEDs and buzzers are used to provide instant visual/auditory feedback during play
 
-#### Fog Processor
+#### 4. Fog Processor
 - A **Raspberry Pi 4B** serves as the local edge computing node. It aggregates sensor data from the ESP32 and performs real-time processing of the video stream captured by an overhead camera module. This camera is critical for enabling AI-based video analysis.
 
 ### AI Machine Learning Component
