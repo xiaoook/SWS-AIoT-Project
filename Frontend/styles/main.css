@@ -1,4 +1,4 @@
-/* 基础样式重置 */
+/* Basic style reset */
 * {
     margin: 0;
     padding: 0;
@@ -19,7 +19,7 @@ body {
     padding: 0 20px;
 }
 
-/* 头部样式 */
+/* Header styles */
 .header {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
@@ -82,7 +82,7 @@ body {
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
 
-/* 主内容区 */
+/* Main content area */
 .main {
     margin: 2rem 0;
 }
@@ -106,7 +106,7 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* 按钮样式 */
+/* Button styles */
 .btn {
     padding: 0.8rem 2rem;
     border: none;
@@ -167,7 +167,7 @@ body {
     box-shadow: none !important;
 }
 
-/* 比赛控制面板 */
+/* Game control panel */
 .game-control {
     text-align: center;
     margin-bottom: 2rem;
@@ -211,7 +211,7 @@ body {
     font-size: 1.2rem;
 }
 
-/* 记分板样式 */
+/* Scoreboard styles */
 .scoreboard {
     background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
@@ -260,7 +260,7 @@ body {
     margin: 0 2rem;
 }
 
-/* 实时信息流 */
+/* Live information feed */
 .live-feed {
     background: rgba(255, 255, 255, 0.8);
     border-radius: 15px;
@@ -302,7 +302,7 @@ body {
     border-left-color: #f44336;
 }
 
-/* 逐回合分析 */
+/* Round by round analysis */
 .analysis-controls {
     margin-bottom: 2rem;
 }
@@ -429,7 +429,7 @@ body {
     font-weight: 500;
 }
 
-/* 视频回放 */
+/* Video replay */
 .replay-container {
     display: grid;
     grid-template-columns: 2fr 1fr;
@@ -506,7 +506,7 @@ body {
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
 
-/* 比赛报告 */
+/* Match report */
 .report-container {
     max-width: 800px;
     margin: 0 auto;
@@ -600,7 +600,7 @@ body {
     line-height: 1.6;
 }
 
-/* 无数据状态 */
+/* No data state */
 .no-data, .no-rounds {
     text-align: center;
     padding: 3rem;
@@ -611,7 +611,7 @@ body {
     border: 2px dashed rgba(102, 126, 234, 0.3);
 }
 
-/* 页脚 */
+/* Footer */
 .footer {
     background: rgba(255, 255, 255, 0.9);
     text-align: center;
@@ -625,7 +625,7 @@ body {
     font-size: 0.9rem;
 }
 
-/* 滚动条样式 */
+/* Scrollbar styles */
 ::-webkit-scrollbar {
     width: 8px;
 }
@@ -644,7 +644,7 @@ body {
     background: linear-gradient(45deg, #764ba2, #667eea);
 }
 
-/* 加载动画 */
+/* Loading animation */
 .loading {
     display: inline-block;
     width: 20px;
@@ -659,7 +659,7 @@ body {
     to { transform: rotate(360deg); }
 }
 
-/* 成功/错误消息 */
+/* Success/Error messages */
 .message {
     position: fixed;
     top: 20px;

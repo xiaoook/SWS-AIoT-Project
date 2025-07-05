@@ -40,12 +40,12 @@ class ReportManager {
         
         finalScoreElement.innerHTML = `
             <div class="score-item ${this.gameData.scores.playerA > this.gameData.scores.playerB ? 'winner' : ''}">
-                <span class="player">玩家A</span>
+                <span class="player">Player A</span>
                 <span class="score">${this.gameData.scores.playerA}</span>
                 ${this.gameData.scores.playerA > this.gameData.scores.playerB ? '<div class="winner-badge">🏆</div>' : ''}
             </div>
             <div class="score-item ${this.gameData.scores.playerB > this.gameData.scores.playerA ? 'winner' : ''}">
-                <span class="player">玩家B</span>
+                <span class="player">Player B</span>
                 <span class="score">${this.gameData.scores.playerB}</span>
                 ${this.gameData.scores.playerB > this.gameData.scores.playerA ? '<div class="winner-badge">🏆</div>' : ''}
             </div>
@@ -220,11 +220,11 @@ class ReportManager {
     
     getErrorSuggestion(error) {
         const suggestions = {
-            '反应迟缓': 'Recommend more reaction speed training, consider using a metronome or reaction lights for practice.',
-            '防守失误': 'Need to improve defensive positioning, suggest watching defense technique videos and specialized practice.',
-            '攻击角度不佳': 'Practice different attack angles to improve diversity and accuracy of attacks.',
-            '注意力分散': 'Recommend strengthening focus exercises in training, try meditation or attention training.',
-            '技术动作不标准': 'Focus on practicing basic technical movements, suggest correction under coach guidance.'
+            'Slow reaction': 'Recommend more reaction speed training, consider using a metronome or reaction lights for practice.',
+            'Defensive errors': 'Need to improve defensive positioning, suggest watching defense technique videos and specialized practice.',
+            'Poor attack angle': 'Practice different attack angles to improve diversity and accuracy of attacks.',
+            'Attention distraction': 'Recommend strengthening focus exercises in training, try meditation or attention training.',
+            'Non-standard technical actions': 'Focus on practicing basic technical movements, suggest correction under coach guidance.'
         };
         
         return suggestions[error] || 'Recommend specialized training for this issue.';

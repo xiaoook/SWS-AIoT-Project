@@ -313,7 +313,7 @@ class AnalysisManager {
         const variance = scores.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / scores.length;
         const stdDev = Math.sqrt(variance);
         
-        // 一致性百分比（标准差越小，一致性越高）
+        // Consistency percentage (lower standard deviation means higher consistency)
         return Math.max(0, 100 - stdDev * 20);
     }
     
@@ -377,14 +377,14 @@ class AnalysisManager {
         })).sort((a, b) => b.count - a.count);
     }
     
-    // 清空分析数据
+    // Clear analysis data
     clearAnalysis() {
         this.rounds = [];
         this.expandedRounds.clear();
         this.displayRounds();
     }
     
-    // 高级筛选功能
+    // Advanced filtering feature
     setupAdvancedFilters() {
         const container = document.querySelector('.analysis-controls');
         if (!container) return;
@@ -393,39 +393,39 @@ class AnalysisManager {
         advancedFilters.className = 'advanced-filters';
         advancedFilters.innerHTML = `
             <div class="filter-group">
-                <label>时间范围：</label>
+                <label>Time range:</label>
                 <select id="timeFilter">
-                    <option value="all">全部</option>
-                    <option value="last10">最近10回合</option>
-                    <option value="last20">最近20回合</option>
-                    <option value="first-half">上半场</option>
-                    <option value="second-half">下半场</option>
+                    <option value="all">All</option>
+                    <option value="last10">Last 10 rounds</option>
+                    <option value="last20">Last 20 rounds</option>
+                    <option value="first-half">First half</option>
+                    <option value="second-half">Second half</option>
                 </select>
             </div>
             
             <div class="filter-group">
-                <label>评分范围：</label>
+                <label>Score range:</label>
                 <select id="scoreFilter">
-                    <option value="all">全部</option>
-                    <option value="high">高分(8-10)</option>
-                    <option value="medium">中分(5-7)</option>
-                    <option value="low">低分(1-4)</option>
+                    <option value="all">All</option>
+                    <option value="high">High score (8-10)</option>
+                    <option value="medium">Medium score (5-7)</option>
+                    <option value="low">Low score (1-4)</option>
                 </select>
             </div>
             
             <div class="filter-group">
-                <label>错误类型：</label>
+                <label>Error type:</label>
                 <select id="errorFilter">
-                    <option value="all">全部</option>
-                    <option value="has-error">有错误</option>
-                    <option value="no-error">无错误</option>
+                    <option value="all">All</option>
+                    <option value="has-error">Has error</option>
+                    <option value="no-error">No error</option>
                 </select>
             </div>
         `;
         
         container.appendChild(advancedFilters);
         
-        // 添加高级筛选事件
+        // Add advanced filtering events
         ['timeFilter', 'scoreFilter', 'errorFilter'].forEach(filterId => {
             const filter = document.getElementById(filterId);
             if (filter) {
@@ -437,22 +437,22 @@ class AnalysisManager {
     }
     
     applyAdvancedFilters() {
-        // 应用高级筛选逻辑
+        // Apply advanced filtering logic
         let filteredRounds = this.getFilteredRounds();
         
-        // 时间筛选
+        // Time filtering
         const timeFilter = document.getElementById('timeFilter');
         if (timeFilter && timeFilter.value !== 'all') {
             filteredRounds = this.applyTimeFilter(filteredRounds, timeFilter.value);
         }
         
-        // 评分筛选
+        // Score filtering
         const scoreFilter = document.getElementById('scoreFilter');
         if (scoreFilter && scoreFilter.value !== 'all') {
             filteredRounds = this.applyScoreFilter(filteredRounds, scoreFilter.value);
         }
         
-        // 错误筛选
+        // Error filtering
         const errorFilter = document.getElementById('errorFilter');
         if (errorFilter && errorFilter.value !== 'all') {
             filteredRounds = this.applyErrorFilter(filteredRounds, errorFilter.value);
@@ -512,7 +512,7 @@ class AnalysisManager {
         if (!container) return;
         
         if (filteredRounds.length === 0) {
-            container.innerHTML = '<div class="no-data">没有符合条件的数据</div>';
+            container.innerHTML = '<div class="no-data">No matching data found</div>';
             return;
         }
         
@@ -523,7 +523,7 @@ class AnalysisManager {
     }
 }
 
-// 初始化分析管理器
+// Initialize analysis manager
 document.addEventListener('DOMContentLoaded', () => {
     window.analysisManager = new AnalysisManager();
 }); 

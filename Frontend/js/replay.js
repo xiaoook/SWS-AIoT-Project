@@ -467,11 +467,11 @@ class ReplayManager {
         message.className = 'video-end-message';
         message.innerHTML = `
             <div class="end-message-content">
-                <h3>回放结束</h3>
-                <p>是否要重新播放或选择其他回合？</p>
+                <h3>Replay Ended</h3>
+                <p>Would you like to replay or select another round?</p>
                 <div class="end-message-buttons">
-                    <button class="btn btn-primary" onclick="this.parentElement.parentElement.parentElement.remove(); window.replayManager.replayVideo();">重新播放</button>
-                    <button class="btn btn-secondary" onclick="this.parentElement.parentElement.parentElement.remove();">关闭</button>
+                    <button class="btn btn-primary" onclick="this.parentElement.parentElement.parentElement.remove(); window.replayManager.replayVideo();">Replay</button>
+                    <button class="btn btn-secondary" onclick="this.parentElement.parentElement.parentElement.remove();">Close</button>
                 </div>
             </div>
         `;
@@ -557,10 +557,10 @@ class ReplayManager {
         controls.className = 'replay-controls-panel';
         controls.innerHTML = `
             <div class="replay-control-buttons">
-                <button class="control-btn" onclick="window.replayManager.replayVideo();">⏪ 重播</button>
-                <button class="control-btn" onclick="window.replayManager.togglePlayPause();">⏯️ 播放/暂停</button>
-                <button class="control-btn" onclick="window.replayManager.skipForward();">⏩ 快进</button>
-                <button class="control-btn" onclick="window.replayManager.toggleFullscreen();">🔍 全屏</button>
+                            <button class="control-btn" onclick="window.replayManager.replayVideo();">⏪ Replay</button>
+            <button class="control-btn" onclick="window.replayManager.togglePlayPause();">⏯️ Play/Pause</button>
+            <button class="control-btn" onclick="window.replayManager.skipForward();">⏩ Fast Forward</button>
+            <button class="control-btn" onclick="window.replayManager.toggleFullscreen();">🔍 Fullscreen</button>
             </div>
             <div class="replay-progress">
                 <div class="progress-bar">
@@ -575,7 +575,7 @@ class ReplayManager {
         
         container.appendChild(controls);
         
-        // 添加控制面板样式
+        // Add control panel styles
         this.addControlsStyles();
     }
     
@@ -666,11 +666,11 @@ class ReplayManager {
     }
 }
 
-// 初始化回放管理器
+// Initialize replay manager
 document.addEventListener('DOMContentLoaded', () => {
     window.replayManager = new ReplayManager();
     
-    // 延迟创建控制面板，确保DOM完全加载
+    // Delay creating control panel to ensure DOM is fully loaded
     setTimeout(() => {
         window.replayManager.createReplayControls();
     }, 1000);

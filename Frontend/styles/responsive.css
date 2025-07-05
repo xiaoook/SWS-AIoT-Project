@@ -1,6 +1,6 @@
-/* 响应式设计样式 */
+/* Responsive design styles */
 
-/* 大屏幕设备 (1200px 及以上) */
+/* Large screen devices (1200px and above) */
 @media (min-width: 1200px) {
     .container {
         max-width: 1400px;
@@ -24,7 +24,7 @@
     }
 }
 
-/* 中等屏幕设备 (768px - 1199px) */
+/* Medium screen devices (768px - 1199px) */
 @media (max-width: 1199px) {
     .replay-container {
         grid-template-columns: 1fr;
@@ -51,7 +51,7 @@
     }
 }
 
-/* 平板设备 (768px - 1023px) */
+/* Tablet devices (768px - 1023px) */
 @media (max-width: 1023px) {
     .header .container {
         flex-direction: column;
@@ -132,7 +132,7 @@
     }
 }
 
-/* 手机设备 (320px - 767px) */
+/* Mobile devices (320px - 767px) */
 @media (max-width: 767px) {
     .container {
         padding: 0 15px;
@@ -353,7 +353,7 @@
     }
 }
 
-/* 超小屏幕设备 (320px 及以下) */
+/* Ultra-small screen devices (320px and below) */
 @media (max-width: 320px) {
     .container {
         padding: 0 10px;
@@ -430,7 +430,7 @@
     }
 }
 
-/* 横屏手机设备 */
+/* Landscape mobile devices */
 @media (max-width: 767px) and (orientation: landscape) {
     .score-display {
         flex-direction: row;
@@ -472,7 +472,7 @@
     }
 }
 
-/* 高分辨率设备 */
+/* High resolution devices */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
     .logo-icon {
         transform: scale(0.9);
@@ -491,7 +491,7 @@
     }
 }
 
-/* 深色模式支持 */
+/* Dark mode support */
 @media (prefers-color-scheme: dark) {
     .tab-content {
         background: rgba(30, 30, 30, 0.95);
@@ -524,7 +524,7 @@
     }
 }
 
-/* 打印样式 */
+/* Print styles */
 @media print {
     body {
         background: white !important;
@@ -566,7 +566,7 @@
     }
 }
 
-/* 可访问性增强 */
+/* Accessibility enhancements */
 @media (prefers-reduced-motion: reduce) {
     * {
         animation-duration: 0.01ms !important;
@@ -579,7 +579,7 @@
     }
 }
 
-/* 焦点可见性 */
+/* Focus visibility */
 @media (prefers-reduced-motion: no-preference) {
     .btn:focus,
     .nav-btn:focus,
@@ -590,7 +590,7 @@
     }
 }
 
-/* 高对比度模式 */
+/* High contrast mode */
 @media (prefers-contrast: high) {
     .btn {
         border: 2px solid currentColor;

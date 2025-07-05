@@ -521,22 +521,22 @@ class HardwareConnection {
     }
 }
 
-// 初始化游戏控制管理器
+// Initialize game control manager
 document.addEventListener('DOMContentLoaded', () => {
     window.gameControlManager = new GameControlManager();
     window.hardwareConnection = new HardwareConnection();
     
-    // 添加键盘事件监听
+    // Add keyboard event listeners
     document.addEventListener('keydown', (e) => {
         window.gameControlManager.handleKeyboardShortcuts(e);
     });
     
-    // 页面加载完成后尝试自动加载保存的游戏
+    // Try to auto-load saved game after page loads
     setTimeout(() => {
         window.gameControlManager.autoLoadGame();
     }, 1000);
     
-    // 定期自动保存（每30秒）
+    // Periodic auto-save (every 30 seconds)
     setInterval(() => {
         if (window.smartCourtApp && window.smartCourtApp.gameState.status === 'playing') {
             window.gameControlManager.autoSaveGame();

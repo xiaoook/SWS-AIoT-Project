@@ -35,7 +35,7 @@ class ExportManager {
         try {
             const gameData = this.getGameData();
             if (!gameData) {
-                window.smartCourtApp.showMessage('没有可导出的数据', 'error');
+                window.smartCourtApp.showMessage('No data available to export', 'error');
                 return;
             }
             
@@ -215,50 +215,50 @@ class ExportManager {
         try {
             const gameData = this.getGameData();
             if (!gameData) {
-                window.smartCourtApp.showMessage('没有可导出的数据', 'error');
+                window.smartCourtApp.showMessage('No data available to export', 'error');
                 return;
             }
             
             // Create workbook
             const workbook = XLSX.utils.book_new();
             
-            // 添加比赛概要表
+            // Add match summary sheet
             this.addExcelSummarySheet(workbook, gameData);
             
-            // 添加回合详情表
+            // Add rounds details sheet
             this.addExcelRoundsSheet(workbook, gameData);
             
-            // 添加统计分析表
+            // Add statistical analysis sheet
             this.addExcelStatsSheet(workbook, gameData);
             
-            // 导出文件
+            // Export file
             const fileName = `SmartCourt_Data_${new Date().toISOString().split('T')[0]}.xlsx`;
             XLSX.writeFile(workbook, fileName);
             
-            window.smartCourtApp.showMessage('Excel数据已导出', 'success');
+            window.smartCourtApp.showMessage('Excel data exported successfully', 'success');
             
         } catch (error) {
-            console.error('Excel导出失败:', error);
-            window.smartCourtApp.showMessage('Excel导出失败', 'error');
+            console.error('Excel export failed:', error);
+            window.smartCourtApp.showMessage('Excel export failed', 'error');
         }
     }
     
     addExcelSummarySheet(workbook, gameData) {
         const summaryData = [
-            ['项目', '值'],
-            ['比赛状态', this.getStatusText(gameData.status)],
-            ['比赛时长', this.formatDuration(gameData.elapsedTime)],
-            ['总回合数', gameData.rounds.length],
-            ['玩家A得分', gameData.scores.playerA],
-            ['玩家B得分', gameData.scores.playerB],
-            ['获胜者', gameData.scores.playerA > gameData.scores.playerB ? '玩家A' : 
-                     gameData.scores.playerB > gameData.scores.playerA ? '玩家B' : '平局'],
-            ['开始时间', gameData.startTime ? new Date(gameData.startTime).toLocaleString('zh-CN') : ''],
-            ['结束时间', gameData.endTime ? new Date(gameData.endTime).toLocaleString('zh-CN') : '']
+            ['Item', 'Value'],
+            ['Match Status', this.getStatusText(gameData.status)],
+            ['Match Duration', this.formatDuration(gameData.elapsedTime)],
+            ['Total Rounds', gameData.rounds.length],
+            ['Player A Score', gameData.scores.playerA],
+            ['Player B Score', gameData.scores.playerB],
+            ['Winner', gameData.scores.playerA > gameData.scores.playerB ? 'Player A' : 
+                     gameData.scores.playerB > gameData.scores.playerA ? 'Player B' : 'Tie'],
+            ['Start Time', gameData.startTime ? new Date(gameData.startTime).toLocaleString('en-US') : ''],
+            ['End Time', gameData.endTime ? new Date(gameData.endTime).toLocaleString('en-US') : '']
         ];
         
         const worksheet = XLSX.utils.aoa_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(workbook, worksheet, '比赛概要');
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Match Summary');
     }
     
     addExcelRoundsSheet(workbook, gameData) {
@@ -382,11 +382,11 @@ class ExportManager {
     
     getErrorSuggestion(error) {
         const suggestions = {
-            '反应迟缓': 'Recommend more reaction speed training, consider using a metronome or reaction lights for practice.',
-            '防守失误': 'Need to improve defensive positioning, suggest watching defense technique videos and specialized practice.',
-            '攻击角度不佳': 'Practice different attack angles to improve diversity and accuracy of attacks.',
-            '注意力分散': 'Recommend strengthening focus exercises in training, try meditation or attention training.',
-            '技术动作不标准': 'Focus on practicing basic technical movements, suggest correction under coach guidance.'
+            'Slow reaction': 'Recommend more reaction speed training, consider using a metronome or reaction lights for practice.',
+            'Defensive errors': 'Need to improve defensive positioning, suggest watching defense technique videos and specialized practice.',
+            'Poor attack angle': 'Practice different attack angles to improve diversity and accuracy of attacks.',
+            'Attention distraction': 'Recommend strengthening focus exercises in training, try meditation or attention training.',
+            'Non-standard technical actions': 'Focus on practicing basic technical movements, suggest correction under coach guidance.'
         };
         
         return suggestions[error] || 'Recommend specialized training for this issue.';

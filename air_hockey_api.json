@@ -1,0 +1,916 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Air_Hockey Assistant API",
+    "description": "Smart Air Hockey Training System API Documentation",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Air Hockey Assistant",
+      "email": "support@airhockeyassistant.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080/api/v1",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.airhockeyassistant.com/v1",
+      "description": "Production server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Game Control",
+      "description": "Game session management"
+    },
+    {
+      "name": "Scoring",
+      "description": "Score management and tracking"
+    },
+    {
+      "name": "Analysis",
+      "description": "Round analysis and AI feedback"
+    },
+    {
+      "name": "Replay",
+      "description": "Video replay management"
+    },
+    {
+      "name": "Reports",
+      "description": "Match reports and export"
+    }
+  ],
+  "paths": {
+    "/games": {
+      "post": {
+        "tags": ["Game Control"],
+        "summary": "Start a new game",
+        "description": "Initialize a new air hockey game session",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Game created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Game"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid game configuration"
+          }
+        }
+      },
+      "get": {
+        "tags": ["Game Control"],
+        "summary": "Get all games",
+        "description": "Retrieve a list of all game sessions",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by game status",
+            "schema": {
+              "type": "string",
+              "enum": ["idle", "playing", "paused", "ended"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of games to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of games",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Game"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/games/{gameId}": {
+      "get": {
+        "tags": ["Game Control"],
+        "summary": "Get game by ID",
+        "description": "Retrieve details of a specific game",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "description": "Unique game identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Game details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Game"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Game Control"],
+        "summary": "Update game status",
+        "description": "Pause, resume, or end a game",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": ["pause", "resume", "end"]
+                  }
+                },
+                "required": ["action"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Game status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Game"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid action"
+          },
+          "404": {
+            "description": "Game not found"
+          }
+        }
+      }
+    },
+    "/games/{gameId}/score": {
+      "post": {
+        "tags": ["Scoring"],
+        "summary": "Add score",
+        "description": "Record a score for a player",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreEvent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Score recorded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Round"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid score data"
+          },
+          "404": {
+            "description": "Game not found"
+          }
+        }
+      }
+    },
+    "/games/{gameId}/rounds": {
+      "get": {
+        "tags": ["Analysis"],
+        "summary": "Get game rounds",
+        "description": "Retrieve all rounds for a specific game",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "winner",
+            "in": "query",
+            "description": "Filter by round winner",
+            "schema": {
+              "type": "string",
+              "enum": ["playerA", "playerB"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of rounds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Round"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found"
+          }
+        }
+      }
+    },
+    "/games/{gameId}/rounds/{roundId}/analysis": {
+      "get": {
+        "tags": ["Analysis"],
+        "summary": "Get round analysis",
+        "description": "Retrieve AI analysis for a specific round",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Round analysis details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Analysis"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Round not found"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Analysis"],
+        "summary": "Create round analysis",
+        "description": "Generate AI analysis for a round",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Analysis created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Analysis"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid analysis data"
+          }
+        }
+      }
+    },
+    "/games/{gameId}/replay": {
+      "get": {
+        "tags": ["Replay"],
+        "summary": "Get replay data",
+        "description": "Retrieve replay information for a game",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Replay data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found"
+          }
+        }
+      }
+    },
+    "/games/{gameId}/replay/{roundId}/video": {
+      "get": {
+        "tags": ["Replay"],
+        "summary": "Get round video",
+        "description": "Stream video for a specific round",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video stream",
+            "content": {
+              "video/mp4": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video not found"
+          }
+        }
+      }
+    },
+    "/games/{gameId}/report": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Get match report",
+        "description": "Generate comprehensive match report",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Report format",
+            "schema": {
+              "type": "string",
+              "enum": ["json", "pdf", "excel"],
+              "default": "json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Match report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchReport"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found"
+          }
+        }
+      }
+    },
+    "/games/{gameId}/export": {
+      "post": {
+        "tags": ["Reports"],
+        "summary": "Export game data",
+        "description": "Export game data in various formats",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Export successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid export parameters"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GameConfig": {
+        "type": "object",
+        "properties": {
+          "playerA": {
+            "type": "string",
+            "description": "Player A name"
+          },
+          "playerB": {
+            "type": "string",
+            "description": "Player B name"
+          },
+          "maxScore": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10,
+            "description": "Maximum score to win"
+          },
+          "timeLimit": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 3600,
+            "description": "Game time limit in seconds"
+          }
+        },
+        "required": ["playerA", "playerB"]
+      },
+      "Game": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique game identifier"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["idle", "playing", "paused", "ended"],
+            "description": "Current game status"
+          },
+          "playerA": {
+            "type": "string",
+            "description": "Player A name"
+          },
+          "playerB": {
+            "type": "string",
+            "description": "Player B name"
+          },
+          "scores": {
+            "$ref": "#/components/schemas/Scores"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Game start time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Game end time"
+          },
+          "elapsedTime": {
+            "type": "integer",
+            "description": "Total elapsed time in seconds"
+          },
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Round"
+            }
+          }
+        }
+      },
+      "Scores": {
+        "type": "object",
+        "properties": {
+          "playerA": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Player A score"
+          },
+          "playerB": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Player B score"
+          }
+        }
+      },
+      "ScoreEvent": {
+        "type": "object",
+        "properties": {
+          "player": {
+            "type": "string",
+            "enum": ["playerA", "playerB"],
+            "description": "Player who scored"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the score occurred"
+          },
+          "position": {
+            "$ref": "#/components/schemas/Position"
+          }
+        },
+        "required": ["player"]
+      },
+      "Position": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number",
+            "format": "float",
+            "description": "X coordinate"
+          },
+          "y": {
+            "type": "number",
+            "format": "float",
+            "description": "Y coordinate"
+          }
+        }
+      },
+      "Round": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Round number"
+          },
+          "winner": {
+            "type": "string",
+            "enum": ["playerA", "playerB"],
+            "description": "Round winner"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Round timestamp"
+          },
+          "playerAScore": {
+            "type": "integer",
+            "description": "Player A score after this round"
+          },
+          "playerBScore": {
+            "type": "integer",
+            "description": "Player B score after this round"
+          },
+          "analysis": {
+            "$ref": "#/components/schemas/Analysis"
+          }
+        }
+      },
+      "Analysis": {
+        "type": "object",
+        "properties": {
+          "feedback": {
+            "type": "string",
+            "description": "AI feedback message"
+          },
+          "errorType": {
+            "type": "string",
+            "enum": ["Slow reaction", "Defensive errors", "Poor attack angle", "Attention distraction", "Non-standard technical actions"],
+            "description": "Identified error type"
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Improvement suggestions"
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Technical score out of 10"
+          }
+        }
+      },
+      "AnalysisRequest": {
+        "type": "object",
+        "properties": {
+          "videoData": {
+            "type": "string",
+            "format": "base64",
+            "description": "Base64 encoded video data"
+          },
+          "sensorData": {
+            "type": "object",
+            "description": "Additional sensor data"
+          }
+        }
+      },
+      "ReplayData": {
+        "type": "object",
+        "properties": {
+          "gameId": {
+            "type": "string",
+            "description": "Game identifier"
+          },
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayRound"
+            }
+          }
+        }
+      },
+      "ReplayRound": {
+        "type": "object",
+        "properties": {
+          "roundId": {
+            "type": "integer",
+            "description": "Round number"
+          },
+          "videoUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Video URL for this round"
+          },
+          "duration": {
+            "type": "number",
+            "format": "float",
+            "description": "Video duration in seconds"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Thumbnail image URL"
+          }
+        }
+      },
+      "MatchReport": {
+        "type": "object",
+        "properties": {
+          "gameId": {
+            "type": "string",
+            "description": "Game identifier"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/GameSummary"
+          },
+          "statistics": {
+            "$ref": "#/components/schemas/GameStatistics"
+          },
+          "aiSuggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AISuggestion"
+            }
+          }
+        }
+      },
+      "GameSummary": {
+        "type": "object",
+        "properties": {
+          "winner": {
+            "type": "string",
+            "enum": ["playerA", "playerB", "tie"],
+            "description": "Game winner"
+          },
+          "finalScore": {
+            "$ref": "#/components/schemas/Scores"
+          },
+          "totalRounds": {
+            "type": "integer",
+            "description": "Total number of rounds"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Game duration in seconds"
+          }
+        }
+      },
+      "GameStatistics": {
+        "type": "object",
+        "properties": {
+          "averageRoundTime": {
+            "type": "number",
+            "format": "float",
+            "description": "Average time per round in seconds"
+          },
+          "errorBreakdown": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Count of each error type"
+          },
+          "winRate": {
+            "type": "object",
+            "properties": {
+              "playerA": {
+                "type": "number",
+                "format": "float",
+                "description": "Player A win rate percentage"
+              },
+              "playerB": {
+                "type": "number",
+                "format": "float",
+                "description": "Player B win rate percentage"
+              }
+            }
+          }
+        }
+      },
+      "AISuggestion": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Suggestion title"
+          },
+          "content": {
+            "type": "string",
+            "description": "Detailed suggestion"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Suggestion priority"
+          }
+        }
+      },
+      "ExportRequest": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": ["json", "csv", "pdf", "excel"],
+            "description": "Export format"
+          },
+          "includeAnalysis": {
+            "type": "boolean",
+            "default": true,
+            "description": "Include AI analysis in export"
+          },
+          "includeVideo": {
+            "type": "boolean",
+            "default": false,
+            "description": "Include video links in export"
+          }
+        },
+        "required": ["format"]
+      },
+      "ExportResponse": {
+        "type": "object",
+        "properties": {
+          "downloadUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Download URL for exported file"
+          },
+          "fileSize": {
+            "type": "integer",
+            "description": "File size in bytes"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Download link expiration time"
+          }
+        }
+      }
+    }
+  }
+} 
