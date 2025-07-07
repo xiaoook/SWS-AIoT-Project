@@ -63,8 +63,171 @@ class SmartCourtApp {
         this.updateScoreboard();
         this.updateTimer();
         
+        // Add sample loss analysis data for demonstration
+        this.generateSampleLossData();
+        
         // Simulate initial data
-        this.addLiveFeedItem('System startup complete, waiting for game to start...');
+        this.addLiveFeedItem('System startup complete, ready to begin!', 'success');
+    }
+    
+    generateSampleLossData() {
+        // Create sample rounds with loss analysis for demonstration
+        const sampleRounds = [
+            {
+                id: 1,
+                winner: 'playerB',
+                timestamp: new Date(Date.now() - 300000), // 5 minutes ago
+                playerAScore: 0,
+                playerBScore: 1,
+                analysis: {
+                    feedback: 'The defense was broken through due to poor positioning',
+                    errorType: 'Defensive errors',
+                    suggestions: ['Improve defensive positioning', 'Enhance ball trajectory prediction', 'Learn better defensive strategies']
+                }
+            },
+            {
+                id: 2,
+                winner: 'playerA',
+                timestamp: new Date(Date.now() - 240000), // 4 minutes ago
+                playerAScore: 1,
+                playerBScore: 1,
+                analysis: {
+                    feedback: 'Reaction speed was insufficient, failed to respond to opponent attacks',
+                    errorType: 'Slow reaction',
+                    suggestions: ['Strengthen reaction speed training', 'Improve movement footwork', 'Enhance ball control practice']
+                }
+            },
+            {
+                id: 3,
+                winner: 'playerB',
+                timestamp: new Date(Date.now() - 180000), // 3 minutes ago
+                playerAScore: 1,
+                playerBScore: 2,
+                analysis: {
+                    feedback: 'Attention was distracted, missed defensive timing',
+                    errorType: 'Attention distraction',
+                    suggestions: ['Strengthen concentration training', 'Strengthen mental pressure training', 'Establish match rhythm']
+                }
+            },
+            {
+                id: 4,
+                winner: 'playerA',
+                timestamp: new Date(Date.now() - 120000), // 2 minutes ago
+                playerAScore: 2,
+                playerBScore: 2,
+                analysis: {
+                    feedback: 'Technical execution was non-standard, affecting ball control',
+                    errorType: 'Non-standard technical actions',
+                    suggestions: ['Standardize technical movements', 'Return to basic practice', 'Seek coach guidance']
+                }
+            },
+            {
+                id: 5,
+                winner: 'playerB',
+                timestamp: new Date(Date.now() - 300000), // 5 minutes ago
+                playerAScore: 2,
+                playerBScore: 3,
+                analysis: {
+                    feedback: 'Movement speed was too slow, couldn\'t keep up with ball pace',
+                    errorType: 'Slow reaction',
+                    suggestions: ['Strengthen physical training', 'Improve movement speed', 'Enhance footwork techniques']
+                }
+            },
+            {
+                id: 6,
+                winner: 'playerA',
+                timestamp: new Date(Date.now() - 240000), // 4 minutes ago
+                playerAScore: 3,
+                playerBScore: 3,
+                analysis: {
+                    feedback: 'Good recovery after losing point',
+                    errorType: null,
+                    suggestions: ['Maintain momentum', 'Keep focused on positioning']
+                }
+            },
+            {
+                id: 7,
+                winner: 'playerA',
+                timestamp: new Date(Date.now() - 180000), // 3 minutes ago
+                playerAScore: 4,
+                playerBScore: 3,
+                analysis: {
+                    feedback: 'Excellent attack strategy under pressure',
+                    errorType: null,
+                    suggestions: ['Continue aggressive play', 'Watch for counter-attacks']
+                }
+            },
+            {
+                id: 8,
+                winner: 'playerB',
+                timestamp: new Date(Date.now() - 120000), // 2 minutes ago
+                playerAScore: 4,
+                playerBScore: 4,
+                analysis: {
+                    feedback: 'Ball control was compromised under pressure',
+                    errorType: 'Non-standard technical actions',
+                    suggestions: ['Focus on fundamental techniques', 'Maintain composure']
+                }
+            },
+            {
+                id: 9,
+                winner: 'playerA',
+                timestamp: new Date(Date.now() - 90000), // 1.5 minutes ago
+                playerAScore: 5,
+                playerBScore: 4,
+                analysis: {
+                    feedback: 'Decisive play in crucial moment',
+                    errorType: null,
+                    suggestions: ['Keep pressure on opponent', 'Stay alert for comeback']
+                }
+            },
+            {
+                id: 10,
+                winner: 'playerB',
+                timestamp: new Date(Date.now() - 45000), // 45 seconds ago
+                playerAScore: 5,
+                playerBScore: 5,
+                analysis: {
+                    feedback: 'Defensive lapse allowed opponent comeback',
+                    errorType: 'Defensive errors',
+                    suggestions: ['Strengthen defensive positioning', 'Maintain concentration']
+                }
+            },
+            {
+                id: 11,
+                winner: 'playerA',
+                timestamp: new Date(Date.now() - 10000), // 10 seconds ago
+                playerAScore: 6,
+                playerBScore: 5,
+                analysis: {
+                    feedback: 'Match point advantage! One point away from 7-point victory',
+                    errorType: null,
+                    suggestions: ['Stay calm under pressure', 'One more point to win!', 'Focus on next play']
+                }
+            }
+        ];
+        
+        // Add sample rounds to game state
+        this.gameState.rounds = sampleRounds;
+        this.gameState.currentRound = sampleRounds.length; // Now 11 rounds
+        this.gameState.scores = { playerA: 6, playerB: 5 }; // Close to 7-point target for demonstration
+        
+        // Set game status to ended if anyone has 7 points
+        if (this.gameState.scores.playerA >= 7 || this.gameState.scores.playerB >= 7) {
+            this.gameState.status = 'ended';
+            this.gameState.endTime = new Date();
+        }
+        
+        // Update analysis manager if available
+        if (window.analysisManager) {
+            setTimeout(() => {
+                window.analysisManager.rounds = [...sampleRounds];
+                window.analysisManager.displayRounds();
+            }, 1000);
+        }
+        
+        // Update scoreboard
+        this.updateScoreboard();
     }
     
     switchTab(tabName) {
@@ -227,9 +390,13 @@ class SmartCourtApp {
         this.stopTimer();
         this.updateGameStatus();
         
-        const winner = this.gameState.scores.playerA > this.gameState.scores.playerB ? 'A' : 'B';
-        this.addLiveFeedItem(`Match ended! Player ${winner} wins!`, 'score');
-        this.showMessage(`Match ended! Player ${winner} wins!`, 'success');
+        const winner = this.gameState.scores.playerA >= 7 ? 'A' : 
+                      this.gameState.scores.playerB >= 7 ? 'B' : 
+                      this.gameState.scores.playerA > this.gameState.scores.playerB ? 'A' : 'B';
+        
+        const finalScore = `${this.gameState.scores.playerA}-${this.gameState.scores.playerB}`;
+        this.addLiveFeedItem(`🏆 MATCH ENDED! Player ${winner} wins ${finalScore}!`, 'score');
+        this.showMessage(`🏆 Player ${winner} wins ${finalScore}! Target: 7 points`, 'success');
         
         // Generate final report
         if (window.reportManager) {
@@ -239,6 +406,11 @@ class SmartCourtApp {
     
     addScore(player) {
         if (this.gameState.status !== 'playing') return;
+        
+        // Check if game should end before adding score
+        if (this.gameState.scores.playerA >= 7 || this.gameState.scores.playerB >= 7) {
+            return; // Game already ended, don't add more scores
+        }
         
         this.gameState.scores[player]++;
         this.gameState.currentRound++;
@@ -256,47 +428,72 @@ class SmartCourtApp {
         this.gameState.rounds.push(round);
         
         this.updateScoreboard();
-        this.addLiveFeedItem(`Player ${player.slice(-1)} scored! Current score: ${this.gameState.scores.playerA} - ${this.gameState.scores.playerB}`, 'score');
+        
+        // Check if someone wins with this score
+        if (this.gameState.scores.playerA >= 7 || this.gameState.scores.playerB >= 7) {
+            const winner = this.gameState.scores.playerA >= 7 ? 'A' : 'B';
+            this.addLiveFeedItem(`Player ${player.slice(-1)} scored! GAME OVER! Player ${winner} wins 7-${this.gameState.scores.playerA >= 7 ? this.gameState.scores.playerB : this.gameState.scores.playerA}!`, 'score');
+            setTimeout(() => this.endGame(), 1000);
+        } else {
+            this.addLiveFeedItem(`Player ${player.slice(-1)} scored! Current score: ${this.gameState.scores.playerA} - ${this.gameState.scores.playerB}`, 'score');
+        }
         
         // Update analysis
         if (window.analysisManager) {
             window.analysisManager.addRound(round);
         }
-        
-        // Check if end condition is met
-        if (this.gameState.scores.playerA >= 10 || this.gameState.scores.playerB >= 10) {
-            setTimeout(() => this.endGame(), 1000);
-        }
     }
     
     generateAIAnalysis() {
-        const analysisTypes = [
-            'Excellent reaction speed',
-            'Defensive positioning needs improvement',
-            'Good attack angle',
-            'Need to improve focus',
-            'Standard technical actions',
-            'Good tactical application'
+        const lossAnalysisTypes = [
+            'The defense was broken through due to poor positioning',
+            'Reaction speed was insufficient, failed to respond to opponent attacks',
+            'Attack angle was poorly chosen, easily countered by opponent',
+            'Attention was distracted, missed defensive timing',
+            'Technical execution was non-standard, affecting ball control',
+            'Defensive strategy was inappropriate, left gaps for opponent',
+            'Ball prediction was inaccurate, leading to passive defense',
+            'Movement speed was too slow, couldn\'t keep up with ball pace'
         ];
         
         const errorTypes = [
             'Slow reaction',
-            'Defensive errors',
+            'Defensive errors', 
             'Poor attack angle',
             'Attention distraction',
             'Non-standard technical actions'
         ];
         
+        const lossPreventionSuggestions = [
+            'Strengthen reaction speed training',
+            'Improve defensive positioning',
+            'Enhance ball trajectory prediction',
+            'Strengthen concentration training',
+            'Standardize technical movements',
+            'Improve movement footwork',
+            'Enhance ball control practice',
+            'Learn better defensive strategies',
+            'Improve body coordination',
+            'Strengthen mental pressure training'
+        ];
+        
+                    // 70% probability of generating loss analysis with error type
+        const hasError = Math.random() > 0.3;
+        
         return {
-            feedback: analysisTypes[Math.floor(Math.random() * analysisTypes.length)],
-            errorType: Math.random() > 0.7 ? errorTypes[Math.floor(Math.random() * errorTypes.length)] : null,
-            suggestions: [
-                'Maintain good body balance',
-                'Improve reaction speed',
-                'Watch defensive positioning',
-                'Strengthen attack accuracy'
-            ].slice(0, Math.floor(Math.random() * 3) + 1)
+            feedback: lossAnalysisTypes[Math.floor(Math.random() * lossAnalysisTypes.length)],
+            errorType: hasError ? errorTypes[Math.floor(Math.random() * errorTypes.length)] : null,
+            suggestions: this.shuffleArray(lossPreventionSuggestions).slice(0, Math.floor(Math.random() * 3) + 2)
         };
+    }
+    
+    shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
     }
     
     simulateGameplay() {
@@ -309,12 +506,20 @@ class SmartCourtApp {
                 return;
             }
             
+            // Check if game should end (7 points reached)
+            if (this.gameState.scores.playerA >= 7 || this.gameState.scores.playerB >= 7) {
+                clearInterval(scoreInterval);
+                return;
+            }
+            
             // Randomly select scoring player
             const player = Math.random() > 0.5 ? 'playerA' : 'playerB';
             this.addScore(player);
             
             // Stop simulation if match ends
-            if (this.gameState.status === 'ended') {
+            if (this.gameState.status === 'ended' || 
+                this.gameState.scores.playerA >= 7 || 
+                this.gameState.scores.playerB >= 7) {
                 clearInterval(scoreInterval);
             }
         }, 3000 + Math.random() * 4000); // 3-7 second random interval
@@ -376,8 +581,29 @@ class SmartCourtApp {
         
         const feedItem = document.createElement('div');
         feedItem.className = `feed-item ${type}`;
+        
+        // Add appropriate icon based on type
+        const icons = {
+            'score': '⚽',
+            'info': 'ℹ️',
+            'error': '❌',
+            'success': '✅'
+        };
+        
+        const icon = icons[type] || 'ℹ️';
+        const time = new Date().toLocaleTimeString('en-US', { 
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        
         feedItem.innerHTML = `
-            <strong>${new Date().toLocaleTimeString()}</strong> - ${message}
+            <div class="feed-item-icon">${icon}</div>
+            <div class="feed-item-content">
+                <div class="feed-item-time">${time}</div>
+                <div class="feed-item-message">${message}</div>
+            </div>
         `;
         
         // Add to top of container
@@ -385,7 +611,7 @@ class SmartCourtApp {
         
         // Limit display count
         const items = feedContainer.querySelectorAll('.feed-item');
-        if (items.length > 20) {
+        if (items.length > 12) {
             items[items.length - 1].remove();
         }
     }
@@ -431,7 +657,8 @@ class SmartCourtApp {
         // Clear live feed
         const feedContainer = document.getElementById('liveFeed');
         if (feedContainer) {
-            feedContainer.innerHTML = '<div class="feed-item">Waiting for game to start...</div>';
+            feedContainer.innerHTML = '';
+            this.addLiveFeedItem('System ready. Waiting for game to start...', 'info');
         }
         
         this.showMessage('Game has been reset', 'success');
@@ -471,4 +698,6 @@ class SmartCourtApp {
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
     window.smartCourtApp = new SmartCourtApp();
-}); 
+});
+
+/* Cache breaker - English Loss Analysis Update: 2025-07-07 03:25 */ 

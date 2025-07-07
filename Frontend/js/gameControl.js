@@ -228,7 +228,7 @@ class GameControlManager {
     // Set game parameters
     setGameParameters(params) {
         this.gameParams = {
-            maxScore: params.maxScore || 10,
+            maxScore: params.maxScore || 7,
             timeLimit: params.timeLimit || null,
             autoPlay: params.autoPlay || false,
             difficulty: params.difficulty || 'normal'

@@ -115,7 +115,7 @@ All dependencies are automatically loaded via CDN, no manual installation requir
 - **Base Score**: Starting from 7 points
 - **Bonus Points**: Excellent performance (+2), Good performance (+1), Standard actions (+1)
 - **Penalty Points**: Error types present (-1)
-- **Final Score**: Range from 1-10 points
+- **Final Score**: Range from 1-7 points (first to reach 7 points wins)
 
 ### Error Type Analysis
 - **Slow Reaction**: Detect reaction speed issues

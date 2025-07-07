@@ -69,7 +69,13 @@
                     <div class="live-feed">
                         <h3>Live Match Feed</h3>
                         <div id="liveFeed" class="feed-container">
-                            <div class="feed-item">Waiting for game to start...</div>
+                            <div class="feed-item info">
+                                <div class="feed-item-icon">ℹ️</div>
+                                <div class="feed-item-content">
+                                    <div class="feed-item-time">--:--:--</div>
+                                    <div class="feed-item-message">Waiting for game to start...</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -80,15 +86,25 @@
                 <div class="container">
                     <h2>Round by Round Analysis</h2>
                     <div class="analysis-controls">
-                        <div class="filter-controls">
-                            <button class="filter-btn active" data-filter="all">All Rounds</button>
-                            <button class="filter-btn" data-filter="playerA">Player A Scores</button>
-                            <button class="filter-btn" data-filter="playerB">Player B Scores</button>
+                        <div class="analysis-toolbar">
+                            <div class="filter-controls">
+                                <button class="filter-btn active" data-filter="all">All Rounds</button>
+                                <button class="filter-btn" data-filter="playerA">Player A Losses</button>
+                                <button class="filter-btn" data-filter="playerB">Player B Losses</button>
+                            </div>
+                            <div class="view-controls">
+                                <button class="view-btn active" data-view="cards">🎯 Detailed Cards</button>
+                                <button class="view-btn" data-view="compact">📋 Compact List</button>
+                                <button class="view-btn" data-view="table">📊 Data Table</button>
+                                <button class="view-btn" data-view="summary">📈 Statistics</button>
+                            </div>
                         </div>
                     </div>
                     
-                    <div id="pointBreakdown" class="point-breakdown">
-                        <div class="no-data">No match data available</div>
+                    <div class="analysis-container">
+                        <div id="pointBreakdown" class="point-breakdown">
+                            <div class="no-data">No match data available</div>
+                        </div>
                     </div>
                 </div>
             </section>
