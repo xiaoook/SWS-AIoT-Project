@@ -422,3 +422,6 @@ FodyWeavers.xsd
 
 # IDEA
 .idea/
+
+# SQL
+*.db-journal
