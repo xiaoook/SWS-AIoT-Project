@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air_Hockey Assistant</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/responsive.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="container">
+                <h1 class="logo">
+                    <span class="logo-icon">🏒</span>
+                    Air Hockey Assistant
+                </h1>
+                <nav class="nav">
+                    <button class="nav-btn" data-tab="game">Game Control</button>
+                    <button class="nav-btn" data-tab="analysis">Round Analysis</button>
+                    <button class="nav-btn" data-tab="replay">Video Replay</button>
+                    <button class="nav-btn" data-tab="report">Match Report</button>
+                </nav>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- Game Control Panel -->
+            <section id="game-tab" class="tab-content active">
+                <div class="container">
+                    <div class="game-control">
+                        <h2>Game Control Panel</h2>
+                        <div class="control-panel">
+                            <button id="startGame" class="btn btn-primary">Start Game</button>
+                            <button id="pauseGame" class="btn btn-secondary" disabled>Pause Game</button>
+                            <button id="endGame" class="btn btn-danger" disabled>End Game</button>
+                        </div>
+                        
+                        <div class="game-status">
+                            <div class="status-indicator">
+                                <span class="status-label">Game Status:</span>
+                                <span id="gameStatus" class="status-value">Not Started</span>
+                            </div>
+                            <div class="timer">
+                                <span class="timer-label">Game Time:</span>
+                                <span id="gameTimer" class="timer-value">00:00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="scoreboard">
+                        <h3>Live Score</h3>
+                        <div class="score-display">
+                            <div class="player-score">
+                                <div class="player-name">Player A</div>
+                                <div class="score" id="scoreA">0</div>
+                            </div>
+                            <div class="vs">VS</div>
+                            <div class="player-score">
+                                <div class="player-name">Player B</div>
+                                <div class="score" id="scoreB">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="live-feed">
+                        <h3>Live Match Feed</h3>
+                        <div id="liveFeed" class="feed-container">
+                            <div class="feed-item info">
+                                <div class="feed-item-icon">ℹ️</div>
+                                <div class="feed-item-content">
+                                    <div class="feed-item-time">--:--:--</div>
+                                    <div class="feed-item-message">Waiting for game to start...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Round Analysis -->
+            <section id="analysis-tab" class="tab-content">
+                <div class="container">
+                    <h2>Round by Round Analysis</h2>
+                    <div class="analysis-controls">
+                        <div class="analysis-toolbar">
+                            <div class="filter-controls">
+                                <button class="filter-btn active" data-filter="all">All Rounds</button>
+                                <button class="filter-btn" data-filter="playerA">Player A Losses</button>
+                                <button class="filter-btn" data-filter="playerB">Player B Losses</button>
+                            </div>
+                            <div class="view-controls">
+                                <button class="view-btn active" data-view="cards">🎯 Detailed Cards</button>
+                                <button class="view-btn" data-view="compact">📋 Compact List</button>
+                                <button class="view-btn" data-view="table">📊 Data Table</button>
+                                <button class="view-btn" data-view="summary">📈 Statistics</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-container">
+                        <div id="pointBreakdown" class="point-breakdown">
+                            <div class="no-data">No match data available</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Video Replay -->
+            <section id="replay-tab" class="tab-content">
+                <div class="container">
+                    <h2>Video Replay & AI Analysis</h2>
+                    <div class="replay-container">
+                        <div class="video-section">
+                            <video id="replayVideo" class="video-player" controls>
+                                <source src="placeholder-video.mp4" type="video/mp4">
+                                Your browser does not support video playback.
+                            </video>
+                        </div>
+                        
+                        <div class="ai-feedback-section">
+                            <h3>AI Analysis Feedback</h3>
+                            <div id="aiFeedback" class="ai-feedback">
+                                <div class="feedback-item">
+                                    <div class="feedback-header">
+                                        <span class="round-number">Select a round to view AI analysis</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="replay-controls">
+                        <h3>Select Round</h3>
+                        <div id="roundSelector" class="round-selector">
+                            <div class="no-rounds">No round data available</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Match Report -->
+            <section id="report-tab" class="tab-content">
+                <div class="container">
+                    <h2>Match Summary Report</h2>
+                    <div class="report-container">
+                        <div class="report-header">
+                            <h3>Match Overview</h3>
+                            <div class="export-controls">
+                                <button id="exportPDF" class="btn btn-export">Export PDF</button>
+                                <button id="exportExcel" class="btn btn-export">Export Excel</button>
+                            </div>
+                        </div>
+
+                        <div class="report-content">
+                            <div class="report-section">
+                                <h4>Final Score</h4>
+                                <div id="finalScore" class="final-score">
+                                    <div class="score-item">
+                                        <span class="player">Player A:</span>
+                                        <span class="score">0</span>
+                                    </div>
+                                    <div class="score-item">
+                                        <span class="player">Player B:</span>
+                                        <span class="score">0</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="report-section">
+                                <h4>Error Statistics</h4>
+                                <div class="chart-container">
+                                    <canvas id="errorChart"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="report-section">
+                                <h4>AI Improvement Suggestions</h4>
+                                <div id="aiSuggestions" class="ai-suggestions">
+                                    <div class="suggestion-item">Complete a match to see AI analysis suggestions</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2024 Air_Hockey Assistant. Smart Air Hockey Training System.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/gameControl.js"></script>
+    <script src="js/analysis.js"></script>
+    <script src="js/replay.js"></script>
+    <script src="js/report.js"></script>
+    <script src="js/export.js"></script>
+</body>
+</html> 
