@@ -1,31 +1,30 @@
-// Round Analysis Manager
+// Game Analysis Manager
 class AnalysisManager {
     constructor() {
-        this.rounds = [];
-        this.currentFilter = 'all';
-        this.currentView = 'cards';
+        this.games = [];
+        this.currentGame = null;
+        this.currentMode = 'rounds'; // 简化为单一模式设置
         this.expandedRounds = new Set();
+        this.roundFilters = {
+            player: 'all',    // 'all', 'playerA', 'playerB'
+            result: 'all',    // 'all', 'wins', 'losses'
+            errorType: 'all'  // 'all', specific error types
+        };
         
         this.init();
     }
     
     init() {
         this.setupEventListeners();
+        this.createGameSelector();
         this.refreshAnalysis();
     }
     
     setupEventListeners() {
-        // Filter button events
-        document.querySelectorAll('.filter-btn').forEach(btn => {
+        // 简化的模式按钮事件
+        document.querySelectorAll('.mode-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                this.setFilter(e.target.dataset.filter);
-            });
-        });
-        
-        // View button events
-        document.querySelectorAll('.view-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.setView(e.target.dataset.view);
+                this.setMode(e.currentTarget.dataset.mode);
             });
         });
         
@@ -35,94 +34,280 @@ class AnalysisManager {
         });
     }
     
-    setFilter(filter) {
-        this.currentFilter = filter;
+    createGameSelector() {
+        // Find analysis toolbar and add game selector
+        const toolbar = document.querySelector('.analysis-toolbar');
+        if (!toolbar) return;
         
-        // Update filter button states
-        document.querySelectorAll('.filter-btn').forEach(btn => {
+        // Create game selector section
+        const gameSelectorHTML = `
+            <div class="game-selector-section">
+                <label class="selector-label">Select Game for Analysis:</label>
+                <select id="gameSelector" class="game-selector">
+                    <option value="">Choose a game...</option>
+                </select>
+                <button id="analyzeGameBtn" class="btn btn-primary" disabled>Analyze Game</button>
+            </div>
+        `;
+        
+        // Insert at the beginning of toolbar
+        toolbar.insertAdjacentHTML('afterbegin', gameSelectorHTML);
+        
+        // Add event listeners
+        const selector = document.getElementById('gameSelector');
+        const analyzeBtn = document.getElementById('analyzeGameBtn');
+        
+        selector.addEventListener('change', (e) => {
+            analyzeBtn.disabled = !e.target.value;
+        });
+        
+        analyzeBtn.addEventListener('click', () => {
+            const selectedGameId = selector.value;
+            if (selectedGameId) {
+                this.loadGameAnalysis(selectedGameId);
+            }
+        });
+    }
+    
+    setMode(mode) {
+        this.currentMode = mode;
+        
+        // Update mode button states
+        document.querySelectorAll('.mode-btn').forEach(btn => {
             btn.classList.remove('active');
-            if (btn.dataset.filter === filter) {
+            if (btn.dataset.mode === mode) {
                 btn.classList.add('active');
             }
         });
         
-        this.displayRounds();
+        this.displayGameAnalysis();
+    }
+    
+    // 保留旧方法为了兼容性，但重定向到新的setMode
+    setFilter(filter) {
+        // 映射旧的filter到新的mode
+        const filterToModeMap = {
+            'round-by-round': 'rounds',
+            'playerA': 'rounds', // 简化为rounds模式
+            'playerB': 'rounds', // 简化为rounds模式
+            'comparison': 'comparison'
+        };
+        
+        this.setMode(filterToModeMap[filter] || 'rounds');
     }
     
     setView(view) {
-        this.currentView = view;
+        // 映射旧的view到新的mode
+        const viewToModeMap = {
+            'timeline': 'rounds',
+            'detailed': 'detailed',
+            'summary': 'comparison' // 简化为comparison模式
+        };
         
-        // Update view button states
-        document.querySelectorAll('.view-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.view === view) {
-                btn.classList.add('active');
-            }
-        });
-        
-        this.displayRounds();
+        this.setMode(viewToModeMap[view] || 'rounds');
     }
     
     refreshAnalysis() {
-        if (window.smartCourtApp && window.smartCourtApp.gameState) {
-            this.rounds = [...window.smartCourtApp.gameState.rounds];
-            this.displayRounds();
+        if (window.smartCourtApp) {
+            // Get all games from history
+            this.games = window.smartCourtApp.getGamesHistory();
+            this.populateGameSelector();
+            
+            // If no current game selected, show current game if available
+            if (!this.currentGame && window.smartCourtApp.currentGameId) {
+                this.loadGameAnalysis(window.smartCourtApp.currentGameId);
+            } else if (!this.currentGame && this.games.length > 0) {
+                // Default to most recent game
+                this.loadGameAnalysis(this.games[this.games.length - 1].gameId);
+            } else {
+                this.displayRounds();
+            }
         }
     }
     
-    addRound(round) {
-        this.rounds.push(round);
-        this.displayRounds();
+    populateGameSelector() {
+        const selector = document.getElementById('gameSelector');
+        if (!selector || this.games.length === 0) return;
+        
+        // Clear existing options except the first one
+        selector.innerHTML = '<option value="">Choose a game...</option>';
+        
+        // Sort games by start time (newest first)
+        const sortedGames = [...this.games].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+        
+        sortedGames.forEach(game => {
+            const option = document.createElement('option');
+            option.value = game.gameId;
+            const startTime = new Date(game.startTime).toLocaleString();
+            const status = game.status === 'ended' ? '✓' : '🔴';
+            const winner = game.winner ? ` (${game.winner.slice(-1)} wins)` : '';
+            option.textContent = `${status} ${game.gameId} - ${game.gameType} - ${startTime}${winner}`;
+            selector.appendChild(option);
+        });
     }
     
-    displayRounds() {
+    loadGameAnalysis(gameId) {
+        const game = this.games.find(g => g.gameId === gameId);
+        if (!game) return;
+        
+        this.currentGame = game;
+        
+        // Update selector
+        const selector = document.getElementById('gameSelector');
+        if (selector) {
+            selector.value = gameId;
+        }
+        
+        // Update button state
+        const analyzeBtn = document.getElementById('analyzeGameBtn');
+        if (analyzeBtn) {
+            analyzeBtn.disabled = false;
+        }
+        
+        this.displayGameAnalysis();
+    }
+    
+    addRound(round) {
+        // This method is now deprecated in favor of game-level analysis
+        this.refreshAnalysis();
+    }
+    
+    displayGameAnalysis() {
+        if (!this.currentGame) {
+            this.displayNoGameMessage();
+            return;
+        }
+        
         const container = document.getElementById('pointBreakdown');
         if (!container) return;
         
-        const filteredRounds = this.getFilteredRounds();
+        // Add game header
+        const gameHeaderHTML = this.createGameHeaderHTML();
         
-        if (filteredRounds.length === 0) {
-            container.innerHTML = '<div class="no-data">No match data available</div>';
+        const gameRounds = this.currentGame.rounds || [];
+        
+        if (gameRounds.length === 0) {
+            container.innerHTML = gameHeaderHTML + '<div class="no-data">No round data available for this game</div>';
             return;
         }
         
         let roundsHTML;
-        switch(this.currentView) {
-            case 'compact':
-                roundsHTML = this.createCompactView(filteredRounds);
+        
+        // 根据当前模式显示不同的视图
+        switch(this.currentMode) {
+            case 'rounds':
+                // 回合分析：显示简洁的时间线视图
+                roundsHTML = this.createTimelineView(gameRounds);
                 break;
-            case 'table':
-                roundsHTML = this.createTableView(filteredRounds);
+            case 'detailed':
+                // 详细分析：显示深度分析视图
+                roundsHTML = this.createSummaryView(gameRounds);
                 break;
-            case 'summary':
-                roundsHTML = this.createSummaryView(filteredRounds);
+            case 'comparison':
+                // 选手对比：显示A vs B对比视图
+                roundsHTML = this.createComparisonStatisticsView(gameRounds);
                 break;
-            default: // cards
-                roundsHTML = filteredRounds.map(round => this.createRoundHTML(round)).join('');
+            default:
+                roundsHTML = this.createTimelineView(gameRounds);
                 break;
         }
         
-        container.innerHTML = roundsHTML;
+        container.innerHTML = gameHeaderHTML + roundsHTML;
         
-        // Add click events only for card view
-        if (this.currentView === 'cards') {
-        this.addRoundClickEvents();
-        } else if (this.currentView === 'compact') {
-            this.addCompactClickEvents();
+        // Add click events for all views
+        this.addAllViewClickEvents();
+    }
+    
+    displayRounds() {
+        // Redirect to game analysis
+        this.displayGameAnalysis();
+    }
+    
+    displayNoGameMessage() {
+        const container = document.getElementById('pointBreakdown');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="no-game-selected">
+                <div class="no-game-icon">🎮</div>
+                <h3>No Game Selected</h3>
+                <p>Please select a game from the dropdown above to view detailed round analysis.</p>
+                ${this.games.length === 0 ? 
+                    '<p><em>No games available. Start a new game to begin analysis.</em></p>' : 
+                    '<p><em>Choose from available games in the selector.</em></p>'
+                }
+            </div>
+        `;
+    }
+    
+    createGameHeaderHTML() {
+        if (!this.currentGame) return '';
+        
+        const startTime = new Date(this.currentGame.startTime).toLocaleString();
+        const endTime = this.currentGame.endTime ? new Date(this.currentGame.endTime).toLocaleString() : 'Ongoing';
+        const duration = this.formatDuration(this.currentGame.duration);
+        const status = this.currentGame.status;
+        const statusIcon = status === 'ended' ? '✅' : status === 'paused' ? '⏸️' : '🔴';
+        
+        return `
+            <div class="game-analysis-header">
+                <div class="game-info-card">
+                    <h3>${statusIcon} ${this.currentGame.gameId} Analysis</h3>
+                    <div class="game-meta">
+                        <div class="meta-item">
+                            <strong>Type:</strong> ${this.currentGame.gameType}
+                        </div>
+                        <div class="meta-item">
+                            <strong>Status:</strong> <span class="status-badge ${status}">${status.toUpperCase()}</span>
+                        </div>
+                        <div class="meta-item">
+                            <strong>Final Score:</strong> ${this.currentGame.finalScores.playerA} - ${this.currentGame.finalScores.playerB}
+                        </div>
+                        ${this.currentGame.winner ? `
+                            <div class="meta-item">
+                                <strong>Winner:</strong> <span class="winner-badge">🏆 Player ${this.currentGame.winner.slice(-1)}</span>
+                            </div>
+                        ` : ''}
+                        <div class="meta-item">
+                            <strong>Total Rounds:</strong> ${this.currentGame.rounds.length}
+                        </div>
+                        <div class="meta-item">
+                            <strong>Duration:</strong> ${duration}
+                        </div>
+                        <div class="meta-item">
+                            <strong>Started:</strong> ${startTime}
+                        </div>
+                        ${this.currentGame.endTime ? `
+                            <div class="meta-item">
+                                <strong>Ended:</strong> ${endTime}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    formatDuration(seconds) {
+        if (!seconds || seconds === 0) return '0:00';
+        
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
         }
     }
     
     getFilteredRounds() {
-        switch (this.currentFilter) {
-            case 'playerA':
-                // Player A losses = rounds where Player B scored
-                return this.rounds.filter(round => round.winner === 'playerB');
-            case 'playerB':
-                // Player B losses = rounds where Player A scored
-                return this.rounds.filter(round => round.winner === 'playerA');
-            default:
-                return this.rounds;
+        // 简化：始终返回所有回合，不再做复杂的过滤
+        if (!this.currentGame || !this.currentGame.rounds) {
+            return [];
         }
+        return this.currentGame.rounds;
     }
     
     createRoundHTML(round) {
@@ -130,28 +315,154 @@ class AnalysisManager {
         const winnerText = round.winner === 'playerA' ? 'Player A' : 'Player B';
         const loserText = round.winner === 'playerA' ? 'Player B' : 'Player A';
         const timeStr = this.formatTime(round.timestamp);
+        const playerAWon = round.winner === 'playerA';
+        const playerBWon = round.winner === 'playerB';
         
         return `
-            <div class="point-item ${isExpanded ? 'expanded' : ''}" data-round-id="${round.id}">
-                <div class="point-header">
-                    <span class="round-number">Round ${round.id}</span>
-                    <span class="point-winner">${loserText} Lost Point</span>
-                    <span class="point-timestamp">${timeStr}</span>
+            <div class="dual-analysis-item ${isExpanded ? 'expanded' : ''}" data-round-id="${round.id}">
+                <div class="round-timeline-header">
+                    <div class="round-info">
+                        <div class="round-number-badge">
+                            <span class="badge-icon">⚡</span>
+                            <span class="badge-text">Round ${round.id}</span>
+                        </div>
+                        <span class="round-time">${timeStr}</span>
+                    </div>
+                    <div class="round-score-display">${round.playerAScore} - ${round.playerBScore}</div>
+                    <div class="round-result">
+                        <span class="winner-announcement">🏆 ${winnerText} wins this round!</span>
+                        <button class="expand-toggle ${isExpanded ? 'expanded' : ''}" data-round-id="${round.id}">
+                            <span class="toggle-icon">${isExpanded ? '▼' : '▶'}</span>
+                            <span class="toggle-text">${isExpanded ? 'Hide Analysis' : 'View Analysis'}</span>
+                        </button>
+                    </div>
                 </div>
                 
-                <div class="point-score">
-                    Score After Loss: ${round.playerAScore} - ${round.playerBScore}
+                <div class="dual-analysis-content ${isExpanded ? 'expanded' : ''}">
+                    <div class="players-analysis">
+                        <!-- Player A Analysis -->
+                        <div class="player-analysis player-a ${playerAWon ? 'winner' : 'loser'}">
+                            <div class="player-header">
+                                <span class="player-icon">🔵</span>
+                                <span class="player-name">Player A</span>
+                                <span class="player-result ${playerAWon ? 'won' : 'lost'}">
+                                    ${playerAWon ? '✅ Won Point' : '❌ Lost Point'}
+                                </span>
+                            </div>
+                            <div class="player-analysis-content">
+                                ${playerAWon ? 
+                                    this.createWinAnalysisHTML(round, 'A') : 
+                                    this.createLossAnalysisHTML(round.analysis, 'Player A')
+                                }
+                            </div>
                 </div>
                 
-                <div class="point-details ${isExpanded ? 'expanded' : ''}">
-                    ${this.createLossAnalysisHTML(round.analysis, loserText)}
+                        <!-- VS Separator -->
+                        <div class="vs-separator">
+                            <div class="vs-icon">VS</div>
+                            <div class="winner-arrow ${playerAWon ? 'left' : 'right'}">
+                                ${playerAWon ? '←' : '→'}
+                            </div>
                 </div>
                 
-                <div class="expand-indicator ${isExpanded ? 'expanded' : ''}">
-                    ${isExpanded ? 'Hide Loss Analysis' : 'View Loss Analysis'}
+                        <!-- Player B Analysis -->
+                        <div class="player-analysis player-b ${playerBWon ? 'winner' : 'loser'}">
+                            <div class="player-header">
+                                <span class="player-icon">🔴</span>
+                                <span class="player-name">Player B</span>
+                                <span class="player-result ${playerBWon ? 'won' : 'lost'}">
+                                    ${playerBWon ? '✅ Won Point' : '❌ Lost Point'}
+                                </span>
+                            </div>
+                            <div class="player-analysis-content">
+                                ${playerBWon ? 
+                                    this.createWinAnalysisHTML(round, 'B') : 
+                                    this.createLossAnalysisHTML(round.analysis, 'Player B')
+                                }
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
+    }
+    
+    // 新增：创建获胜方分析
+    createWinAnalysisHTML(round, player) {
+        const score = round.analysis ? this.calculateRoundScore(round.analysis) : 7;
+        const performanceLevel = score >= 8 ? 'Excellent' : score >= 6 ? 'Good' : 'Standard';
+        const winFactors = this.generateWinFactors(round.analysis);
+        
+        return `
+            <div class="win-analysis">
+                <h5>🏆 ${player} Victory Analysis</h5>
+                <div class="analysis-content">
+                    <div class="analysis-section win-section-1">
+                        <div class="section-header">
+                            <span class="section-number">01</span>
+                            <strong class="section-title">Performance Level</strong>
+                        </div>
+                        <div class="section-content">
+                            ✨ ${performanceLevel} execution (${score}/10)
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-section win-section-2">
+                        <div class="section-header">
+                            <span class="section-number">02</span>
+                            <strong class="section-title">Success Factors</strong>
+                        </div>
+                        <div class="section-content">
+                            <div class="win-factors">
+                                ${winFactors.map((factor, index) => 
+                                    `<span class="win-factor">${index + 1}. ${factor}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-section win-section-3">
+                        <div class="section-header">
+                            <span class="section-number">03</span>
+                            <strong class="section-title">Strategic Advantage</strong>
+                        </div>
+                        <div class="section-content">
+                            🎯 Successfully capitalized on opponent's weakness and maintained pressure
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-section win-section-4">
+                        <div class="section-header">
+                            <span class="section-number">04</span>
+                            <strong class="section-title">Positive Reinforcement</strong>
+                        </div>
+                        <div class="section-content">
+                            💪 Keep up this level of performance and continue applying similar strategies
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // 新增：生成获胜因素
+    generateWinFactors(analysis) {
+        const factors = [];
+        
+        if (analysis && analysis.feedback) {
+            if (analysis.feedback.includes('excellent')) factors.push('Superior technical execution');
+            if (analysis.feedback.includes('good')) factors.push('Solid performance consistency');
+            if (analysis.feedback.includes('strategic')) factors.push('Smart tactical positioning');
+            if (analysis.feedback.includes('pressure')) factors.push('Excellent pressure management');
+            if (analysis.feedback.includes('timing')) factors.push('Perfect timing execution');
+        }
+        
+        // Add default factors if none found
+        if (factors.length === 0) {
+            factors.push('Good tactical awareness', 'Effective strategy execution', 'Maintained composure under pressure');
+        }
+        
+        return factors.slice(0, 3); // Limit to 3 factors
     }
     
     createAnalysisHTML(analysis) {
@@ -387,9 +698,30 @@ class AnalysisManager {
     }
     
     addRoundClickEvents() {
+        // 为新的dual-analysis-item添加事件监听器
+        document.querySelectorAll('.expand-toggle').forEach(button => {
+            if (button.hasAttribute('data-event-bound')) return;
+            
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                const roundId = parseInt(button.dataset.roundId);
+                if (!isNaN(roundId)) {
+                    console.log('expand-toggle clicked, roundId:', roundId);
+                    this.toggleDetailedRound(roundId);
+                }
+            });
+            
+            button.setAttribute('data-event-bound', 'true');
+        });
+        
+        // 为旧的point-item添加事件监听器（兼容性）
         document.querySelectorAll('.point-item').forEach(item => {
+            if (!item) return; // null检查
+            
             // Remove existing listeners to prevent duplication
             const newItem = item.cloneNode(true);
+            if (item.parentNode) {
             item.parentNode.replaceChild(newItem, item);
             
             newItem.addEventListener('click', (e) => {
@@ -399,52 +731,49 @@ class AnalysisManager {
                 }
                 
                 const roundId = parseInt(e.currentTarget.dataset.roundId);
-                this.toggleRoundExpansion(roundId, e.currentTarget);
+                    if (!isNaN(roundId)) {
+                        console.log('point-item clicked, roundId:', roundId);
+                        this.toggleDetailedRound(roundId);
+                    }
             });
+            }
         });
         
-        // Add separate click events for expand indicators
+        // Add separate click events for expand indicators (兼容性)
         document.querySelectorAll('.expand-indicator').forEach(indicator => {
+            if (!indicator) return; // null检查
+            
             indicator.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const roundItem = e.currentTarget.closest('.point-item');
+                if (roundItem) {
                 const roundId = parseInt(roundItem.dataset.roundId);
-                this.toggleRoundExpansion(roundId, roundItem);
+                    if (!isNaN(roundId)) {
+                        console.log('expand-indicator clicked, roundId:', roundId);
+                        this.toggleDetailedRound(roundId);
+                    }
+                }
             });
         });
+        
+        console.log('addRoundClickEvents completed - supporting both new dual-analysis-item and old point-item');
     }
     
+    // 保留旧方法用于兼容性 - 彻底重写避免错误
     toggleRoundExpansion(roundId, itemElement) {
-        const wasExpanded = this.expandedRounds.has(roundId);
-        
-        if (wasExpanded) {
-            this.expandedRounds.delete(roundId);
+        console.log('toggleRoundExpansion called with roundId:', roundId, 'redirecting to toggleDetailedRound');
+        // 直接调用新方法，不再调用任何旧的DOM操作
+        if (roundId && !isNaN(roundId)) {
+            this.toggleDetailedRound(roundId);
         } else {
-            this.expandedRounds.add(roundId);
+            console.error('Invalid roundId in toggleRoundExpansion:', roundId);
         }
-        
-        // Update UI immediately for better user experience
-        this.updateItemExpansion(itemElement, !wasExpanded);
-        
-        // Then refresh the full display
-        setTimeout(() => {
-        this.displayRounds();
-        }, 50);
     }
 
     updateItemExpansion(itemElement, isExpanded) {
-        const details = itemElement.querySelector('.point-details');
-        const indicator = itemElement.querySelector('.expand-indicator');
-        
-        if (isExpanded) {
-            itemElement.classList.add('expanded');
-            details.classList.add('expanded');
-            indicator.classList.add('expanded');
-        } else {
-            itemElement.classList.remove('expanded');
-            details.classList.remove('expanded');
-            indicator.classList.remove('expanded');
-        }
+        // 完全废弃这个方法，所有操作由toggleDetailedRound处理
+        console.log('updateItemExpansion called but disabled - all operations handled by toggleDetailedRound');
+        // 不做任何DOM操作，直接返回
     }
     
     formatTime(timestamp) {
@@ -459,12 +788,14 @@ class AnalysisManager {
     
     // Get analysis statistics
     getAnalysisStats() {
-        if (this.rounds.length === 0) return null;
+        if (!this.currentGame || !this.currentGame.rounds || this.currentGame.rounds.length === 0) return null;
+        
+        const gameRounds = this.currentGame.rounds;
         
         const stats = {
-            totalRounds: this.rounds.length,
-            playerAWins: this.rounds.filter(r => r.winner === 'playerA').length,
-            playerBWins: this.rounds.filter(r => r.winner === 'playerB').length,
+            totalRounds: gameRounds.length,
+            playerAWins: gameRounds.filter(r => r.winner === 'playerA').length,
+            playerBWins: gameRounds.filter(r => r.winner === 'playerB').length,
             averageScore: 0,
             commonErrors: {},
             improvements: {},
@@ -473,15 +804,15 @@ class AnalysisManager {
         
         // Calculate average score
         let totalScore = 0;
-        this.rounds.forEach(round => {
+        gameRounds.forEach(round => {
             if (round.analysis) {
                 totalScore += this.calculateRoundScore(round.analysis);
             }
         });
-        stats.averageScore = (totalScore / this.rounds.length).toFixed(1);
+        stats.averageScore = (totalScore / gameRounds.length).toFixed(1);
         
         // Count common errors
-        this.rounds.forEach(round => {
+        gameRounds.forEach(round => {
             if (round.analysis && round.analysis.errorType) {
                 stats.commonErrors[round.analysis.errorType] = 
                     (stats.commonErrors[round.analysis.errorType] || 0) + 1;
@@ -489,7 +820,7 @@ class AnalysisManager {
         });
         
         // Count improvement suggestions
-        this.rounds.forEach(round => {
+        gameRounds.forEach(round => {
             if (round.analysis && round.analysis.suggestions) {
                 round.analysis.suggestions.forEach(suggestion => {
                     stats.improvements[suggestion] = 
@@ -499,7 +830,7 @@ class AnalysisManager {
         });
         
         // Timeline data
-        stats.timeline = this.rounds.map(round => ({
+        stats.timeline = gameRounds.map(round => ({
             round: round.id,
             timestamp: round.timestamp,
             score: round.analysis ? this.calculateRoundScore(round.analysis) : 5,
@@ -518,7 +849,8 @@ class AnalysisManager {
         }
         
         const exportData = {
-            rounds: this.rounds,
+            game: this.currentGame,
+            rounds: this.currentGame ? this.currentGame.rounds : [],
             stats: stats,
             exportTime: new Date().toISOString(),
             version: '1.0.0'
@@ -650,9 +982,9 @@ class AnalysisManager {
     
     // Clear analysis data
     clearAnalysis() {
-        this.rounds = [];
+        this.currentGame = null;
         this.expandedRounds.clear();
-        this.displayRounds();
+        this.displayGameAnalysis();
     }
     
     // Advanced filtering feature
@@ -787,10 +1119,1189 @@ class AnalysisManager {
             return;
         }
         
-        const roundsHTML = filteredRounds.map(round => this.createRoundHTML(round)).join('');
+        const roundsHTML = this.createTimelineView(filteredRounds);
         container.innerHTML = roundsHTML;
         
-        this.addRoundClickEvents();
+        this.addTimelineClickEvents();
+    }
+
+    // Create Timeline View - Rounds organized by round number with A/B classification
+    createTimelineView(rounds) {
+        if (!rounds || rounds.length === 0) {
+            return '<div class="no-data">No round data available</div>';
+        }
+
+        // 创建筛选控件HTML
+        const filtersHTML = this.createRoundFiltersHTML();
+        
+        // 应用筛选
+        const filteredRounds = this.applyRoundFilters(rounds);
+
+        let viewHTML = `
+            <div class="timeline-view">
+                <div class="timeline-header">
+                    <h3>🕒 Round-by-Round Timeline Analysis</h3>
+                    <p class="timeline-subtitle">Each round shows Player A and Player B performance breakdown</p>
+                </div>
+                
+                ${filtersHTML}
+                
+                <div class="timeline-stats">
+                    <div class="filter-stats">
+                        <span class="stats-label">Showing:</span>
+                        <span class="stats-value">${filteredRounds.length} of ${rounds.length} rounds</span>
+                        ${this.getFilterSummary(filteredRounds)}
+                    </div>
+                </div>
+                
+                <div class="rounds-timeline">
+        `;
+
+        if (filteredRounds.length === 0) {
+            viewHTML += '<div class="no-filtered-data">No rounds match the current filters. Try adjusting your selection.</div>';
+        } else {
+            filteredRounds.forEach(round => {
+                viewHTML += this.createRoundHTML(round);
+            });
+        }
+
+        viewHTML += `
+                </div>
+            </div>
+        `;
+
+        return viewHTML;
+    }
+
+    // Create A vs B Comparison Timeline View - 对比版时间线视图
+    createComparisonTimelineView(rounds) {
+        if (!rounds || rounds.length === 0) {
+            return '<div class="no-data">No round data available</div>';
+        }
+
+        // 计算对比统计数据
+        const comparisonStats = this.calculateComparisonStats(rounds);
+
+        let viewHTML = `
+            <div class="comparison-view comparison-timeline">
+                <div class="comparison-header">
+                    <h3>⚖️ A vs B Timeline Comparison</h3>
+                    <p class="comparison-subtitle">Round-by-round comparison showing both players' performance timeline</p>
+                </div>
+                
+                <!-- 简化的统计概览 -->
+                <div class="quick-comparison-stats">
+                    <div class="quick-stat-item">
+                        <span class="stat-label">🔵 Player A Win Rate:</span>
+                        <span class="stat-value">${comparisonStats.playerA.winRate}%</span>
+                    </div>
+                    <div class="quick-stat-item">
+                        <span class="stat-label">🔴 Player B Win Rate:</span>
+                        <span class="stat-value">${comparisonStats.playerB.winRate}%</span>
+                    </div>
+                    <div class="quick-stat-item">
+                        <span class="stat-label">📊 Final Score:</span>
+                        <span class="stat-value">${comparisonStats.finalScore.playerA} - ${comparisonStats.finalScore.playerB}</span>
+                    </div>
+                </div>
+                
+                <!-- 回合时间线对比 -->
+                <div class="rounds-timeline-comparison">
+                    <h4>🔍 Round-by-Round Timeline</h4>
+                    <div class="timeline-comparison-rounds">
+        `;
+
+        rounds.forEach(round => {
+            viewHTML += this.createComparisonTimelineItem(round);
+        });
+
+        viewHTML += `
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return viewHTML;
+    }
+
+    // Create A vs B Comparison Detailed View - 对比版详细分析视图
+    createComparisonDetailedView(rounds) {
+        if (!rounds || rounds.length === 0) {
+            return '<div class="no-data">No round data available</div>';
+        }
+
+        const comparisonStats = this.calculateComparisonStats(rounds);
+
+        return `
+            <div class="comparison-view comparison-detailed">
+                <div class="comparison-header">
+                    <h3>⚖️ A vs B Detailed Analysis Comparison</h3>
+                    <p class="comparison-subtitle">In-depth analysis comparing both players' technical performance and strategies</p>
+                </div>
+                
+                <!-- 详细对比统计 -->
+                <div class="detailed-comparison-stats">
+                    <div class="comparison-stats-grid">
+                        <div class="player-stats player-a-stats">
+                        <div class="player-header">
+                                <h4>🔵 Player A Detailed Analysis</h4>
+                        </div>
+                            <div class="stats-content">
+                                <div class="stat-item">
+                                    <span class="stat-label">Points Won:</span>
+                                    <span class="stat-value">${comparisonStats.playerA.pointsWon}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Points Lost:</span>
+                                    <span class="stat-value">${comparisonStats.playerA.pointsLost}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Win Rate:</span>
+                                    <span class="stat-value">${comparisonStats.playerA.winRate}%</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Avg Tech Score:</span>
+                                    <span class="stat-value">${comparisonStats.playerA.avgTechScore}/10</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Most Common Error:</span>
+                                    <span class="stat-value">${comparisonStats.playerA.commonError || 'None'}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Performance Level:</span>
+                                    <span class="stat-value">${this.getPerformanceLevel(comparisonStats.playerA.avgTechScore)}</span>
+                                </div>
+                            </div>
+                    </div>
+                    
+                        <div class="vs-separator">
+                            <div class="vs-icon">VS</div>
+                            <div class="final-score">
+                                Final Score<br>
+                                <span class="score-display">${comparisonStats.finalScore.playerA} - ${comparisonStats.finalScore.playerB}</span>
+                            </div>
+                            <div class="winner-badge">
+                                ${comparisonStats.finalScore.playerA > comparisonStats.finalScore.playerB ? 
+                                    '🏆 Player A Wins' : 
+                                    comparisonStats.finalScore.playerB > comparisonStats.finalScore.playerA ? 
+                                    '🏆 Player B Wins' : 
+                                    '🤝 Draw'}
+                            </div>
+                    </div>
+                    
+                        <div class="player-stats player-b-stats">
+                        <div class="player-header">
+                                <h4>🔴 Player B Detailed Analysis</h4>
+                        </div>
+                            <div class="stats-content">
+                                <div class="stat-item">
+                                    <span class="stat-label">Points Won:</span>
+                                    <span class="stat-value">${comparisonStats.playerB.pointsWon}</span>
+                    </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Points Lost:</span>
+                                    <span class="stat-value">${comparisonStats.playerB.pointsLost}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Win Rate:</span>
+                                    <span class="stat-value">${comparisonStats.playerB.winRate}%</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Avg Tech Score:</span>
+                                    <span class="stat-value">${comparisonStats.playerB.avgTechScore}/10</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Most Common Error:</span>
+                                    <span class="stat-value">${comparisonStats.playerB.commonError || 'None'}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Performance Level:</span>
+                                    <span class="stat-value">${this.getPerformanceLevel(comparisonStats.playerB.avgTechScore)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 详细回合分析 -->
+                <div class="detailed-rounds-comparison">
+                    <h4>🔍 Detailed Round Analysis</h4>
+                    <div class="detailed-comparison-rounds">
+                        ${rounds.map(round => this.createDetailedComparisonRoundItem(round)).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Create A vs B Comparison Statistics View - 对比版统计视图
+    createComparisonStatisticsView(rounds) {
+        if (!rounds || rounds.length === 0) {
+            return '<div class="no-data">No round data available</div>';
+        }
+
+        const comparisonStats = this.calculateComparisonStats(rounds);
+        const advancedStats = this.calculateAdvancedComparisonStats(rounds);
+
+        return `
+            <div class="comparison-view comparison-statistics">
+                <div class="comparison-header">
+                    <h3>⚖️ A vs B Statistical Analysis</h3>
+                    <p class="comparison-subtitle">Comprehensive statistical comparison with charts and advanced metrics</p>
+                </div>
+                
+                <!-- 统计总览 -->
+                <div class="statistics-overview">
+                    <div class="overview-grid">
+                        <div class="overview-card performance-card">
+                            <h4>🎯 Performance Overview</h4>
+                            <div class="performance-comparison">
+                                <div class="player-performance">
+                                    <span class="player-label">🔵 Player A</span>
+                                    <div class="performance-bar">
+                                        <div class="performance-fill player-a" style="width: ${comparisonStats.playerA.winRate}%"></div>
+                    </div>
+                                    <span class="performance-value">${comparisonStats.playerA.winRate}% Win Rate</span>
+                                </div>
+                                <div class="player-performance">
+                                    <span class="player-label">🔴 Player B</span>
+                                    <div class="performance-bar">
+                                        <div class="performance-fill player-b" style="width: ${comparisonStats.playerB.winRate}%"></div>
+                                    </div>
+                                    <span class="performance-value">${comparisonStats.playerB.winRate}% Win Rate</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="overview-card tech-scores-card">
+                            <h4>📊 Technical Scores</h4>
+                            <div class="tech-scores-comparison">
+                                <div class="score-item">
+                                    <span class="score-label">🔵 Player A Avg:</span>
+                                    <span class="score-value ${this.getScoreClass(comparisonStats.playerA.avgTechScore)}">${comparisonStats.playerA.avgTechScore}/10</span>
+                                </div>
+                                <div class="score-item">
+                                    <span class="score-label">🔴 Player B Avg:</span>
+                                    <span class="score-value ${this.getScoreClass(comparisonStats.playerB.avgTechScore)}">${comparisonStats.playerB.avgTechScore}/10</span>
+                                </div>
+                                <div class="score-comparison">
+                                    ${this.getPerformanceComparison(comparisonStats.playerA.avgTechScore, comparisonStats.playerB.avgTechScore)}
+                                </div>
+                            </div>
+                </div>
+                
+                        <div class="overview-card errors-card">
+                            <h4>⚠️ Error Analysis</h4>
+                            <div class="errors-comparison">
+                                <div class="player-errors">
+                                    <span class="player-label">🔵 Player A:</span>
+                                    <span class="error-value">${comparisonStats.playerA.commonError || 'No common errors'}</span>
+                        </div>
+                                <div class="player-errors">
+                                    <span class="player-label">🔴 Player B:</span>
+                                    <span class="error-value">${comparisonStats.playerB.commonError || 'No common errors'}</span>
+                    </div>
+            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 高级统计 -->
+                <div class="advanced-statistics">
+                    <h4>📈 Advanced Analytics</h4>
+                    <div class="advanced-stats-grid">
+                        <div class="advanced-stat-card">
+                            <h5>🎯 Consistency Analysis</h5>
+                            <div class="consistency-comparison">
+                                <div class="consistency-item">
+                                    <span class="player-name">🔵 Player A</span>
+                                    <span class="consistency-score">${advancedStats.playerA.consistency}%</span>
+                                </div>
+                                <div class="consistency-item">
+                                    <span class="player-name">🔴 Player B</span>
+                                    <span class="consistency-score">${advancedStats.playerB.consistency}%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="advanced-stat-card">
+                            <h5>📊 Performance Trend</h5>
+                            <div class="trend-comparison">
+                                <div class="trend-item">
+                                    <span class="player-name">🔵 Player A</span>
+                                    <span class="trend-indicator ${advancedStats.playerA.trend}">${this.getTrendIcon(advancedStats.playerA.trend)} ${advancedStats.playerA.trend}</span>
+                                </div>
+                                <div class="trend-item">
+                                    <span class="player-name">🔴 Player B</span>
+                                    <span class="trend-indicator ${advancedStats.playerB.trend}">${this.getTrendIcon(advancedStats.playerB.trend)} ${advancedStats.playerB.trend}</span>
+                                </div>
+                            </div>
+                </div>
+                
+                        <div class="advanced-stat-card">
+                            <h5>🏆 Dominance Index</h5>
+                            <div class="dominance-comparison">
+                                <div class="dominance-meter">
+                                    <div class="dominance-bar">
+                                        <div class="dominance-fill" style="left: ${this.calculateDominancePosition(comparisonStats)}%"></div>
+                                    </div>
+                                    <div class="dominance-labels">
+                                        <span class="player-label">🔵 Player A</span>
+                                        <span class="player-label">🔴 Player B</span>
+                                    </div>
+                                </div>
+                                <div class="dominance-description">
+                                    <div class="dominance-value">
+                                        ${this.getDominanceDescription(comparisonStats)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 比赛时间线图 -->
+                <div class="match-timeline-chart">
+                    <h4>📈 Match Score Timeline</h4>
+                    <div class="timeline-charts-container">
+                        <div class="timeline-chart-section">
+                            <h5>🏆 Score Progress</h5>
+                            <div class="timeline-chart">
+                                ${this.createScoreTimelineChart(rounds)}
+                            </div>
+                        </div>
+                        
+                        <div class="timeline-chart-section">
+                            <h5>📊 Performance Trend</h5>
+                            <div class="performance-trend-chart">
+                                ${this.createPerformanceTrendChart(rounds)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 辅助方法
+    getPerformanceLevel(avgScore) {
+        if (avgScore === 'N/A') return 'No Data';
+        const score = parseFloat(avgScore);
+        if (score >= 8) return 'Excellent';
+        if (score >= 6) return 'Good';
+        if (score >= 4) return 'Average';
+        return 'Needs Improvement';
+    }
+
+    getScoreClass(avgScore) {
+        if (avgScore === 'N/A') return 'no-data';
+        const score = parseFloat(avgScore);
+        if (score >= 8) return 'excellent';
+        if (score >= 6) return 'good';
+        if (score >= 4) return 'average';
+        return 'poor';
+    }
+
+    getPerformanceComparison(scoreA, scoreB) {
+        if (scoreA === 'N/A' || scoreB === 'N/A') return 'Insufficient data for comparison';
+        
+        const diff = parseFloat(scoreA) - parseFloat(scoreB);
+        if (Math.abs(diff) < 0.5) return '🤝 Very similar performance levels';
+        if (diff > 0) return `🔵 Player A performs ${diff.toFixed(1)} points better`;
+        return `🔴 Player B performs ${Math.abs(diff).toFixed(1)} points better`;
+    }
+
+    getTrendIcon(trend) {
+        switch(trend) {
+            case 'improving': return '📈';
+            case 'declining': return '📉';
+            case 'stable': return '➡️';
+            default: return '❓';
+        }
+    }
+
+
+
+    calculateDominancePosition(stats) {
+        const scoreA = parseFloat(stats.playerA.avgTechScore) || 5;
+        const scoreB = parseFloat(stats.playerB.avgTechScore) || 5;
+        const winRateA = parseFloat(stats.playerA.winRate) || 50;
+        const winRateB = parseFloat(stats.playerB.winRate) || 50;
+        
+        // 综合评分：技术分数权重40%，胜率权重60%
+        const totalA = (scoreA * 0.4) + (winRateA * 0.6 / 10);
+        const totalB = (scoreB * 0.4) + (winRateB * 0.6 / 10);
+        
+        // 转换为0-100的位置
+        const total = totalA + totalB;
+        return total > 0 ? (totalA / total * 100) : 50;
+    }
+
+    getDominanceDescription(stats) {
+        const position = this.calculateDominancePosition(stats);
+        const playerAWinRate = parseFloat(stats.playerA.winRate) || 50;
+        const playerBWinRate = parseFloat(stats.playerB.winRate) || 50;
+        
+        if (Math.abs(position - 50) < 10) {
+            return "Balanced Match - Very Close Competition";
+        } else if (position > 65) {
+            return `Player A Dominance - ${playerAWinRate}% vs ${playerBWinRate}%`;
+        } else if (position < 35) {
+            return `Player B Dominance - ${playerBWinRate}% vs ${playerAWinRate}%`;
+        } else if (position > 55) {
+            return `Player A Advantage - ${playerAWinRate}% vs ${playerBWinRate}%`;
+        } else {
+            return `Player B Advantage - ${playerBWinRate}% vs ${playerAWinRate}%`;
+        }
+    }
+
+    // 计算对比统计数据
+    calculateComparisonStats(rounds) {
+        const stats = {
+            playerA: {
+                pointsWon: 0,
+                pointsLost: 0,
+                winRate: 0,
+                avgTechScore: 0,
+                commonError: null,
+                errors: {}
+            },
+            playerB: {
+                pointsWon: 0,
+                pointsLost: 0,
+                winRate: 0,
+                avgTechScore: 0,
+                commonError: null,
+                errors: {}
+            },
+            finalScore: {
+                playerA: 0,
+                playerB: 0
+            }
+        };
+
+        let playerATechScores = [];
+        let playerBTechScores = [];
+
+        rounds.forEach(round => {
+            // 统计得分
+            if (round.winner === 'playerA') {
+                stats.playerA.pointsWon++;
+                stats.playerB.pointsLost++;
+            } else {
+                stats.playerB.pointsWon++;
+                stats.playerA.pointsLost++;
+            }
+
+            // 收集技术评分和错误信息
+            if (round.analysis) {
+                const techScore = this.calculateRoundScore(round.analysis);
+                
+                if (round.winner === 'playerB') {
+                    // Player A 失分
+                    playerATechScores.push(techScore);
+                    if (round.analysis.errorType) {
+                        stats.playerA.errors[round.analysis.errorType] = 
+                            (stats.playerA.errors[round.analysis.errorType] || 0) + 1;
+                    }
+                } else {
+                    // Player B 失分
+                    playerBTechScores.push(techScore);
+                    if (round.analysis.errorType) {
+                        stats.playerB.errors[round.analysis.errorType] = 
+                            (stats.playerB.errors[round.analysis.errorType] || 0) + 1;
+                    }
+                }
+        }
+        
+            // 最终比分
+            stats.finalScore.playerA = round.playerAScore;
+            stats.finalScore.playerB = round.playerBScore;
+        });
+
+        // 计算胜率
+        const totalRounds = rounds.length;
+        stats.playerA.winRate = ((stats.playerA.pointsWon / totalRounds) * 100).toFixed(1);
+        stats.playerB.winRate = ((stats.playerB.pointsWon / totalRounds) * 100).toFixed(1);
+
+        // 计算平均技术评分
+        if (playerATechScores.length > 0) {
+            stats.playerA.avgTechScore = (playerATechScores.reduce((a, b) => a + b, 0) / playerATechScores.length).toFixed(1);
+        } else {
+            stats.playerA.avgTechScore = 'N/A';
+        }
+
+        if (playerBTechScores.length > 0) {
+            stats.playerB.avgTechScore = (playerBTechScores.reduce((a, b) => a + b, 0) / playerBTechScores.length).toFixed(1);
+        } else {
+            stats.playerB.avgTechScore = 'N/A';
+        }
+        
+        // 找出最常见的错误
+        if (Object.keys(stats.playerA.errors).length > 0) {
+            stats.playerA.commonError = Object.entries(stats.playerA.errors)
+                .sort(([,a], [,b]) => b - a)[0][0];
+        }
+
+        if (Object.keys(stats.playerB.errors).length > 0) {
+            stats.playerB.commonError = Object.entries(stats.playerB.errors)
+                .sort(([,a], [,b]) => b - a)[0][0];
+        }
+
+        return stats;
+    }
+
+    // 计算高级对比统计
+    calculateAdvancedComparisonStats(rounds) {
+        const playerAScores = [];
+        const playerBScores = [];
+
+        rounds.forEach(round => {
+            if (round.analysis) {
+                const score = this.calculateRoundScore(round.analysis);
+                if (round.winner === 'playerB') {
+                    playerAScores.push(score);
+                } else {
+                    playerBScores.push(score);
+                }
+            }
+        });
+
+        return {
+            playerA: {
+                consistency: this.calculateConsistency(playerAScores),
+                trend: this.calculatePerformanceTrend(playerAScores)
+            },
+            playerB: {
+                consistency: this.calculateConsistency(playerBScores),
+                trend: this.calculatePerformanceTrend(playerBScores)
+            }
+        };
+    }
+
+    // 计算一致性
+    calculateConsistency(scores) {
+        if (scores.length < 2) return 100;
+        
+        const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+        const variance = scores.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / scores.length;
+        const stdDev = Math.sqrt(variance);
+        
+        // 一致性百分比 (标准差越低一致性越高)
+        return Math.max(0, (100 - stdDev * 20)).toFixed(1);
+    }
+
+
+
+    // 创建对比时间线项目
+    createComparisonTimelineItem(round) {
+        const timeStr = this.formatTime(round.timestamp);
+        const playerALost = round.winner === 'playerB';
+        const playerBLost = round.winner === 'playerA';
+
+        return `
+            <div class="comparison-timeline-item" data-round-id="${round.id}">
+                <div class="timeline-round-header">
+                    <div class="round-info">
+                        <span class="round-number">Round ${round.id}</span>
+                        <span class="round-time">${timeStr}</span>
+                        <span class="round-score">${round.playerAScore} - ${round.playerBScore}</span>
+                </div>
+                </div>
+                
+                <div class="timeline-players-comparison">
+                    <div class="timeline-player-result player-a ${playerALost ? 'lost-point' : 'won-point'}">
+                        <div class="player-icon">🔵</div>
+                        <div class="player-status">
+                            <span class="player-name">Player A</span>
+                            <span class="result-text ${playerALost ? 'lost' : 'won'}">
+                                ${playerALost ? 'Lost Point' : 'Won Point'}
+                            </span>
+                        </div>
+                        ${playerALost ? this.createTimelinePlayerLoss(round.analysis) : this.createTimelinePlayerWin()}
+                    </div>
+                    
+                    <div class="timeline-vs-separator">
+                        <div class="timeline-arrow ${playerALost ? 'right' : 'left'}">
+                            ${playerALost ? '→' : '←'}
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-player-result player-b ${playerBLost ? 'lost-point' : 'won-point'}">
+                        <div class="player-icon">🔴</div>
+                        <div class="player-status">
+                            <span class="player-name">Player B</span>
+                            <span class="result-text ${playerBLost ? 'lost' : 'won'}">
+                                ${playerBLost ? 'Lost Point' : 'Won Point'}
+                            </span>
+                        </div>
+                        ${playerBLost ? this.createTimelinePlayerLoss(round.analysis) : this.createTimelinePlayerWin()}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 创建详细对比回合项目
+    createDetailedComparisonRoundItem(round) {
+        const timeStr = this.formatTime(round.timestamp);
+        const playerALost = round.winner === 'playerB';
+        const playerBLost = round.winner === 'playerA';
+
+        return `
+            <div class="detailed-comparison-round-item" data-round-id="${round.id}">
+                <div class="detailed-round-header">
+                    <div class="round-info-detailed">
+                        <h5>Round ${round.id} - ${timeStr}</h5>
+                        <span class="score-detailed">${round.playerAScore} - ${round.playerBScore}</span>
+                    </div>
+                    </div>
+                
+                <div class="detailed-players-analysis">
+                    <div class="detailed-player-analysis player-a ${playerALost ? 'lost-point' : 'won-point'}">
+                        <div class="detailed-player-header">
+                            <span class="player-icon">🔵</span>
+                            <span class="player-name">Player A</span>
+                            <span class="detailed-result ${playerALost ? 'lost' : 'won'}">
+                                ${playerALost ? '❌ Lost' : '✅ Won'}
+                            </span>
+                        </div>
+                        ${playerALost ? this.createDetailedPlayerLoss(round.analysis) : this.createDetailedPlayerWin(round.analysis)}
+                </div>
+                
+                    <div class="detailed-vs-separator">
+                        <div class="detailed-arrow ${playerALost ? 'right' : 'left'}">
+                            ${playerALost ? '▶' : '◀'}
+                        </div>
+                    </div>
+                    
+                    <div class="detailed-player-analysis player-b ${playerBLost ? 'lost-point' : 'won-point'}">
+                        <div class="detailed-player-header">
+                            <span class="player-icon">🔴</span>
+                            <span class="player-name">Player B</span>
+                            <span class="detailed-result ${playerBLost ? 'lost' : 'won'}">
+                                ${playerBLost ? '❌ Lost' : '✅ Won'}
+                            </span>
+                        </div>
+                        ${playerBLost ? this.createDetailedPlayerLoss(round.analysis) : this.createDetailedPlayerWin(round.analysis)}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 创建时间线选手失分分析
+    createTimelinePlayerLoss(analysis) {
+        if (!analysis) return '<div class="no-data">No analysis data</div>';
+        
+        const score = this.calculateRoundScore(analysis);
+        const riskLevel = this.getRiskLevel(Math.max(1, 10 - score));
+
+        return `
+            <div class="timeline-loss-summary">
+                <div class="loss-metrics">
+                    <span class="tech-score-mini">Score: ${score}/10</span>
+                    <span class="risk-mini risk-${riskLevel.toLowerCase().replace(' ', '-')}">${riskLevel}</span>
+                </div>
+                <div class="loss-issue">
+                    ${analysis.errorType || 'Technical mistake'}
+                </div>
+            </div>
+        `;
+    }
+
+    // 创建时间线选手获胜分析
+    createTimelinePlayerWin() {
+        return `
+            <div class="timeline-win-summary">
+                <div class="win-metrics">
+                    <span class="performance-mini">Good Performance</span>
+                </div>
+                <div class="win-reason">
+                    Capitalized on opportunity
+                </div>
+            </div>
+        `;
+    }
+
+    // 创建详细选手失分分析
+    createDetailedPlayerLoss(analysis) {
+        if (!analysis) return '<div class="no-data">No detailed analysis available</div>';
+        
+        const score = this.calculateRoundScore(analysis);
+        const riskLevel = this.getRiskLevel(Math.max(1, 10 - score));
+
+        return `
+            <div class="detailed-loss-analysis">
+                <div class="detailed-metrics">
+                    <div class="metric-item">
+                        <span class="metric-label">Tech Score:</span>
+                        <span class="metric-value">${score}/10</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Risk Level:</span>
+                        <span class="risk-badge risk-${riskLevel.toLowerCase().replace(' ', '-')}">${riskLevel}</span>
+                    </div>
+                </div>
+                <div class="detailed-issue">
+                    <strong>Issue:</strong> ${analysis.errorType || 'General technical mistake'}
+                </div>
+                <div class="detailed-feedback">
+                    <strong>Analysis:</strong> ${analysis.feedback ? analysis.feedback.substring(0, 120) + (analysis.feedback.length > 120 ? '...' : '') : 'No detailed feedback available'}
+                </div>
+                ${analysis.suggestions && analysis.suggestions.length > 0 ? `
+                    <div class="detailed-suggestions">
+                        <strong>Key Suggestions:</strong>
+                        <ul>
+                            ${analysis.suggestions.slice(0, 2).map(suggestion => `<li>${suggestion}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    // 创建详细选手获胜分析
+    createDetailedPlayerWin(analysis) {
+        const score = analysis ? this.calculateRoundScore(analysis) : 7;
+        const performanceLevel = score >= 8 ? 'Excellent' : score >= 6 ? 'Good' : 'Standard';
+
+        return `
+            <div class="detailed-win-analysis">
+                <div class="detailed-metrics">
+                    <div class="metric-item">
+                        <span class="metric-label">Tech Score:</span>
+                        <span class="metric-value">${score}/10</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Performance:</span>
+                        <span class="performance-badge">${performanceLevel}</span>
+                    </div>
+                </div>
+                <div class="detailed-achievement">
+                    <strong>Achievement:</strong> Successfully executed winning strategy
+                </div>
+                <div class="detailed-advantage">
+                    <strong>Advantage:</strong> Took advantage of opponent's mistake effectively
+                </div>
+            </div>
+        `;
+    }
+
+    // 创建比分时间线图表
+    createScoreTimelineChart(rounds) {
+        if (!rounds || rounds.length === 0) return '<div class="no-data">No timeline data available</div>';
+
+        let chartHTML = `
+            <div class="score-timeline">
+                <div class="timeline-axis">
+                    <div class="axis-label">Score</div>
+        `;
+
+        rounds.forEach((round, index) => {
+            const heightA = (round.playerAScore / Math.max(round.playerAScore, round.playerBScore, 10)) * 100;
+            const heightB = (round.playerBScore / Math.max(round.playerAScore, round.playerBScore, 10)) * 100;
+            
+            chartHTML += `
+                <div class="timeline-point" data-round="${round.id}">
+                    <div class="score-bars">
+                        <div class="score-bar player-a-bar" style="height: ${heightA}%" title="Player A: ${round.playerAScore}"></div>
+                        <div class="score-bar player-b-bar" style="height: ${heightB}%" title="Player B: ${round.playerBScore}"></div>
+                    </div>
+                    <div class="round-label">R${round.id}</div>
+                </div>
+            `;
+        });
+
+        chartHTML += `
+                </div>
+                <div class="timeline-legend">
+                    <div class="legend-item">
+                        <div class="legend-color player-a"></div>
+                        <span>Player A</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color player-b"></div>
+                        <span>Player B</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return chartHTML;
+    }
+
+    // 创建表现趋势图表
+    createPerformanceTrendChart(rounds) {
+        if (!rounds || rounds.length === 0) return '<div class="no-data">No trend data available</div>';
+
+        let chartHTML = `
+            <div class="performance-trend-container">
+                <div class="trend-line-chart">
+        `;
+
+        let playerAWins = 0;
+        let playerBWins = 0;
+
+        rounds.forEach((round, index) => {
+            if (round.winner === 'playerA') playerAWins++;
+            else playerBWins++;
+
+            const playerAWinRate = (playerAWins / (index + 1)) * 100;
+            const playerBWinRate = (playerBWins / (index + 1)) * 100;
+
+            chartHTML += `
+                <div class="trend-point" data-round="${round.id}">
+                    <div class="trend-lines">
+                        <div class="trend-line player-a-trend" style="height: ${playerAWinRate}%" title="Player A Win Rate: ${playerAWinRate.toFixed(1)}%"></div>
+                        <div class="trend-line player-b-trend" style="height: ${playerBWinRate}%" title="Player B Win Rate: ${playerBWinRate.toFixed(1)}%"></div>
+                    </div>
+                    <div class="trend-label">R${round.id}</div>
+                </div>
+            `;
+        });
+
+        chartHTML += `
+                </div>
+                <div class="trend-legend">
+                    <div class="legend-item">
+                        <div class="legend-line player-a-line"></div>
+                        <span>Player A Win Rate</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line player-b-line"></div>
+                        <span>Player B Win Rate</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return chartHTML;
+    }
+
+    // 创建胜负分布图
+    createWinLossChart(rounds) {
+        if (!rounds || rounds.length === 0) return '<div class="no-data">No distribution data available</div>';
+
+        const playerAWins = rounds.filter(r => r.winner === 'playerA').length;
+        const playerBWins = rounds.filter(r => r.winner === 'playerB').length;
+        const totalRounds = rounds.length;
+
+        const playerAPercentage = (playerAWins / totalRounds) * 100;
+        const playerBPercentage = (playerBWins / totalRounds) * 100;
+
+        return `
+            <div class="win-loss-distribution">
+                <div class="distribution-bars">
+                    <div class="distribution-bar-container">
+                        <div class="distribution-bar">
+                            <div class="win-segment player-a-wins" style="width: ${playerAPercentage}%"></div>
+                            <div class="win-segment player-b-wins" style="width: ${playerBPercentage}%"></div>
+                        </div>
+                        <div class="distribution-labels">
+                            <span class="label-left">Player A: ${playerAWins} wins</span>
+                            <span class="label-right">Player B: ${playerBWins} wins</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="distribution-stats">
+                    <div class="stat-item">
+                        <div class="stat-icon">🔵</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${playerAPercentage.toFixed(1)}%</div>
+                            <div class="stat-label">Player A Win Rate</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon">🔴</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${playerBPercentage.toFixed(1)}%</div>
+                            <div class="stat-label">Player B Win Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 创建时间线统计信息
+    createTimelineStatistics(rounds) {
+        if (!rounds || rounds.length === 0) return '<div class="no-data">No statistics available</div>';
+
+        const totalRounds = rounds.length;
+        const playerAWins = rounds.filter(r => r.winner === 'playerA').length;
+        const playerBWins = rounds.filter(r => r.winner === 'playerB').length;
+        
+        // 计算最长连胜纪录
+        const playerAStreak = this.calculateLongestStreak(rounds, 'playerA');
+        const playerBStreak = this.calculateLongestStreak(rounds, 'playerB');
+        
+        // 计算平均分数
+        const finalScoreA = rounds.length > 0 ? rounds[rounds.length - 1].playerAScore : 0;
+        const finalScoreB = rounds.length > 0 ? rounds[rounds.length - 1].playerBScore : 0;
+        const avgScorePerRound = totalRounds > 0 ? ((finalScoreA + finalScoreB) / totalRounds).toFixed(1) : 0;
+
+        return `
+            <div class="timeline-stat-item">
+                <div class="stat-icon">🎯</div>
+                <div class="stat-content">
+                    <div class="stat-value">${totalRounds}</div>
+                    <div class="stat-label">Total Rounds</div>
+                </div>
+            </div>
+            
+            <div class="timeline-stat-item">
+                <div class="stat-icon">🏆</div>
+                <div class="stat-content">
+                    <div class="stat-value">${Math.max(playerAStreak, playerBStreak)}</div>
+                    <div class="stat-label">Longest Streak</div>
+                </div>
+            </div>
+            
+            <div class="timeline-stat-item">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-content">
+                    <div class="stat-value">${avgScorePerRound}</div>
+                    <div class="stat-label">Avg Score/Round</div>
+                </div>
+            </div>
+            
+            <div class="timeline-stat-item">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-content">
+                    <div class="stat-value">${finalScoreA} - ${finalScoreB}</div>
+                    <div class="stat-label">Final Score</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 计算最长连胜纪录
+    calculateLongestStreak(rounds, player) {
+        let maxStreak = 0;
+        let currentStreak = 0;
+        
+        rounds.forEach(round => {
+            if (round.winner === player) {
+                currentStreak++;
+                maxStreak = Math.max(maxStreak, currentStreak);
+            } else {
+                currentStreak = 0;
+            }
+        });
+        
+        return maxStreak;
+    }
+
+    // 简化的切换方法 - 支持新的dual-analysis-item结构
+    toggleDetailedRound(roundId) {
+        console.log('toggleDetailedRound called with roundId:', roundId);
+        
+        const isExpanded = this.expandedRounds.has(roundId);
+        
+        if (isExpanded) {
+            this.expandedRounds.delete(roundId);
+        } else {
+            this.expandedRounds.add(roundId);
+        }
+
+        // 直接操作DOM元素 - 支持多种元素结构
+        const roundCards = document.querySelectorAll(`[data-round-id="${roundId}"]`);
+        console.log('Found cards:', roundCards.length);
+        
+        roundCards.forEach(card => {
+            if (!card) return;
+            
+            // 新的dual-analysis-item结构
+            const dualContent = card.querySelector('.dual-analysis-content');
+            const expandToggle = card.querySelector('.expand-toggle');
+            const expandIcon = card.querySelector('.expand-toggle .toggle-icon');
+            const expandText = card.querySelector('.expand-toggle .toggle-text');
+            
+            // 旧的详细视图结构（兼容性）
+            const detailedContent = card.querySelector('.detailed-card-content');
+            const toggleBtn = card.querySelector('.toggle-btn');
+            const toggleIcon = card.querySelector('.toggle-icon');
+            const toggleText = card.querySelector('.toggle-text');
+
+            if (!isExpanded) {
+                // 展开
+                card.classList.add('expanded');
+                
+                // 处理新的dual-analysis-item结构
+                if (dualContent) {
+                    dualContent.classList.add('expanded');
+                }
+                if (expandToggle) expandToggle.classList.add('expanded');
+                if (expandIcon) expandIcon.textContent = '▼';
+                if (expandText) expandText.textContent = 'Hide Analysis';
+                
+                // 处理旧的详细视图结构（兼容性）
+                if (detailedContent) {
+                    detailedContent.classList.remove('hide');
+                    detailedContent.classList.add('show');
+                }
+                if (toggleBtn) toggleBtn.classList.add('expanded');
+                if (toggleIcon) toggleIcon.textContent = '▼';
+                if (toggleText) toggleText.textContent = 'Hide Details';
+                
+                console.log('Expanded round:', roundId);
+            } else {
+                // 收起
+                card.classList.remove('expanded');
+                
+                // 处理新的dual-analysis-item结构
+                if (dualContent) {
+                    dualContent.classList.remove('expanded');
+                }
+                if (expandToggle) expandToggle.classList.remove('expanded');
+                if (expandIcon) expandIcon.textContent = '▶';
+                if (expandText) expandText.textContent = 'View Analysis';
+                
+                // 处理旧的详细视图结构（兼容性）
+                if (detailedContent) {
+                    detailedContent.classList.remove('show');
+                    detailedContent.classList.add('hide');
+                }
+                if (toggleBtn) toggleBtn.classList.remove('expanded');
+                if (toggleIcon) toggleIcon.textContent = '▶';
+                if (toggleText) toggleText.textContent = 'View Details';
+                
+                console.log('Collapsed round:', roundId);
+            }
+        });
+    }
+
+    // 新增：为所有视图添加事件监听器 - 包含detailed view
+    addAllViewClickEvents() {
+        try {
+            // Timeline view events
+        document.querySelectorAll('.round-timeline-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (!e.target.closest('.suggestion-tag') && !e.target.closest('.factor-tag')) {
+                    const roundId = parseInt(item.dataset.roundId);
+                    this.showRoundDetails(roundId);
+                }
+            });
+        });
+
+            // Detailed view events - 新增
+            document.querySelectorAll('.detailed-card-header[data-clickable="header"]').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    try {
+                        e.stopPropagation();
+                        const roundCard = e.currentTarget.closest('.detailed-round-card');
+                        if (roundCard) {
+                            const roundId = parseInt(roundCard.dataset.roundId);
+                            console.log('Header clicked, roundId:', roundId);
+                            this.toggleDetailedRound(roundId);
+                        }
+                    } catch (error) {
+                        console.error('Error in header click handler:', error);
+                    }
+                });
+            });
+
+            document.querySelectorAll('.toggle-btn[data-clickable="button"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                    try {
+                e.stopPropagation();
+                        const roundId = parseInt(e.currentTarget.dataset.roundId);
+                        console.log('Button clicked, roundId:', roundId);
+                        this.toggleDetailedRound(roundId);
+                    } catch (error) {
+                        console.error('Error in button click handler:', error);
+                    }
+            });
+        });
+
+            // Compact view events
+            document.querySelectorAll('.compact-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const roundId = parseInt(e.currentTarget.dataset.roundId);
+                    this.showRoundDetails(roundId);
+                });
+            });
+            
+            // Table view events
+            document.querySelectorAll('.view-detail-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const roundId = parseInt(e.target.dataset.roundId);
+                    this.showRoundDetails(roundId);
+                });
+            });
+            
+            // Summary view events
+            document.querySelectorAll('.summary-round-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    const roundId = parseInt(e.currentTarget.dataset.roundId);
+                    this.showRoundDetails(roundId);
+                });
+            });
+
+            // Comparison view events - 新增
+            document.querySelectorAll('.comparison-round-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    // 不阻止冒泡，让整个item都可以点击
+                    const roundId = parseInt(e.currentTarget.dataset.roundId);
+                    if (roundId && !isNaN(roundId)) {
+                        console.log('Comparison round item clicked, roundId:', roundId);
+                        this.showRoundDetails(roundId);
+                    }
+                });
+            });
+
+            // Comparison Timeline View events - 新增 
+            document.querySelectorAll('.comparison-timeline-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const roundId = parseInt(e.currentTarget.dataset.roundId);
+                    if (roundId && !isNaN(roundId)) {
+                        console.log('Comparison timeline item clicked, roundId:', roundId);
+                        this.showRoundDetails(roundId);
+                    }
+                });
+            });
+
+            // Detailed Comparison View events - 新增
+            document.querySelectorAll('.detailed-comparison-round-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const roundId = parseInt(e.currentTarget.dataset.roundId);
+                    if (roundId && !isNaN(roundId)) {
+                        console.log('Detailed comparison round item clicked, roundId:', roundId);
+                        this.showRoundDetails(roundId);
+                    }
+                });
+            });
+
+            // Score Timeline Chart events - 新增
+            document.querySelectorAll('.timeline-point').forEach(point => {
+                point.addEventListener('click', (e) => {
+                    const roundId = parseInt(e.currentTarget.dataset.round);
+                    if (roundId && !isNaN(roundId)) {
+                        console.log('Timeline chart point clicked, roundId:', roundId);
+                        this.showRoundDetails(roundId);
+                    }
+                });
+            });
+
+            // Tag events
+        document.querySelectorAll('.suggestion-tag, .factor-tag').forEach(tag => {
+            tag.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        });
+            
+            console.log('Event listeners added for all views successfully');
+        } catch (error) {
+            console.error('Error in addAllViewClickEvents:', error);
+        }
+    }
+    
+    // Add event listeners for timeline view (保持向后兼容)
+    addTimelineClickEvents() {
+        this.addAllViewClickEvents();
     }
 
     // Create compact view
@@ -1072,7 +2583,9 @@ class AnalysisManager {
     
     // Show round details modal
     showRoundDetails(roundId) {
-        const round = this.rounds.find(r => r.id === roundId);
+        if (!this.currentGame || !this.currentGame.rounds) return;
+        
+        const round = this.currentGame.rounds.find(r => r.id === roundId);
         if (!round) return;
         
         const loserText = round.winner === 'playerA' ? 'Player B' : 'Player A';
@@ -1104,6 +2617,170 @@ class AnalysisManager {
                 document.body.removeChild(modal);
             }
         });
+    }
+
+    // 创建回合筛选控件HTML
+    createRoundFiltersHTML() {
+        const errorTypes = this.getAvailableErrorTypes();
+        
+        return `
+            <div class="round-filters">
+                <div class="filters-header">
+                    <h4>🔍 Filter Options</h4>
+                    <button class="filter-reset-btn" onclick="analysisManager.resetRoundFilters()">
+                        Reset All Filters
+                    </button>
+                </div>
+                
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">👥 Player Focus:</label>
+                        <select class="filter-select" id="playerFilter" onchange="analysisManager.updateRoundFilter('player', this.value)">
+                            <option value="all" ${this.roundFilters.player === 'all' ? 'selected' : ''}>All Players</option>
+                            <option value="playerA" ${this.roundFilters.player === 'playerA' ? 'selected' : ''}>🔵 Player A Only</option>
+                            <option value="playerB" ${this.roundFilters.player === 'playerB' ? 'selected' : ''}>🔴 Player B Only</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label class="filter-label">📊 Result Type:</label>
+                        <select class="filter-select" id="resultFilter" onchange="analysisManager.updateRoundFilter('result', this.value)">
+                            <option value="all" ${this.roundFilters.result === 'all' ? 'selected' : ''}>All Results</option>
+                            <option value="wins" ${this.roundFilters.result === 'wins' ? 'selected' : ''}>✅ Player Wins Only</option>
+                            <option value="losses" ${this.roundFilters.result === 'losses' ? 'selected' : ''}>❌ Player Losses Only</option>
+                        </select>
+                        <small class="filter-hint">Note: Select a player first for Win/Loss filtering</small>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label class="filter-label">⚠️ Error Type:</label>
+                        <select class="filter-select" id="errorFilter" onchange="analysisManager.updateRoundFilter('errorType', this.value)">
+                            <option value="all" ${this.roundFilters.errorType === 'all' ? 'selected' : ''}>All Error Types</option>
+                            ${errorTypes.map(error => 
+                                `<option value="${error}" ${this.roundFilters.errorType === error ? 'selected' : ''}>${error}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // 获取可用的错误类型
+    getAvailableErrorTypes() {
+        if (!this.currentGame || !this.currentGame.rounds) return [];
+        
+        const errorTypes = new Set();
+        this.currentGame.rounds.forEach(round => {
+            if (round.analysis && round.analysis.errorType) {
+                errorTypes.add(round.analysis.errorType);
+            }
+        });
+        
+        return Array.from(errorTypes).sort();
+    }
+    
+    // 应用回合筛选
+    applyRoundFilters(rounds) {
+        return rounds.filter(round => {
+            // Player筛选
+            if (this.roundFilters.player !== 'all') {
+                const selectedPlayer = this.roundFilters.player;
+                
+                // Result筛选与Player筛选结合
+                if (this.roundFilters.result === 'wins') {
+                    // 显示指定玩家获胜的回合
+                    if (round.winner !== selectedPlayer) return false;
+                } else if (this.roundFilters.result === 'losses') {
+                    // 显示指定玩家失败的回合
+                    if (round.winner === selectedPlayer) return false;
+                } else {
+                    // 'all' - 显示与指定玩家相关的所有回合（实际上就是所有回合，因为每个回合都涉及两个玩家）
+                    // 但为了更好的用户体验，这里可以显示该玩家获胜的回合
+                    if (round.winner !== selectedPlayer) return false;
+                }
+            } else {
+                // 没有选择特定玩家时的Result筛选
+                if (this.roundFilters.result === 'wins') {
+                    // 显示所有获胜回合（这个逻辑在没有指定玩家时可能不太有意义）
+                    // 保持显示所有回合
+                } else if (this.roundFilters.result === 'losses') {
+                    // 显示所有失败回合（同样，在没有指定玩家时意义不大）
+                    // 保持显示所有回合
+                }
+            }
+            
+            // Error Type筛选
+            if (this.roundFilters.errorType !== 'all') {
+                if (!round.analysis || round.analysis.errorType !== this.roundFilters.errorType) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+    }
+    
+    // 更新筛选器
+    updateRoundFilter(filterType, value) {
+        this.roundFilters[filterType] = value;
+        
+        // 如果选择了特定玩家，自动调整结果筛选的逻辑
+        if (filterType === 'player' && value !== 'all') {
+            // 保持当前的result筛选，但重新解释其含义
+        }
+        
+        // 重新显示分析
+        this.displayGameAnalysis();
+    }
+    
+    // 重置所有筛选器
+    resetRoundFilters() {
+        this.roundFilters = {
+            player: 'all',
+            result: 'all',
+            errorType: 'all'
+        };
+        this.displayGameAnalysis();
+    }
+    
+    // 获取筛选摘要
+    getFilterSummary(filteredRounds) {
+        if (!filteredRounds.length) return '';
+        
+        const playerAWins = filteredRounds.filter(r => r.winner === 'playerA').length;
+        const playerBWins = filteredRounds.filter(r => r.winner === 'playerB').length;
+        
+        let summary = `<div class="filter-summary">`;
+        
+        if (this.roundFilters.player !== 'all') {
+            const playerName = this.roundFilters.player === 'playerA' ? '🔵 Player A' : '🔴 Player B';
+            let resultText = '';
+            
+            if (this.roundFilters.result === 'wins') {
+                resultText = ' Wins';
+            } else if (this.roundFilters.result === 'losses') {
+                resultText = ' Losses';
+            } else {
+                resultText = ' (All Results)';
+            }
+            
+            summary += `<span class="summary-item">Focus: ${playerName}${resultText}</span>`;
+        } else {
+            summary += `<span class="summary-item">🔵 A: ${playerAWins} wins | 🔴 B: ${playerBWins} wins</span>`;
+        }
+        
+        if (this.roundFilters.result !== 'all' && this.roundFilters.player === 'all') {
+            const resultText = this.roundFilters.result === 'wins' ? '✅ Wins Only' : '❌ Losses Only';
+            summary += `<span class="summary-item">${resultText}</span>`;
+        }
+        
+        if (this.roundFilters.errorType !== 'all') {
+            summary += `<span class="summary-item">⚠️ Error: ${this.roundFilters.errorType}</span>`;
+        }
+        
+        summary += `</div>`;
+        return summary;
     }
 }
 

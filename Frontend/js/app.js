@@ -12,6 +12,11 @@ class SmartCourtApp {
             elapsedTime: 0
         };
         
+        // Game history management
+        this.gamesHistory = [];
+        this.currentGameId = null;
+        this.gameCounter = 0;
+        
         this.init();
     }
     
@@ -71,163 +76,171 @@ class SmartCourtApp {
     }
     
     generateSampleLossData() {
-        // Create sample rounds with loss analysis for demonstration
-        const sampleRounds = [
+        // Generate multiple sample games for demonstration
+        this.generateSampleGames();
+        
+        // Load the most recent game into current game state
+        if (this.gamesHistory.length > 0) {
+            const mostRecentGame = this.gamesHistory[this.gamesHistory.length - 1];
+            this.loadGame(mostRecentGame.gameId);
+        }
+    }
+    
+    generateSampleGames() {
+        const games = [
+            // Game 1: Player A wins 7-5 (Most recent - current state)
             {
-                id: 1,
+                gameId: 'GAME-001',
+                gameType: 'Practice Match',
+                startTime: new Date(Date.now() - 600000), // 10 minutes ago
+                endTime: new Date(Date.now() - 60000), // 1 minute ago  
+                duration: 540, // 9 minutes
+                finalScores: { playerA: 6, playerB: 5 },
+                winner: null, // Still in progress
+                status: 'paused',
+                rounds: [
+                    { id: 1, winner: 'playerB', timestamp: new Date(Date.now() - 580000), playerAScore: 0, playerBScore: 1, analysis: { feedback: 'The defense was broken through due to poor positioning', errorType: 'Defensive errors', suggestions: ['Improve defensive positioning', 'Enhance ball trajectory prediction'] }},
+                    { id: 2, winner: 'playerA', timestamp: new Date(Date.now() - 540000), playerAScore: 1, playerBScore: 1, analysis: { feedback: 'Reaction speed was insufficient, failed to respond to opponent attacks', errorType: 'Slow reaction', suggestions: ['Strengthen reaction speed training', 'Improve movement footwork'] }},
+                    { id: 3, winner: 'playerB', timestamp: new Date(Date.now() - 500000), playerAScore: 1, playerBScore: 2, analysis: { feedback: 'Attention was distracted, missed defensive timing', errorType: 'Attention distraction', suggestions: ['Strengthen concentration training', 'Establish match rhythm'] }},
+                    { id: 4, winner: 'playerA', timestamp: new Date(Date.now() - 460000), playerAScore: 2, playerBScore: 2, analysis: { feedback: 'Technical execution was non-standard, affecting ball control', errorType: 'Non-standard technical actions', suggestions: ['Standardize technical movements', 'Return to basic practice'] }},
+                    { id: 5, winner: 'playerB', timestamp: new Date(Date.now() - 420000), playerAScore: 2, playerBScore: 3, analysis: { feedback: 'Movement speed was too slow, couldn\'t keep up with ball pace', errorType: 'Slow reaction', suggestions: ['Strengthen physical training', 'Improve movement speed'] }},
+                    { id: 6, winner: 'playerA', timestamp: new Date(Date.now() - 380000), playerAScore: 3, playerBScore: 3, analysis: { feedback: 'Good recovery after losing point', errorType: null, suggestions: ['Maintain momentum', 'Keep focused on positioning'] }},
+                    { id: 7, winner: 'playerA', timestamp: new Date(Date.now() - 340000), playerAScore: 4, playerBScore: 3, analysis: { feedback: 'Excellent attack strategy under pressure', errorType: null, suggestions: ['Continue aggressive play', 'Watch for counter-attacks'] }},
+                    { id: 8, winner: 'playerB', timestamp: new Date(Date.now() - 300000), playerAScore: 4, playerBScore: 4, analysis: { feedback: 'Ball control was compromised under pressure', errorType: 'Non-standard technical actions', suggestions: ['Focus on fundamental techniques', 'Maintain composure'] }},
+                    { id: 9, winner: 'playerA', timestamp: new Date(Date.now() - 260000), playerAScore: 5, playerBScore: 4, analysis: { feedback: 'Decisive play in crucial moment', errorType: null, suggestions: ['Keep pressure on opponent', 'Stay alert for comeback'] }},
+                    { id: 10, winner: 'playerB', timestamp: new Date(Date.now() - 220000), playerAScore: 5, playerBScore: 5, analysis: { feedback: 'Defensive lapse allowed opponent comeback', errorType: 'Defensive errors', suggestions: ['Strengthen defensive positioning', 'Maintain concentration'] }},
+                    { id: 11, winner: 'playerA', timestamp: new Date(Date.now() - 180000), playerAScore: 6, playerBScore: 5, analysis: { feedback: 'Match point advantage! One point away from 7-point victory', errorType: null, suggestions: ['Stay calm under pressure', 'One more point to win!'] }}
+                ]
+            },
+            
+            // Game 2: Player B wins 7-3 (Completed)
+            {
+                gameId: 'GAME-002',
+                gameType: 'Training Session',
+                startTime: new Date(Date.now() - 7200000), // 2 hours ago
+                endTime: new Date(Date.now() - 6600000), // 1.5 hours ago
+                duration: 600, // 10 minutes
+                finalScores: { playerA: 3, playerB: 7 },
                 winner: 'playerB',
-                timestamp: new Date(Date.now() - 300000), // 5 minutes ago
-                playerAScore: 0,
-                playerBScore: 1,
-                analysis: {
-                    feedback: 'The defense was broken through due to poor positioning',
-                    errorType: 'Defensive errors',
-                    suggestions: ['Improve defensive positioning', 'Enhance ball trajectory prediction', 'Learn better defensive strategies']
-                }
+                status: 'ended',
+                rounds: [
+                    { id: 1, winner: 'playerB', timestamp: new Date(Date.now() - 7150000), playerAScore: 0, playerBScore: 1, analysis: { feedback: 'Strong opening play', errorType: null, suggestions: ['Keep up the momentum'] }},
+                    { id: 2, winner: 'playerB', timestamp: new Date(Date.now() - 7100000), playerAScore: 0, playerBScore: 2, analysis: { feedback: 'Opponent failed to adapt to pace', errorType: 'Slow reaction', suggestions: ['Increase reaction training'] }},
+                    { id: 3, winner: 'playerA', timestamp: new Date(Date.now() - 7050000), playerAScore: 1, playerBScore: 2, analysis: { feedback: 'Good defensive recovery', errorType: null, suggestions: ['Build on this success'] }},
+                    { id: 4, winner: 'playerB', timestamp: new Date(Date.now() - 7000000), playerAScore: 1, playerBScore: 3, analysis: { feedback: 'Excellent ball placement', errorType: null, suggestions: ['Continue strategic play'] }},
+                    { id: 5, winner: 'playerB', timestamp: new Date(Date.now() - 6950000), playerAScore: 1, playerBScore: 4, analysis: { feedback: 'Opponent defensive positioning poor', errorType: 'Defensive errors', suggestions: ['Review defensive fundamentals'] }},
+                    { id: 6, winner: 'playerA', timestamp: new Date(Date.now() - 6900000), playerAScore: 2, playerBScore: 4, analysis: { feedback: 'Improved concentration showing results', errorType: null, suggestions: ['Maintain focus'] }},
+                    { id: 7, winner: 'playerB', timestamp: new Date(Date.now() - 6850000), playerAScore: 2, playerBScore: 5, analysis: { feedback: 'Technical superiority evident', errorType: null, suggestions: ['Close out the game'] }},
+                    { id: 8, winner: 'playerA', timestamp: new Date(Date.now() - 6800000), playerAScore: 3, playerBScore: 5, analysis: { feedback: 'Late game pressure response', errorType: null, suggestions: ['Fight for every point'] }},
+                    { id: 9, winner: 'playerB', timestamp: new Date(Date.now() - 6750000), playerAScore: 3, playerBScore: 6, analysis: { feedback: 'Match point opportunity', errorType: null, suggestions: ['One point to victory'] }},
+                    { id: 10, winner: 'playerB', timestamp: new Date(Date.now() - 6700000), playerAScore: 3, playerBScore: 7, analysis: { feedback: 'Victory secured with decisive shot', errorType: null, suggestions: ['Excellent performance!'] }}
+                ]
             },
+            
+            // Game 3: Player A wins 7-4 (Completed)
             {
-                id: 2,
+                gameId: 'GAME-003',
+                gameType: 'Competitive Match',
+                startTime: new Date(Date.now() - 14400000), // 4 hours ago
+                endTime: new Date(Date.now() - 13800000), // 3.5 hours ago
+                duration: 600, // 10 minutes
+                finalScores: { playerA: 7, playerB: 4 },
                 winner: 'playerA',
-                timestamp: new Date(Date.now() - 240000), // 4 minutes ago
-                playerAScore: 1,
-                playerBScore: 1,
-                analysis: {
-                    feedback: 'Reaction speed was insufficient, failed to respond to opponent attacks',
-                    errorType: 'Slow reaction',
-                    suggestions: ['Strengthen reaction speed training', 'Improve movement footwork', 'Enhance ball control practice']
-                }
-            },
-            {
-                id: 3,
-                winner: 'playerB',
-                timestamp: new Date(Date.now() - 180000), // 3 minutes ago
-                playerAScore: 1,
-                playerBScore: 2,
-                analysis: {
-                    feedback: 'Attention was distracted, missed defensive timing',
-                    errorType: 'Attention distraction',
-                    suggestions: ['Strengthen concentration training', 'Strengthen mental pressure training', 'Establish match rhythm']
-                }
-            },
-            {
-                id: 4,
-                winner: 'playerA',
-                timestamp: new Date(Date.now() - 120000), // 2 minutes ago
-                playerAScore: 2,
-                playerBScore: 2,
-                analysis: {
-                    feedback: 'Technical execution was non-standard, affecting ball control',
-                    errorType: 'Non-standard technical actions',
-                    suggestions: ['Standardize technical movements', 'Return to basic practice', 'Seek coach guidance']
-                }
-            },
-            {
-                id: 5,
-                winner: 'playerB',
-                timestamp: new Date(Date.now() - 300000), // 5 minutes ago
-                playerAScore: 2,
-                playerBScore: 3,
-                analysis: {
-                    feedback: 'Movement speed was too slow, couldn\'t keep up with ball pace',
-                    errorType: 'Slow reaction',
-                    suggestions: ['Strengthen physical training', 'Improve movement speed', 'Enhance footwork techniques']
-                }
-            },
-            {
-                id: 6,
-                winner: 'playerA',
-                timestamp: new Date(Date.now() - 240000), // 4 minutes ago
-                playerAScore: 3,
-                playerBScore: 3,
-                analysis: {
-                    feedback: 'Good recovery after losing point',
-                    errorType: null,
-                    suggestions: ['Maintain momentum', 'Keep focused on positioning']
-                }
-            },
-            {
-                id: 7,
-                winner: 'playerA',
-                timestamp: new Date(Date.now() - 180000), // 3 minutes ago
-                playerAScore: 4,
-                playerBScore: 3,
-                analysis: {
-                    feedback: 'Excellent attack strategy under pressure',
-                    errorType: null,
-                    suggestions: ['Continue aggressive play', 'Watch for counter-attacks']
-                }
-            },
-            {
-                id: 8,
-                winner: 'playerB',
-                timestamp: new Date(Date.now() - 120000), // 2 minutes ago
-                playerAScore: 4,
-                playerBScore: 4,
-                analysis: {
-                    feedback: 'Ball control was compromised under pressure',
-                    errorType: 'Non-standard technical actions',
-                    suggestions: ['Focus on fundamental techniques', 'Maintain composure']
-                }
-            },
-            {
-                id: 9,
-                winner: 'playerA',
-                timestamp: new Date(Date.now() - 90000), // 1.5 minutes ago
-                playerAScore: 5,
-                playerBScore: 4,
-                analysis: {
-                    feedback: 'Decisive play in crucial moment',
-                    errorType: null,
-                    suggestions: ['Keep pressure on opponent', 'Stay alert for comeback']
-                }
-            },
-            {
-                id: 10,
-                winner: 'playerB',
-                timestamp: new Date(Date.now() - 45000), // 45 seconds ago
-                playerAScore: 5,
-                playerBScore: 5,
-                analysis: {
-                    feedback: 'Defensive lapse allowed opponent comeback',
-                    errorType: 'Defensive errors',
-                    suggestions: ['Strengthen defensive positioning', 'Maintain concentration']
-                }
-            },
-            {
-                id: 11,
-                winner: 'playerA',
-                timestamp: new Date(Date.now() - 10000), // 10 seconds ago
-                playerAScore: 6,
-                playerBScore: 5,
-                analysis: {
-                    feedback: 'Match point advantage! One point away from 7-point victory',
-                    errorType: null,
-                    suggestions: ['Stay calm under pressure', 'One more point to win!', 'Focus on next play']
-                }
+                status: 'ended',
+                rounds: [
+                    { id: 1, winner: 'playerA', timestamp: new Date(Date.now() - 14350000), playerAScore: 1, playerBScore: 0, analysis: { feedback: 'Perfect game opening', errorType: null, suggestions: ['Maintain aggressive play'] }},
+                    { id: 2, winner: 'playerA', timestamp: new Date(Date.now() - 14300000), playerAScore: 2, playerBScore: 0, analysis: { feedback: 'Dominant early performance', errorType: null, suggestions: ['Keep pressure on opponent'] }},
+                    { id: 3, winner: 'playerB', timestamp: new Date(Date.now() - 14250000), playerAScore: 2, playerBScore: 1, analysis: { feedback: 'Opponent breaks through defense', errorType: 'Defensive errors', suggestions: ['Tighten defensive positioning'] }},
+                    { id: 4, winner: 'playerA', timestamp: new Date(Date.now() - 14200000), playerAScore: 3, playerBScore: 1, analysis: { feedback: 'Quick response to opponent score', errorType: null, suggestions: ['Stay mentally strong'] }},
+                    { id: 5, winner: 'playerB', timestamp: new Date(Date.now() - 14150000), playerAScore: 3, playerBScore: 2, analysis: { feedback: 'Attention lapse allows comeback', errorType: 'Attention distraction', suggestions: ['Maintain concentration'] }},
+                    { id: 6, winner: 'playerA', timestamp: new Date(Date.now() - 14100000), playerAScore: 4, playerBScore: 2, analysis: { feedback: 'Regaining control of match', errorType: null, suggestions: ['Build toward victory'] }},
+                    { id: 7, winner: 'playerB', timestamp: new Date(Date.now() - 14050000), playerAScore: 4, playerBScore: 3, analysis: { feedback: 'Opponent shows resilience', errorType: 'Poor attack angle', suggestions: ['Improve shot selection'] }},
+                    { id: 8, winner: 'playerA', timestamp: new Date(Date.now() - 14000000), playerAScore: 5, playerBScore: 3, analysis: { feedback: 'Strategic patience pays off', errorType: null, suggestions: ['Two more points to win'] }},
+                    { id: 9, winner: 'playerB', timestamp: new Date(Date.now() - 13950000), playerAScore: 5, playerBScore: 4, analysis: { feedback: 'Late comeback attempt', errorType: 'Non-standard technical actions', suggestions: ['Focus on fundamentals'] }},
+                    { id: 10, winner: 'playerA', timestamp: new Date(Date.now() - 13900000), playerAScore: 6, playerBScore: 4, analysis: { feedback: 'Match point achieved', errorType: null, suggestions: ['One point from victory'] }},
+                    { id: 11, winner: 'playerA', timestamp: new Date(Date.now() - 13850000), playerAScore: 7, playerBScore: 4, analysis: { feedback: 'Decisive victory completed!', errorType: null, suggestions: ['Excellent match performance'] }}
+                ]
             }
         ];
         
-        // Add sample rounds to game state
-        this.gameState.rounds = sampleRounds;
-        this.gameState.currentRound = sampleRounds.length; // Now 11 rounds
-        this.gameState.scores = { playerA: 6, playerB: 5 }; // Close to 7-point target for demonstration
+        // Add games to history
+        this.gamesHistory = games;
+        this.gameCounter = games.length;
+    }
+    
+    // Game management methods
+    loadGame(gameId) {
+        const game = this.gamesHistory.find(g => g.gameId === gameId);
+        if (!game) return false;
         
-        // Set game status to ended if anyone has 7 points
-        if (this.gameState.scores.playerA >= 7 || this.gameState.scores.playerB >= 7) {
-            this.gameState.status = 'ended';
-            this.gameState.endTime = new Date();
-        }
+        // Load game data into current state
+        this.currentGameId = gameId;
+        this.gameState.rounds = [...game.rounds];
+        this.gameState.currentRound = game.rounds.length;
+        this.gameState.scores = { ...game.finalScores };
+        this.gameState.status = game.status;
+        this.gameState.startTime = game.startTime;
+        this.gameState.endTime = game.endTime;
+        this.gameState.elapsedTime = game.duration;
+        
+        // Update UI
+        this.updateGameStatus();
+        this.updateScoreboard();
         
         // Update analysis manager if available
         if (window.analysisManager) {
             setTimeout(() => {
-                window.analysisManager.rounds = [...sampleRounds];
+                window.analysisManager.rounds = [...game.rounds];
                 window.analysisManager.displayRounds();
-            }, 1000);
+            }, 100);
         }
         
-        // Update scoreboard
-        this.updateScoreboard();
+        return true;
+    }
+    
+    saveCurrentGameToHistory() {
+        if (!this.currentGameId) {
+            // Create new game ID
+            this.gameCounter++;
+            this.currentGameId = `GAME-${String(this.gameCounter).padStart(3, '0')}`;
+        }
+        
+        // Find existing game or create new one
+        let gameIndex = this.gamesHistory.findIndex(g => g.gameId === this.currentGameId);
+        const gameData = {
+            gameId: this.currentGameId,
+            gameType: this.gameState.status === 'ended' ? 'Completed Match' : 'Live Match',
+            startTime: this.gameState.startTime,
+            endTime: this.gameState.endTime,
+            duration: this.gameState.elapsedTime,
+            finalScores: { ...this.gameState.scores },
+            winner: this.gameState.status === 'ended' ? 
+                   (this.gameState.scores.playerA >= 7 ? 'playerA' : 
+                    this.gameState.scores.playerB >= 7 ? 'playerB' : null) : null,
+            status: this.gameState.status,
+            rounds: [...this.gameState.rounds]
+        };
+        
+        if (gameIndex >= 0) {
+            // Update existing game
+            this.gamesHistory[gameIndex] = gameData;
+        } else {
+            // Add new game
+            this.gamesHistory.push(gameData);
+        }
+    }
+    
+    getGamesHistory() {
+        return [...this.gamesHistory];
+    }
+    
+    deleteGame(gameId) {
+        const index = this.gamesHistory.findIndex(g => g.gameId === gameId);
+        if (index >= 0) {
+            this.gamesHistory.splice(index, 1);
+            return true;
+        }
+        return false;
     }
     
     switchTab(tabName) {
@@ -257,10 +270,19 @@ class SmartCourtApp {
     onTabSwitch(tabName) {
         // Execute corresponding logic based on switched tab
         switch (tabName) {
+            case 'history':
+                // Refresh game history data
+                if (window.gameHistoryManager) {
+                    window.gameHistoryManager.refreshDisplay();
+                }
+                break;
             case 'analysis':
-                // Refresh analysis data
+                // Refresh game analysis data
                 if (window.analysisManager) {
-                    window.analysisManager.refreshAnalysis();
+                    // Force refresh to get latest games
+                    setTimeout(() => {
+                        window.analysisManager.refreshAnalysis();
+                    }, 100);
                 }
                 break;
             case 'replay':
@@ -288,13 +310,17 @@ class SmartCourtApp {
                     break;
                 case '2':
                     e.preventDefault();
-                    this.switchTab('analysis');
+                    this.switchTab('history');
                     break;
                 case '3':
                     e.preventDefault();
-                    this.switchTab('replay');
+                    this.switchTab('analysis');
                     break;
                 case '4':
+                    e.preventDefault();
+                    this.switchTab('replay');
+                    break;
+                case '5':
                     e.preventDefault();
                     this.switchTab('report');
                     break;
@@ -350,6 +376,10 @@ class SmartCourtApp {
     
     // Game state management
     startGame() {
+        // Create new game ID for new game
+        this.gameCounter++;
+        this.currentGameId = `GAME-${String(this.gameCounter).padStart(3, '0')}`;
+        
         this.gameState.status = 'playing';
         this.gameState.startTime = new Date();
         this.gameState.scores = { playerA: 0, playerB: 0 };
@@ -360,12 +390,15 @@ class SmartCourtApp {
         this.startTimer();
         this.updateGameStatus();
         this.updateScoreboard();
-        this.addLiveFeedItem('Match started!', 'score');
+        this.addLiveFeedItem(`New match started! Game ID: ${this.currentGameId}`, 'score');
+        
+        // Save initial game state to history
+        this.saveCurrentGameToHistory();
         
         // Simulate scoring
         this.simulateGameplay();
         
-        this.showMessage('Match has started!', 'success');
+        this.showMessage(`New match started! Game ID: ${this.currentGameId}`, 'success');
     }
     
     pauseGame() {
@@ -395,8 +428,11 @@ class SmartCourtApp {
                       this.gameState.scores.playerA > this.gameState.scores.playerB ? 'A' : 'B';
         
         const finalScore = `${this.gameState.scores.playerA}-${this.gameState.scores.playerB}`;
-        this.addLiveFeedItem(`🏆 MATCH ENDED! Player ${winner} wins ${finalScore}!`, 'score');
-        this.showMessage(`🏆 Player ${winner} wins ${finalScore}! Target: 7 points`, 'success');
+        this.addLiveFeedItem(`🏆 MATCH ENDED! Player ${winner} wins ${finalScore}! (${this.currentGameId})`, 'score');
+        this.showMessage(`🏆 Player ${winner} wins ${finalScore}! Game ${this.currentGameId} completed`, 'success');
+        
+        // Save final game state to history
+        this.saveCurrentGameToHistory();
         
         // Generate final report
         if (window.reportManager) {
@@ -442,6 +478,9 @@ class SmartCourtApp {
         if (window.analysisManager) {
             window.analysisManager.addRound(round);
         }
+        
+        // Save updated game state to history
+        this.saveCurrentGameToHistory();
     }
     
     generateAIAnalysis() {
