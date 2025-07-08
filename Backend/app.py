@@ -14,6 +14,7 @@ current_score = {
     'B': 0
 }
 current_round = 0
+current_game = 0
 
 # emit the current score when the new client connects
 @socketio.on('connect')
@@ -73,6 +74,40 @@ def call_retrieve_rounds(gid=None):
         "status": "success",
         "rounds": rounds
     }), 200
+
+@app.route('/newgame', methods=['POST'])
+def new_game():
+    data = request.get_json()
+
+    # get the data
+    try:
+        playerA = int(data.get('playerA'))
+        playerB = int(data.get('playerB'))
+        logger.debug(f'playerA: {playerA}')
+        logger.debug(f'playerB: {playerB}')
+    except ValueError as e:
+        return jsonify({
+            "status": "error",
+            'message': 'player id should be an integer'
+        }), 400
+
+    # create the new game and get its gid
+    try:
+        gid = create_game(playerA, playerB)
+    except RuntimeError as e:
+        return jsonify({
+            "status": "error",
+            'message': str(e)
+        }), 500
+
+    # change the current game to the new game
+    global current_game
+    current_game = gid
+
+    return jsonify({
+        "status": "success",
+        "gid": gid
+    }), 201
 
 @app.route('/goal', methods=['GET'])
 def goal():
