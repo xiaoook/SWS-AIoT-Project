@@ -1,8 +1,24 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, request, jsonify
 from Backend.core.dataManage import *
 from Backend.logger import logger
-
+from flask_socketio import SocketIO, emit
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'hockey!'
+socketio = SocketIO(app)
+
+current_score = {
+    'A': 0,
+    'B': 0
+}
+
+# emit the current score when the new client connects
+@socketio.on('connect')
+def on_connect():
+    logger.info('Client connected')
+    emit('score_update', curren_score)
 
 @app.route('/', methods=['GET'])
 def index():
@@ -57,5 +73,22 @@ def call_retrieve_rounds(gid=None):
         "rounds": rounds
     }), 200
 
+@app.route('/goal', methods=['GET'])
+def goal():
+    global current_score
+    team = request.args.get('team')
+    logger.debug(f'team: {team}')
+    if team in current_score:
+        current_score[team] += 1
+        logger.info(f'{team} scored, current score: {current_score[team]}')
+        return jsonify({
+            "status": "success"
+        }), 200
+    return jsonify({
+        "status": "error",
+        "message": "team not found"
+    }), 400
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # app.run(debug=True, port=5000)
+    socketio.run(app, debug=True, port=5000)
