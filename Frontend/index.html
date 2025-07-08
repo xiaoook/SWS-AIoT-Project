@@ -20,7 +20,8 @@
                 </h1>
                 <nav class="nav">
                     <button class="nav-btn" data-tab="game">Game Control</button>
-                    <button class="nav-btn" data-tab="analysis">Round Analysis</button>
+                    <button class="nav-btn" data-tab="history">Game History</button>
+                    <button class="nav-btn" data-tab="analysis">Game Analysis</button>
                     <button class="nav-btn" data-tab="replay">Video Replay</button>
                     <button class="nav-btn" data-tab="report">Match Report</button>
                 </nav>
@@ -81,22 +82,55 @@
                 </div>
             </section>
 
-            <!-- Round Analysis -->
+            <!-- Game History -->
+            <section id="history-tab" class="tab-content">
+                <div class="container">
+                    <h2>🎮 Game History</h2>
+                    <div class="history-controls">
+                        <div class="history-toolbar">
+                            <div class="info-display">
+                                <span id="totalGames" class="info-item">Total Games: 0</span>
+                                <span id="completedGames" class="info-item">Completed: 0</span>
+                                <span id="activeGames" class="info-item">Active: 0</span>
+                            </div>
+                            <div class="action-controls">
+                                <button id="refreshHistory" class="btn btn-secondary">🔄 Refresh</button>
+                                <button id="clearHistory" class="btn btn-danger">🗑️ Clear All</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="games-container">
+                        <div id="gamesGrid" class="games-grid">
+                            <div class="no-games">No games found. Start a new game to see history.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Game Analysis -->
             <section id="analysis-tab" class="tab-content">
                 <div class="container">
-                    <h2>Round by Round Analysis</h2>
+                    <h2>Game Analysis Dashboard</h2>
                     <div class="analysis-controls">
                         <div class="analysis-toolbar">
-                            <div class="filter-controls">
-                                <button class="filter-btn active" data-filter="all">All Rounds</button>
-                                <button class="filter-btn" data-filter="playerA">Player A Losses</button>
-                                <button class="filter-btn" data-filter="playerB">Player B Losses</button>
-                            </div>
-                            <div class="view-controls">
-                                <button class="view-btn active" data-view="cards">🎯 Detailed Cards</button>
-                                <button class="view-btn" data-view="compact">📋 Compact List</button>
-                                <button class="view-btn" data-view="table">📊 Data Table</button>
-                                <button class="view-btn" data-view="summary">📈 Statistics</button>
+                            <!-- 简化为3个核心分析模式 -->
+                            <div class="analysis-modes">
+                                <button class="mode-btn active" data-mode="rounds">
+                                    <span class="mode-icon">📊</span>
+                                    <span class="mode-text">Round Analysis</span>
+                                    <span class="mode-desc">Round-by-round timeline view</span>
+                                </button>
+                                <button class="mode-btn" data-mode="detailed">
+                                    <span class="mode-icon">🎯</span>
+                                    <span class="mode-text">Detailed Analysis</span>
+                                    <span class="mode-desc">In-depth technical analysis</span>
+                                </button>
+                                <button class="mode-btn" data-mode="comparison">
+                                    <span class="mode-icon">⚖️</span>
+                                    <span class="mode-text">Player Comparison</span>
+                                    <span class="mode-desc">A vs B performance comparison</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -116,8 +150,10 @@
                     <div class="replay-container">
                         <div class="video-section">
                             <video id="replayVideo" class="video-player" controls>
-                                <source src="placeholder-video.mp4" type="video/mp4">
-                                Your browser does not support video playback.
+                                <!-- Video source will be loaded dynamically when available -->
+                                <div class="video-placeholder">
+                                    <p>📹 Video replay will be available after game analysis</p>
+                                </div>
                             </video>
                         </div>
                         
@@ -198,6 +234,7 @@
 
     <script src="js/app.js"></script>
     <script src="js/gameControl.js"></script>
+    <script src="js/gameHistory.js"></script>
     <script src="js/analysis.js"></script>
     <script src="js/replay.js"></script>
     <script src="js/report.js"></script>
