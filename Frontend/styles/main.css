@@ -3942,9 +3942,11 @@ body {
 
 .overview-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 2.5rem;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2rem;
     margin-bottom: 2.5rem;
+    width: 100%;
+    max-width: 1200px;
 }
 
 .overview-card {
@@ -4128,9 +4130,10 @@ body {
 
 .advanced-stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
-    max-width: 900px;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 1200px;
 }
 
 .advanced-stat-card {
@@ -4206,116 +4209,129 @@ body {
     color: #3498db;
 }
 
-.dominance-meter {
-    position: relative;
-    height: 80px;
-    padding: 1.5rem;
-    background: rgba(44, 62, 80, 0.03);
-    border-radius: 12px;
-    border: 1px solid rgba(44, 62, 80, 0.1);
-    margin-bottom: 1.5rem;
+/* 重新设计的 Dominance Index */
+.dominance-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
-.dominance-bar {
-    width: 100%;
-    height: 12px;
-    background: linear-gradient(90deg, 
-        rgba(52, 152, 219, 0.3) 0%, 
-        rgba(52, 152, 219, 0.1) 30%, 
-        rgba(236, 240, 241, 1) 45%, 
-        rgba(236, 240, 241, 1) 55%, 
-        rgba(231, 76, 60, 0.1) 70%, 
-        rgba(231, 76, 60, 0.3) 100%);
-    border-radius: 6px;
+.dominance-visual {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid rgba(44, 62, 80, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.dominance-scale {
     position: relative;
-    top: 50%;
-    transform: translateY(-50%);
-    border: 2px solid rgba(44, 62, 80, 0.1);
+    margin: 1rem 0;
+}
+
+.dominance-track {
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, 
+        #3498db 0%, 
+        #74b9ff 20%, 
+        #ecf0f1 35%, 
+        #ecf0f1 65%, 
+        #ff7675 80%, 
+        #e74c3c 100%);
+    border-radius: 3px;
+    position: relative;
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.dominance-fill {
+.dominance-indicator {
     position: absolute;
-    top: -12px;
-    width: 20px;
-    height: 36px;
-    background: linear-gradient(135deg, #2c3e50, #34495e);
-    border-radius: 10px;
-    transform: translateX(-50%);
+    top: -6px;
+    width: 18px;
+    height: 18px;
+    background: #2c3e50;
     border: 2px solid white;
-    box-shadow: 0 4px 12px rgba(44, 62, 80, 0.3);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    cursor: pointer;
 }
 
-.dominance-fill:hover {
+.dominance-indicator:hover {
     transform: translateX(-50%) scale(1.1);
-    box-shadow: 0 6px 16px rgba(44, 62, 80, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.dominance-fill::before {
+.dominance-indicator::after {
     content: '';
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     background: white;
     border-radius: 50%;
     transform: translate(-50%, -50%);
 }
 
-.dominance-labels {
+.dominance-players {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 1.2rem;
-    font-size: 1rem;
-    font-weight: 600;
+    margin-top: 1rem;
     padding: 0 0.5rem;
 }
 
-.dominance-labels .player-label {
+.dominance-player {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #2c3e50;
+    font-size: 0.9rem;
+    font-weight: 600;
 }
 
-.dominance-labels .player-label:first-child {
-    color: #3498db;
-}
-
-.dominance-labels .player-label:last-child {
-    color: #e74c3c;
-}
-
-.dominance-labels .player-label::before {
-    content: '';
+.player-indicator {
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: currentColor;
 }
 
-.dominance-comparison {
+.player-a .player-indicator {
+    background: #3498db;
+}
+
+.player-b .player-indicator {
+    background: #e74c3c;
+}
+
+.player-a {
+    color: #3498db;
+}
+
+.player-b {
+    color: #e74c3c;
+}
+
+.dominance-result {
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
     margin-top: 0.5rem;
 }
 
-.dominance-description {
-    text-align: center;
-    margin-top: 1rem;
-}
-
-.dominance-value {
-    font-size: 1rem;
+.dominance-status {
+    font-size: 0.9rem;
     font-weight: 600;
     color: #495057;
-    background: rgba(108, 117, 125, 0.1);
-    padding: 0.8rem 1.2rem;
-    border-radius: 8px;
-    display: inline-block;
+    margin-bottom: 0.3rem;
+}
+
+.dominance-description {
+    font-size: 0.8rem;
+    color: #6c757d;
     line-height: 1.4;
-    border: 1px solid rgba(108, 117, 125, 0.2);
 }
 
 /* Score Timeline Chart */
@@ -4556,6 +4572,7 @@ body {
     
     .overview-grid, .advanced-stats-grid {
         grid-template-columns: 1fr;
+        gap: 1.5rem;
     }
     
     .score-bars {
@@ -4566,35 +4583,54 @@ body {
         height: 100px;
     }
     
-    .dominance-meter {
-        height: 70px;
-        padding: 1.2rem;
-        margin-bottom: 1rem;
+        .dominance-visual {
+        padding: 1rem;
     }
-    
-    .dominance-bar {
-        height: 8px;
+
+    .dominance-scale {
+        margin: 0.8rem 0;
     }
-    
-    .dominance-fill {
-        width: 16px;
-        height: 28px;
-        top: -10px;
+
+    .dominance-track {
+        height: 4px;
     }
-    
-    .dominance-labels {
-        font-size: 0.85rem;
-        margin-top: 0.6rem;
+
+    .dominance-indicator {
+        width: 14px;
+        height: 14px;
+        top: -5px;
     }
-    
-    .dominance-labels .player-label::before {
+
+    .dominance-indicator::after {
+        width: 4px;
+        height: 4px;
+    }
+
+    .dominance-players {
+        margin-top: 0.8rem;
+        padding: 0;
+    }
+
+    .dominance-player {
+        font-size: 0.8rem;
+    }
+
+    .player-indicator {
         width: 8px;
         height: 8px;
     }
-    
-    .dominance-value {
-        font-size: 0.9rem;
-        padding: 0.6rem 1rem;
+
+    .dominance-result {
+        padding: 0.8rem;
+        margin-top: 0.8rem;
+    }
+
+    .dominance-status {
+        font-size: 0.8rem;
+    }
+
+    .dominance-description {
+        font-size: 0.75rem;
     }
     
     .timeline-charts-container {
@@ -4623,6 +4659,19 @@ body {
     }
     
 
+}
+
+/* 响应式设计 - 中等尺寸屏幕 */
+@media (max-width: 1024px) {
+    .overview-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 1.8rem;
+    }
+    
+    .advanced-stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
 }
 
 /* 简化的分析模式选择器 */

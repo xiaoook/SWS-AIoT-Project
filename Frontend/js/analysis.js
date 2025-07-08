@@ -1418,9 +1418,9 @@ class AnalysisManager {
                                     <span class="consistency-score">${advancedStats.playerA.consistency}%</span>
                                 </div>
                                 <div class="consistency-item">
-                                    <span class="player-name">🔴 Player B</span>
+                            <span class="player-name">🔴 Player B</span>
                                     <span class="consistency-score">${advancedStats.playerB.consistency}%</span>
-                                </div>
+                        </div>
                             </div>
                         </div>
                         
@@ -1440,18 +1440,29 @@ class AnalysisManager {
                 
                         <div class="advanced-stat-card">
                             <h5>🏆 Dominance Index</h5>
-                            <div class="dominance-comparison">
-                                <div class="dominance-meter">
-                                    <div class="dominance-bar">
-                                        <div class="dominance-fill" style="left: ${this.calculateDominancePosition(comparisonStats)}%"></div>
+                            <div class="dominance-section">
+                                <div class="dominance-visual">
+                                    <div class="dominance-scale">
+                                        <div class="dominance-track">
+                                            <div class="dominance-indicator" style="left: ${this.calculateDominancePosition(comparisonStats)}%"></div>
+                                        </div>
                                     </div>
-                                    <div class="dominance-labels">
-                                        <span class="player-label">🔵 Player A</span>
-                                        <span class="player-label">🔴 Player B</span>
+                                    <div class="dominance-players">
+                                        <div class="dominance-player player-a">
+                                            <div class="player-indicator"></div>
+                                            <span>Player A</span>
+                                        </div>
+                                        <div class="dominance-player player-b">
+                                            <div class="player-indicator"></div>
+                                            <span>Player B</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="dominance-description">
-                                    <div class="dominance-value">
+                                <div class="dominance-result">
+                                    <div class="dominance-status">
+                                        ${this.getDominanceTitle(comparisonStats)}
+                                    </div>
+                                    <div class="dominance-description">
                                         ${this.getDominanceDescription(comparisonStats)}
                                     </div>
                                 </div>
@@ -1537,21 +1548,37 @@ class AnalysisManager {
         return total > 0 ? (totalA / total * 100) : 50;
     }
 
+    getDominanceTitle(stats) {
+        const position = this.calculateDominancePosition(stats);
+        
+        if (Math.abs(position - 50) < 10) {
+            return "Balanced Match";
+        } else if (position > 65) {
+            return "Player A Dominance";
+        } else if (position < 35) {
+            return "Player B Dominance";
+        } else if (position > 55) {
+            return "Player A Advantage";
+        } else {
+            return "Player B Advantage";
+        }
+    }
+
     getDominanceDescription(stats) {
         const position = this.calculateDominancePosition(stats);
         const playerAWinRate = parseFloat(stats.playerA.winRate) || 50;
         const playerBWinRate = parseFloat(stats.playerB.winRate) || 50;
         
         if (Math.abs(position - 50) < 10) {
-            return "Balanced Match - Very Close Competition";
+            return `Very close competition with ${playerAWinRate}% vs ${playerBWinRate}% win rates`;
         } else if (position > 65) {
-            return `Player A Dominance - ${playerAWinRate}% vs ${playerBWinRate}%`;
+            return `Strong performance advantage with ${playerAWinRate}% win rate`;
         } else if (position < 35) {
-            return `Player B Dominance - ${playerBWinRate}% vs ${playerAWinRate}%`;
+            return `Strong performance advantage with ${playerBWinRate}% win rate`;
         } else if (position > 55) {
-            return `Player A Advantage - ${playerAWinRate}% vs ${playerBWinRate}%`;
+            return `Slight edge in overall performance and consistency`;
         } else {
-            return `Player B Advantage - ${playerBWinRate}% vs ${playerAWinRate}%`;
+            return `Slight edge in overall performance and consistency`;
         }
     }
 
@@ -1717,7 +1744,7 @@ class AnalysisManager {
                             <span class="result-text ${playerALost ? 'lost' : 'won'}">
                                 ${playerALost ? 'Lost Point' : 'Won Point'}
                             </span>
-                        </div>
+                    </div>
                         ${playerALost ? this.createTimelinePlayerLoss(round.analysis) : this.createTimelinePlayerWin()}
                     </div>
                     
@@ -1725,8 +1752,8 @@ class AnalysisManager {
                         <div class="timeline-arrow ${playerALost ? 'right' : 'left'}">
                             ${playerALost ? '→' : '←'}
                         </div>
-                    </div>
-                    
+                </div>
+                
                     <div class="timeline-player-result player-b ${playerBLost ? 'lost-point' : 'won-point'}">
                         <div class="player-icon">🔴</div>
                         <div class="player-status">
@@ -1747,7 +1774,7 @@ class AnalysisManager {
         const timeStr = this.formatTime(round.timestamp);
         const playerALost = round.winner === 'playerB';
         const playerBLost = round.winner === 'playerA';
-
+        
         return `
             <div class="detailed-comparison-round-item" data-round-id="${round.id}">
                 <div class="detailed-round-header">
@@ -1755,7 +1782,7 @@ class AnalysisManager {
                         <h5>Round ${round.id} - ${timeStr}</h5>
                         <span class="score-detailed">${round.playerAScore} - ${round.playerBScore}</span>
                     </div>
-                    </div>
+                </div>
                 
                 <div class="detailed-players-analysis">
                     <div class="detailed-player-analysis player-a ${playerALost ? 'lost-point' : 'won-point'}">
@@ -1997,7 +2024,7 @@ class AnalysisManager {
                         <div class="distribution-bar">
                             <div class="win-segment player-a-wins" style="width: ${playerAPercentage}%"></div>
                             <div class="win-segment player-b-wins" style="width: ${playerBPercentage}%"></div>
-                        </div>
+                </div>
                         <div class="distribution-labels">
                             <span class="label-left">Player A: ${playerAWins} wins</span>
                             <span class="label-right">Player B: ${playerBWins} wins</span>
@@ -2048,7 +2075,7 @@ class AnalysisManager {
                 <div class="stat-content">
                     <div class="stat-value">${totalRounds}</div>
                     <div class="stat-label">Total Rounds</div>
-                </div>
+                    </div>
             </div>
             
             <div class="timeline-stat-item">
@@ -2056,9 +2083,9 @@ class AnalysisManager {
                 <div class="stat-content">
                     <div class="stat-value">${Math.max(playerAStreak, playerBStreak)}</div>
                     <div class="stat-label">Longest Streak</div>
+                    </div>
                 </div>
-            </div>
-            
+                
             <div class="timeline-stat-item">
                 <div class="stat-icon">⚡</div>
                 <div class="stat-content">
