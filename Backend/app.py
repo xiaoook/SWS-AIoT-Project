@@ -13,6 +13,7 @@ current_score = {
     'A': 0,
     'B': 0
 }
+current_round = 0
 
 # emit the current score when the new client connects
 @socketio.on('connect')
@@ -76,14 +77,31 @@ def call_retrieve_rounds(gid=None):
 @app.route('/goal', methods=['GET'])
 def goal():
     global current_score
+    global current_round
     team = request.args.get('team')
+
+    # error handling of gid
+    try:
+        gid = int(request.args.get('gid'))
+    except ValueError:
+        return jsonify({
+            "status": "error",
+            'message': 'gid should be an integer'
+        })
+
     logger.debug(f'team: {team}')
+    # make sure the team is right
     if team in current_score:
+        current_round += 1
         current_score[team] += 1
+        socketio.emit('score_update', current_score)
         logger.info(f'{team} scored, current score: {current_score[team]}')
+        insert_rounds(gid, current_round, current_score) # insert the round into database
         return jsonify({
             "status": "success"
         }), 200
+
+    # invalid team
     return jsonify({
         "status": "error",
         "message": "team not found"
