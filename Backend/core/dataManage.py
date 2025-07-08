@@ -1,6 +1,5 @@
 import sqlite3
 from pathlib import Path
-import logging
 from Backend.logger import logger
 
 DB_FILE = Path.cwd() / "data" / "data.db"
