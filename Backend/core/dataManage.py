@@ -1,8 +1,7 @@
 import sqlite3
 from pathlib import Path
 import logging
-
-logger = logging.getLogger('my_logger')
+from Backend.logger import logger
 
 DB_FILE = Path.cwd() / "data" / "data.db"
 
@@ -13,11 +12,25 @@ def retrieve_games(limit: int = 10) -> list | None:
         conn = sqlite3.connect(DB_FILE)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute("SELECT * FROM Game LIMIT ?", (limit,))
+        cur.execute("""
+        SELECT
+            g.gid,
+            date,
+            p1.name AS playerAname,
+            p2.name AS playerBname,
+            pointA,
+            pointB,
+            time,
+            duration
+        FROM Game g
+        JOIN Player p1 ON g.playerAid = p1.pid
+        JOIN Player p2 ON g.playerBid = p2.pid
+        LIMIT ?
+        """, (limit,))
         results = cur.fetchall()
-    except sqlite3.OperationalError:
+    except sqlite3.OperationalError as e:
         # error handling: wrong database path
-        print(DB_FILE)
+        logger.error(f"Error: {e}")
         return None
     finally:
         if conn is not None:
