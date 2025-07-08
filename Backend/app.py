@@ -74,6 +74,36 @@ def call_retrieve_rounds(gid=None):
         "rounds": rounds
     }), 200
 
+@app.route('/newgame', methods=['POST'])
+def new_game():
+    data = request.get_json()
+
+    # get the data
+    try:
+        playerA = int(data.get('playerA'))
+        playerB = int(data.get('playerB'))
+        logger.debug(f'playerA: {playerA}')
+        logger.debug(f'playerB: {playerB}')
+    except ValueError as e:
+        return jsonify({
+            "status": "error",
+            'message': 'player id should be an integer'
+        }), 400
+
+    # create the new game and get its gid
+    try:
+        gid = create_game(playerA, playerB)
+    except RuntimeError as e:
+        return jsonify({
+            "status": "error",
+            'message': str(e)
+        }), 500
+
+    return jsonify({
+        "status": "success",
+        "gid": gid
+    }), 201
+
 @app.route('/goal', methods=['GET'])
 def goal():
     global current_score
