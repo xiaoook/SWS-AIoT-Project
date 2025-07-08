@@ -1,6 +1,5 @@
 import sqlite3
 from pathlib import Path
-import logging
 from Backend.logger import logger
 
 DB_FILE = Path.cwd() / "data" / "data.db"
@@ -62,3 +61,18 @@ def retrieve_rounds(gid: int) -> list | None:
 
     rounds = [dict(row) for row in results]
     return rounds
+
+def insert_rounds(gid: int, round: int, score: dict) -> None:
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO Round (roundInGame, gid, pointA, pointB) VALUES (?, ?, ?, ?)""", (gid, round, score["A"], score["B"]))
+        conn.commit()
+        logger.info(f"Round {round} of game {gid} inserted successfully")
+    except sqlite3.OperationalError as e:
+        logger.error(f"Error: {e}")
+    finally:
+        if conn is not None:
+            conn.close()

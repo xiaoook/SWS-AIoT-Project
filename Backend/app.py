@@ -1,8 +1,25 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, request, jsonify
 from Backend.core.dataManage import *
 from Backend.logger import logger
-
+from flask_socketio import SocketIO, emit
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'hockey!'
+socketio = SocketIO(app)
+
+current_score = {
+    'A': 0,
+    'B': 0
+}
+current_round = 0
+
+# emit the current score when the new client connects
+@socketio.on('connect')
+def on_connect():
+    logger.info('Client connected')
+    emit('score_update', current_score)
 
 @app.route('/', methods=['GET'])
 def index():
@@ -57,5 +74,39 @@ def call_retrieve_rounds(gid=None):
         "rounds": rounds
     }), 200
 
+@app.route('/goal', methods=['GET'])
+def goal():
+    global current_score
+    global current_round
+    team = request.args.get('team')
+
+    # error handling of gid
+    try:
+        gid = int(request.args.get('gid'))
+    except ValueError:
+        return jsonify({
+            "status": "error",
+            'message': 'gid should be an integer'
+        })
+
+    logger.debug(f'team: {team}')
+    # make sure the team is right
+    if team in current_score:
+        current_round += 1
+        current_score[team] += 1
+        socketio.emit('score_update', current_score)
+        logger.info(f'{team} scored, current score: {current_score[team]}')
+        insert_rounds(gid, current_round, current_score) # insert the round into database
+        return jsonify({
+            "status": "success"
+        }), 200
+
+    # invalid team
+    return jsonify({
+        "status": "error",
+        "message": "team not found"
+    }), 400
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # app.run(debug=True, port=5000)
+    socketio.run(app, debug=True, port=5000)
