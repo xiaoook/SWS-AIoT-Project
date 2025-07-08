@@ -18,7 +18,7 @@ current_score = {
 @socketio.on('connect')
 def on_connect():
     logger.info('Client connected')
-    emit('score_update', curren_score)
+    emit('score_update', current_score)
 
 @app.route('/', methods=['GET'])
 def index():
