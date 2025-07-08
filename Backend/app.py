@@ -14,6 +14,7 @@ current_score = {
     'B': 0
 }
 current_round = 0
+current_game = 0
 
 # emit the current score when the new client connects
 @socketio.on('connect')
@@ -98,6 +99,10 @@ def new_game():
             "status": "error",
             'message': str(e)
         }), 500
+
+    # change the current game to the new game
+    global current_game
+    current_game = gid
 
     return jsonify({
         "status": "success",
