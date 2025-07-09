@@ -176,6 +176,16 @@ def select_game():
         "game": game
     }), 200
 
+@app.route('/player/create', methods=['POST'])
+def create_player():
+    data = request.get_json()
+    name = data.get('name')
+    new_player(name)
+    return jsonify({
+        "status": "success",
+        "name": name
+    })
+
 if __name__ == "__main__":
     # app.run(debug=True, port=5000)
     socketio.run(app, debug=True, port=5000)

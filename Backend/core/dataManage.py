@@ -150,3 +150,15 @@ def retrieve_selected_game(gid: int):
         logger.error(f"No game found with id {gid}")
         return {}
     return game
+
+def new_player(name):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        cur.execute("INSERT INTO Player (name) VALUES ?", (name,))
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        logger.error(e)
+        return None
+    logger.info(f'player {name} created')
+    return None
