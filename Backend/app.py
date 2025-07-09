@@ -184,7 +184,7 @@ def create_player():
     return jsonify({
         "status": "success",
         "name": name
-    })
+    }), 201
 
 if __name__ == "__main__":
     # app.run(debug=True, port=5000)

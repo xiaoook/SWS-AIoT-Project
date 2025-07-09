@@ -3,7 +3,7 @@ from pathlib import Path
 from Backend.logger import logger
 import time
 
-DB_FILE = Path.cwd() / "data" / "data.db"
+DB_FILE = Path.cwd() / 'Backend' / "data" / "data.db"
 
 def retrieve_games(limit: int = 10) -> list | None:
     conn = None
@@ -155,7 +155,7 @@ def new_player(name):
     try:
         conn = sqlite3.connect(DB_FILE)
         cur = conn.cursor()
-        cur.execute("INSERT INTO Player (name) VALUES ?", (name,))
+        cur.execute("INSERT INTO Player (name) VALUES (?)", (name,))
         conn.commit()
     except sqlite3.OperationalError as e:
         logger.error(e)
