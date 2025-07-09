@@ -1579,29 +1579,88 @@ body {
 }
 
 /* Success/Error messages */
+/* 优化的得分通知样式 */
 .message {
     position: fixed;
     top: 20px;
     right: 20px;
-    padding: 1rem 2rem;
-    border-radius: 10px;
+    padding: 10px 18px;
+    border-radius: 18px;
     color: white;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 13px;
     z-index: 1000;
-    animation: slideInRight 0.3s ease-out;
+    animation: slideInRight 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
+    max-width: 240px;
+    text-align: center;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    line-height: 1.4;
+}
+
+.message:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.message:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .message.success {
-    background: linear-gradient(45deg, #4CAF50, #45a049);
+    background: linear-gradient(135deg, #4CAF50, #45a049, #388e3c);
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
 }
 
 .message.error {
-    background: linear-gradient(45deg, #f44336, #d32f2f);
+    background: linear-gradient(135deg, #f44336, #d32f2f, #c62828);
+    box-shadow: 0 6px 20px rgba(244, 67, 54, 0.3);
+}
+
+.message.info {
+    background: linear-gradient(135deg, #2196F3, #1976D2, #1565C0);
+    box-shadow: 0 6px 20px rgba(33, 150, 243, 0.3);
+}
+
+.message.warning {
+    background: linear-gradient(135deg, #ff9800, #f57c00, #ef6c00);
+    box-shadow: 0 6px 20px rgba(255, 152, 0, 0.3);
 }
 
 @keyframes slideInRight {
-    from { transform: translateX(100px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+    from { 
+        transform: translateX(100px); 
+        opacity: 0; 
+        scale: 0.8;
+    }
+    to { 
+        transform: translateX(0); 
+        opacity: 1; 
+        scale: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from { 
+        transform: translateX(0); 
+        opacity: 1; 
+        scale: 1;
+    }
+    to { 
+        transform: translateX(100px); 
+        opacity: 0; 
+        scale: 0.8;
+    }
+}
+
+/* 消息淡出效果 */
+.message.fade-out {
+    animation: slideOutRight 0.3s ease-in-out forwards;
 }
 
 /* Multi-view styles */

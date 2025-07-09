@@ -488,7 +488,7 @@ class SmartCourtApp {
         this.addLiveFeedItem('🎯 Game started - Waiting for sensor detection...', 'info');
         
         // 不再执行任何自动模拟逻辑
-        return;
+                return;
     }
     
     startTimer() {
@@ -588,13 +588,28 @@ class SmartCourtApp {
         messageElement.className = `message ${type}`;
         messageElement.textContent = message;
         
+        // Add click to close functionality
+        let isRemoved = false;
+        const removeMessage = () => {
+            if (isRemoved) return;
+            isRemoved = true;
+            messageElement.classList.add('fade-out');
+            // Remove element after animation completes
+            setTimeout(() => {
+                if (messageElement.parentNode) {
+                    messageElement.remove();
+                }
+            }, 300); // matches animation duration
+        };
+        
+        // Click to close
+        messageElement.addEventListener('click', removeMessage);
+        
         // Add to page
         document.body.appendChild(messageElement);
         
-        // Auto-remove after 3 seconds
-        setTimeout(() => {
-            messageElement.remove();
-        }, 3000);
+        // Auto-remove after 2.5 seconds with fade-out animation
+        setTimeout(removeMessage, 2500);
     }
     
     // Get game state
@@ -699,7 +714,7 @@ class SmartCourtApp {
         // 更新UI
         this.updateScoreboard();
         
-        // 添加实时feed
+        // 只在feed中显示，不重复显示消息通知
         const message = `🎯 Score Update: ${this.gameState.scores.playerA} - ${this.gameState.scores.playerB}`;
         this.addLiveFeedItem(message, 'score');
         
@@ -812,11 +827,19 @@ class SmartCourtApp {
     
     // 模拟进球（用于测试）
     simulateGoalA() {
-        this.sendWebSocketMessage('goal', { team: 'playerA' });
+        if (window.wsManager) {
+            window.wsManager.simulateGoal('playerA');
+        } else {
+            this.showMessage('WebSocket manager not available', 'error');
+        }
     }
     
     simulateGoalB() {
-        this.sendWebSocketMessage('goal', { team: 'playerB' });
+        if (window.wsManager) {
+            window.wsManager.simulateGoal('playerB');
+        } else {
+            this.showMessage('WebSocket manager not available', 'error');
+        }
     }
     
     // 获取WebSocket连接状态
@@ -827,12 +850,36 @@ class SmartCourtApp {
     // 检查WebSocket连接状态
     checkWebSocketConnection() {
         const status = this.getWebSocketStatus();
-        const message = status.isConnected 
-            ? `✅ Connected to ${status.serverUrl || 'server'}` 
-            : `❌ Disconnected (${status.reconnectAttempts || 0} attempts)`;
         
-        this.addLiveFeedItem(message, status.isConnected ? 'success' : 'error');
-        this.showMessage(message, status.isConnected ? 'success' : 'error');
+        if (status.isConnected) {
+            const message = `✅ Connected to ${status.serverUrl || 'server'}`;
+            this.addLiveFeedItem(message, 'success');
+            this.showMessage(message, 'success');
+        } else {
+            // 执行连接诊断 - 避免CORS问题
+            this.addLiveFeedItem('🔍 Running connection diagnostics...', 'info');
+            this.addLiveFeedItem('🔄 Attempting to reconnect WebSocket...', 'info');
+            
+            // 尝试重新连接 (Socket.IO会自己处理服务器可用性检查)
+            if (window.wsManager) {
+                window.wsManager.connect();
+                this.showMessage('Attempting to reconnect...', 'info');
+                
+                // 设置连接超时检查
+                setTimeout(() => {
+                    const newStatus = this.getWebSocketStatus();
+                    if (!newStatus.isConnected) {
+                        this.addLiveFeedItem('❌ Connection failed after timeout', 'error');
+                        this.addLiveFeedItem('💡 Please ensure backend server is running:', 'info');
+                        this.addLiveFeedItem('   Backend should be on port 5001', 'info');
+                        this.showMessage('Failed to connect - check backend server', 'error');
+                    }
+                }, 5000); // 5秒超时
+            } else {
+                this.addLiveFeedItem('❌ WebSocket manager not available', 'error');
+                this.showMessage('WebSocket manager error', 'error');
+            }
+        }
     }
 }
 
