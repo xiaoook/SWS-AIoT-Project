@@ -40,6 +40,15 @@
                             <button id="endGame" class="btn btn-danger" disabled>End Game</button>
                         </div>
                         
+                        <div class="websocket-controls">
+                            <h4>WebSocket Test Controls</h4>
+                            <div class="test-buttons">
+                                <button id="simulateGoalA" class="btn btn-export">Player A Goal</button>
+                                <button id="simulateGoalB" class="btn btn-export">Player B Goal</button>
+                                <button id="checkConnection" class="btn btn-secondary">Check Connection</button>
+                            </div>
+                        </div>
+                        
                         <div class="game-status">
                             <div class="status-indicator">
                                 <span class="status-label">Game Status:</span>
@@ -48,6 +57,10 @@
                             <div class="timer">
                                 <span class="timer-label">Game Time:</span>
                                 <span id="gameTimer" class="timer-value">00:00</span>
+                            </div>
+                            <div class="connection-status">
+                                <span class="connection-label">Server:</span>
+                                <span id="wsStatus" class="ws-status disconnected">Disconnected</span>
                             </div>
                         </div>
                     </div>
@@ -232,6 +245,7 @@
         </footer>
     </div>
 
+    <script src="js/websocket.js"></script>
     <script src="js/app.js"></script>
     <script src="js/gameControl.js"></script>
     <script src="js/gameHistory.js"></script>

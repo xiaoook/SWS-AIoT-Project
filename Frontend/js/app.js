@@ -24,6 +24,7 @@ class SmartCourtApp {
         this.setupEventListeners();
         this.setupTabNavigation();
         this.initializeComponents();
+        this.initializeWebSocket();
         this.showMessage('System initialized, ready to start the game!', 'success');
     }
     
@@ -33,6 +34,19 @@ class SmartCourtApp {
             btn.addEventListener('click', (e) => {
                 this.switchTab(e.target.dataset.tab);
             });
+        });
+        
+        // WebSocket test button events
+        document.getElementById('simulateGoalA')?.addEventListener('click', () => {
+            this.simulateGoalA();
+        });
+        
+        document.getElementById('simulateGoalB')?.addEventListener('click', () => {
+            this.simulateGoalB();
+        });
+        
+        document.getElementById('checkConnection')?.addEventListener('click', () => {
+            this.checkWebSocketConnection();
         });
         
         // Global keyboard events
@@ -68,104 +82,35 @@ class SmartCourtApp {
         this.updateScoreboard();
         this.updateTimer();
         
-        // Add sample loss analysis data for demonstration
-        this.generateSampleLossData();
+        // 清理状态 - 不再生成模拟数据
+        // this.generateSampleLossData(); // 已禁用模拟数据
         
-        // Simulate initial data
-        this.addLiveFeedItem('System startup complete, ready to begin!', 'success');
+        // 系统启动消息
+        this.addLiveFeedItem('System ready - Connect sensors to begin scoring!', 'info');
     }
     
     generateSampleLossData() {
+        // 已禁用 - 不再生成模拟数据
         // Generate multiple sample games for demonstration
-        this.generateSampleGames();
+        // this.generateSampleGames();
         
         // Load the most recent game into current game state
-        if (this.gamesHistory.length > 0) {
-            const mostRecentGame = this.gamesHistory[this.gamesHistory.length - 1];
-            this.loadGame(mostRecentGame.gameId);
-        }
+        // if (this.gamesHistory.length > 0) {
+        //     const mostRecentGame = this.gamesHistory[this.gamesHistory.length - 1];
+        //     this.loadGame(mostRecentGame.gameId);
+        // }
+        console.log('Sample data generation disabled - real data mode');
     }
     
     generateSampleGames() {
-        const games = [
-            // Game 1: Player A wins 7-5 (Most recent - current state)
-            {
-                gameId: 'GAME-001',
-                gameType: 'Practice Match',
-                startTime: new Date(Date.now() - 600000), // 10 minutes ago
-                endTime: new Date(Date.now() - 60000), // 1 minute ago  
-                duration: 540, // 9 minutes
-                finalScores: { playerA: 6, playerB: 5 },
-                winner: null, // Still in progress
-                status: 'paused',
-                rounds: [
-                    { id: 1, winner: 'playerB', timestamp: new Date(Date.now() - 580000), playerAScore: 0, playerBScore: 1, analysis: { feedback: 'The defense was broken through due to poor positioning', errorType: 'Defensive errors', suggestions: ['Improve defensive positioning', 'Enhance ball trajectory prediction'] }},
-                    { id: 2, winner: 'playerA', timestamp: new Date(Date.now() - 540000), playerAScore: 1, playerBScore: 1, analysis: { feedback: 'Reaction speed was insufficient, failed to respond to opponent attacks', errorType: 'Slow reaction', suggestions: ['Strengthen reaction speed training', 'Improve movement footwork'] }},
-                    { id: 3, winner: 'playerB', timestamp: new Date(Date.now() - 500000), playerAScore: 1, playerBScore: 2, analysis: { feedback: 'Attention was distracted, missed defensive timing', errorType: 'Attention distraction', suggestions: ['Strengthen concentration training', 'Establish match rhythm'] }},
-                    { id: 4, winner: 'playerA', timestamp: new Date(Date.now() - 460000), playerAScore: 2, playerBScore: 2, analysis: { feedback: 'Technical execution was non-standard, affecting ball control', errorType: 'Non-standard technical actions', suggestions: ['Standardize technical movements', 'Return to basic practice'] }},
-                    { id: 5, winner: 'playerB', timestamp: new Date(Date.now() - 420000), playerAScore: 2, playerBScore: 3, analysis: { feedback: 'Movement speed was too slow, couldn\'t keep up with ball pace', errorType: 'Slow reaction', suggestions: ['Strengthen physical training', 'Improve movement speed'] }},
-                    { id: 6, winner: 'playerA', timestamp: new Date(Date.now() - 380000), playerAScore: 3, playerBScore: 3, analysis: { feedback: 'Good recovery after losing point', errorType: null, suggestions: ['Maintain momentum', 'Keep focused on positioning'] }},
-                    { id: 7, winner: 'playerA', timestamp: new Date(Date.now() - 340000), playerAScore: 4, playerBScore: 3, analysis: { feedback: 'Excellent attack strategy under pressure', errorType: null, suggestions: ['Continue aggressive play', 'Watch for counter-attacks'] }},
-                    { id: 8, winner: 'playerB', timestamp: new Date(Date.now() - 300000), playerAScore: 4, playerBScore: 4, analysis: { feedback: 'Ball control was compromised under pressure', errorType: 'Non-standard technical actions', suggestions: ['Focus on fundamental techniques', 'Maintain composure'] }},
-                    { id: 9, winner: 'playerA', timestamp: new Date(Date.now() - 260000), playerAScore: 5, playerBScore: 4, analysis: { feedback: 'Decisive play in crucial moment', errorType: null, suggestions: ['Keep pressure on opponent', 'Stay alert for comeback'] }},
-                    { id: 10, winner: 'playerB', timestamp: new Date(Date.now() - 220000), playerAScore: 5, playerBScore: 5, analysis: { feedback: 'Defensive lapse allowed opponent comeback', errorType: 'Defensive errors', suggestions: ['Strengthen defensive positioning', 'Maintain concentration'] }},
-                    { id: 11, winner: 'playerA', timestamp: new Date(Date.now() - 180000), playerAScore: 6, playerBScore: 5, analysis: { feedback: 'Match point advantage! One point away from 7-point victory', errorType: null, suggestions: ['Stay calm under pressure', 'One more point to win!'] }}
-                ]
-            },
-            
-            // Game 2: Player B wins 7-3 (Completed)
-            {
-                gameId: 'GAME-002',
-                gameType: 'Training Session',
-                startTime: new Date(Date.now() - 7200000), // 2 hours ago
-                endTime: new Date(Date.now() - 6600000), // 1.5 hours ago
-                duration: 600, // 10 minutes
-                finalScores: { playerA: 3, playerB: 7 },
-                winner: 'playerB',
-                status: 'ended',
-                rounds: [
-                    { id: 1, winner: 'playerB', timestamp: new Date(Date.now() - 7150000), playerAScore: 0, playerBScore: 1, analysis: { feedback: 'Strong opening play', errorType: null, suggestions: ['Keep up the momentum'] }},
-                    { id: 2, winner: 'playerB', timestamp: new Date(Date.now() - 7100000), playerAScore: 0, playerBScore: 2, analysis: { feedback: 'Opponent failed to adapt to pace', errorType: 'Slow reaction', suggestions: ['Increase reaction training'] }},
-                    { id: 3, winner: 'playerA', timestamp: new Date(Date.now() - 7050000), playerAScore: 1, playerBScore: 2, analysis: { feedback: 'Good defensive recovery', errorType: null, suggestions: ['Build on this success'] }},
-                    { id: 4, winner: 'playerB', timestamp: new Date(Date.now() - 7000000), playerAScore: 1, playerBScore: 3, analysis: { feedback: 'Excellent ball placement', errorType: null, suggestions: ['Continue strategic play'] }},
-                    { id: 5, winner: 'playerB', timestamp: new Date(Date.now() - 6950000), playerAScore: 1, playerBScore: 4, analysis: { feedback: 'Opponent defensive positioning poor', errorType: 'Defensive errors', suggestions: ['Review defensive fundamentals'] }},
-                    { id: 6, winner: 'playerA', timestamp: new Date(Date.now() - 6900000), playerAScore: 2, playerBScore: 4, analysis: { feedback: 'Improved concentration showing results', errorType: null, suggestions: ['Maintain focus'] }},
-                    { id: 7, winner: 'playerB', timestamp: new Date(Date.now() - 6850000), playerAScore: 2, playerBScore: 5, analysis: { feedback: 'Technical superiority evident', errorType: null, suggestions: ['Close out the game'] }},
-                    { id: 8, winner: 'playerA', timestamp: new Date(Date.now() - 6800000), playerAScore: 3, playerBScore: 5, analysis: { feedback: 'Late game pressure response', errorType: null, suggestions: ['Fight for every point'] }},
-                    { id: 9, winner: 'playerB', timestamp: new Date(Date.now() - 6750000), playerAScore: 3, playerBScore: 6, analysis: { feedback: 'Match point opportunity', errorType: null, suggestions: ['One point to victory'] }},
-                    { id: 10, winner: 'playerB', timestamp: new Date(Date.now() - 6700000), playerAScore: 3, playerBScore: 7, analysis: { feedback: 'Victory secured with decisive shot', errorType: null, suggestions: ['Excellent performance!'] }}
-                ]
-            },
-            
-            // Game 3: Player A wins 7-4 (Completed)
-            {
-                gameId: 'GAME-003',
-                gameType: 'Competitive Match',
-                startTime: new Date(Date.now() - 14400000), // 4 hours ago
-                endTime: new Date(Date.now() - 13800000), // 3.5 hours ago
-                duration: 600, // 10 minutes
-                finalScores: { playerA: 7, playerB: 4 },
-                winner: 'playerA',
-                status: 'ended',
-                rounds: [
-                    { id: 1, winner: 'playerA', timestamp: new Date(Date.now() - 14350000), playerAScore: 1, playerBScore: 0, analysis: { feedback: 'Perfect game opening', errorType: null, suggestions: ['Maintain aggressive play'] }},
-                    { id: 2, winner: 'playerA', timestamp: new Date(Date.now() - 14300000), playerAScore: 2, playerBScore: 0, analysis: { feedback: 'Dominant early performance', errorType: null, suggestions: ['Keep pressure on opponent'] }},
-                    { id: 3, winner: 'playerB', timestamp: new Date(Date.now() - 14250000), playerAScore: 2, playerBScore: 1, analysis: { feedback: 'Opponent breaks through defense', errorType: 'Defensive errors', suggestions: ['Tighten defensive positioning'] }},
-                    { id: 4, winner: 'playerA', timestamp: new Date(Date.now() - 14200000), playerAScore: 3, playerBScore: 1, analysis: { feedback: 'Quick response to opponent score', errorType: null, suggestions: ['Stay mentally strong'] }},
-                    { id: 5, winner: 'playerB', timestamp: new Date(Date.now() - 14150000), playerAScore: 3, playerBScore: 2, analysis: { feedback: 'Attention lapse allows comeback', errorType: 'Attention distraction', suggestions: ['Maintain concentration'] }},
-                    { id: 6, winner: 'playerA', timestamp: new Date(Date.now() - 14100000), playerAScore: 4, playerBScore: 2, analysis: { feedback: 'Regaining control of match', errorType: null, suggestions: ['Build toward victory'] }},
-                    { id: 7, winner: 'playerB', timestamp: new Date(Date.now() - 14050000), playerAScore: 4, playerBScore: 3, analysis: { feedback: 'Opponent shows resilience', errorType: 'Poor attack angle', suggestions: ['Improve shot selection'] }},
-                    { id: 8, winner: 'playerA', timestamp: new Date(Date.now() - 14000000), playerAScore: 5, playerBScore: 3, analysis: { feedback: 'Strategic patience pays off', errorType: null, suggestions: ['Two more points to win'] }},
-                    { id: 9, winner: 'playerB', timestamp: new Date(Date.now() - 13950000), playerAScore: 5, playerBScore: 4, analysis: { feedback: 'Late comeback attempt', errorType: 'Non-standard technical actions', suggestions: ['Focus on fundamentals'] }},
-                    { id: 10, winner: 'playerA', timestamp: new Date(Date.now() - 13900000), playerAScore: 6, playerBScore: 4, analysis: { feedback: 'Match point achieved', errorType: null, suggestions: ['One point from victory'] }},
-                    { id: 11, winner: 'playerA', timestamp: new Date(Date.now() - 13850000), playerAScore: 7, playerBScore: 4, analysis: { feedback: 'Decisive victory completed!', errorType: null, suggestions: ['Excellent match performance'] }}
-                ]
-            }
-        ];
+        // 已禁用所有模拟游戏数据
+        // 系统现在等待真实的传感器输入
         
-        // Add games to history
-        this.gamesHistory = games;
-        this.gameCounter = games.length;
+        // 清空游戏历史，从零开始
+        this.gamesHistory = [];
+        this.gameCounter = 0;
+        
+        console.log('Sample games disabled - starting with clean state');
     }
     
     // Game management methods
@@ -395,10 +340,10 @@ class SmartCourtApp {
         // Save initial game state to history
         this.saveCurrentGameToHistory();
         
-        // Simulate scoring
-        this.simulateGameplay();
+        // 已禁用自动模拟 - 等待真实传感器输入
+        // this.simulateGameplay(); // 自动模拟已禁用
         
-        this.showMessage(`New match started! Game ID: ${this.currentGameId}`, 'success');
+        this.showMessage(`New match started! Game ID: ${this.currentGameId} - Waiting for sensor input`, 'success');
     }
     
     pauseGame() {
@@ -536,32 +481,14 @@ class SmartCourtApp {
     }
     
     simulateGameplay() {
-        if (this.gameState.status !== 'playing') return;
+        // 自动模拟已禁用 - 系统等待真实的传感器输入
+        console.log('Auto-simulation disabled. Waiting for real sensor input via WebSocket.');
         
-        // Simulate random scoring
-        const scoreInterval = setInterval(() => {
-            if (this.gameState.status !== 'playing') {
-                clearInterval(scoreInterval);
-                return;
-            }
-            
-            // Check if game should end (7 points reached)
-            if (this.gameState.scores.playerA >= 7 || this.gameState.scores.playerB >= 7) {
-                clearInterval(scoreInterval);
-                return;
-            }
-            
-            // Randomly select scoring player
-            const player = Math.random() > 0.5 ? 'playerA' : 'playerB';
-            this.addScore(player);
-            
-            // Stop simulation if match ends
-            if (this.gameState.status === 'ended' || 
-                this.gameState.scores.playerA >= 7 || 
-                this.gameState.scores.playerB >= 7) {
-                clearInterval(scoreInterval);
-            }
-        }, 3000 + Math.random() * 4000); // 3-7 second random interval
+        // 显示等待传感器的消息
+        this.addLiveFeedItem('🎯 Game started - Waiting for sensor detection...', 'info');
+        
+        // 不再执行任何自动模拟逻辑
+        return;
     }
     
     startTimer() {
@@ -731,6 +658,181 @@ class SmartCourtApp {
         } catch (error) {
             this.showMessage('Import failed: Invalid data format', 'error');
         }
+    }
+    
+    // WebSocket 初始化和回调方法
+    initializeWebSocket() {
+        if (window.wsManager) {
+            // 设置WebSocket回调函数
+            window.wsManager.setCallback('onScoreUpdate', (scoreData) => {
+                this.handleWebSocketScoreUpdate(scoreData);
+            });
+            
+            window.wsManager.setCallback('onGameStatus', (statusData) => {
+                this.handleWebSocketGameStatus(statusData);
+            });
+            
+            window.wsManager.setCallback('onRoundUpdate', (roundData) => {
+                this.handleWebSocketRoundUpdate(roundData);
+            });
+            
+            window.wsManager.setCallback('onConnectionStatus', (status) => {
+                this.handleWebSocketConnectionStatus(status);
+            });
+            
+            console.log('WebSocket callbacks initialized');
+        } else {
+            console.warn('WebSocket manager not available');
+        }
+    }
+    
+    // 处理WebSocket比分更新
+    handleWebSocketScoreUpdate(scoreData) {
+        console.log('Handling score update:', scoreData);
+        
+        // 更新本地游戏状态
+        this.gameState.scores = {
+            playerA: scoreData.playerA || scoreData.home || 0,
+            playerB: scoreData.playerB || scoreData.away || 0
+        };
+        
+        // 更新UI
+        this.updateScoreboard();
+        
+        // 添加实时feed
+        const message = `🎯 Score Update: ${this.gameState.scores.playerA} - ${this.gameState.scores.playerB}`;
+        this.addLiveFeedItem(message, 'score');
+        
+        // 检查是否有人获胜
+        if (this.gameState.scores.playerA >= 7 || this.gameState.scores.playerB >= 7) {
+            const winner = this.gameState.scores.playerA >= 7 ? 'A' : 'B';
+            this.addLiveFeedItem(`🏆 GAME OVER! Player ${winner} wins!`, 'success');
+            
+            // 自动结束游戏
+            setTimeout(() => {
+                this.gameState.status = 'ended';
+                this.gameState.endTime = new Date();
+                this.updateGameStatus();
+                this.saveCurrentGameToHistory();
+            }, 1000);
+        }
+    }
+    
+    // 处理WebSocket游戏状态更新
+    handleWebSocketGameStatus(statusData) {
+        console.log('Handling game status update:', statusData);
+        
+        if (statusData.status) {
+            this.gameState.status = statusData.status;
+            this.updateGameStatus();
+            
+            const message = `📊 Game Status: ${statusData.status}`;
+            this.addLiveFeedItem(message, 'info');
+        }
+    }
+    
+    // 处理WebSocket回合更新
+    handleWebSocketRoundUpdate(roundData) {
+        console.log('Handling round update:', roundData);
+        
+        // 创建新的回合记录
+        const round = {
+            id: roundData.round || this.gameState.currentRound + 1,
+            winner: roundData.winner,
+            timestamp: new Date(roundData.timestamp || Date.now()),
+            playerAScore: roundData.playerAScore || 0,
+            playerBScore: roundData.playerBScore || 0,
+            analysis: roundData.analysis || this.generateAIAnalysis()
+        };
+        
+        // 添加到游戏状态
+        this.gameState.rounds.push(round);
+        this.gameState.currentRound = round.id;
+        
+        // 更新比分
+        this.gameState.scores = {
+            playerA: round.playerAScore,
+            playerB: round.playerBScore
+        };
+        
+        // 更新UI
+        this.updateScoreboard();
+        
+        // 添加实时feed
+        const winner = roundData.winner === 'playerA' ? 'A' : 'B';
+        const message = `⭐ Round ${round.id}: Player ${winner} scored! Current: ${round.playerAScore}-${round.playerBScore}`;
+        this.addLiveFeedItem(message, 'score');
+        
+        // 更新分析管理器
+        if (window.analysisManager) {
+            window.analysisManager.addRound(round);
+        }
+        
+        // 保存游戏状态
+        this.saveCurrentGameToHistory();
+    }
+    
+    // 处理WebSocket连接状态更新
+    handleWebSocketConnectionStatus(status) {
+        console.log('WebSocket connection status:', status);
+        
+        let message = '';
+        let messageType = 'info';
+        
+        switch (status) {
+            case 'connected':
+                message = '🔗 Connected to game server';
+                messageType = 'success';
+                break;
+            case 'connecting':
+                message = '🔄 Connecting to game server...';
+                messageType = 'info';
+                break;
+            case 'disconnected':
+                message = '❌ Disconnected from game server';
+                messageType = 'error';
+                break;
+            case 'error':
+                message = '⚠️ Connection error occurred';
+                messageType = 'error';
+                break;
+        }
+        
+        if (message) {
+            this.addLiveFeedItem(message, messageType);
+        }
+    }
+    
+    // 发送WebSocket消息
+    sendWebSocketMessage(eventName, data) {
+        if (window.wsManager) {
+            window.wsManager.sendMessage(eventName, data);
+        }
+    }
+    
+    // 模拟进球（用于测试）
+    simulateGoalA() {
+        this.sendWebSocketMessage('goal', { team: 'playerA' });
+    }
+    
+    simulateGoalB() {
+        this.sendWebSocketMessage('goal', { team: 'playerB' });
+    }
+    
+    // 获取WebSocket连接状态
+    getWebSocketStatus() {
+        return window.wsManager ? window.wsManager.getConnectionStatus() : { isConnected: false };
+    }
+    
+    // 检查WebSocket连接状态
+    checkWebSocketConnection() {
+        const status = this.getWebSocketStatus();
+        const message = status.isConnected 
+            ? `✅ Connected to ${status.serverUrl || 'server'}` 
+            : `❌ Disconnected (${status.reconnectAttempts || 0} attempts)`;
+        
+        this.addLiveFeedItem(message, status.isConnected ? 'success' : 'error');
+        this.showMessage(message, status.isConnected ? 'success' : 'error');
     }
 }
 
