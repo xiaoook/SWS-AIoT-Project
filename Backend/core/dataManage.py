@@ -162,3 +162,21 @@ def new_player(name):
         return None
     logger.info(f'player {name} created')
     return None
+
+
+def fetch_all_players():
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM Player")
+        results = cur.fetchall()
+    except sqlite3.OperationalError as e:
+        logger.error(e)
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+    players = [dict(row) for row in results]
+    return players
