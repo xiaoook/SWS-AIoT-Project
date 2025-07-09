@@ -189,7 +189,7 @@ def create_player():
 @app.route('/player/all', methods=['GET'])
 def all_players():
     players = fetch_all_players()
-    if players == None:
+    if players is None:
         return jsonify({
             "status": "error",
             "message": "database error"
