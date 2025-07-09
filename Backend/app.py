@@ -7,7 +7,7 @@ from Backend.logger import logger
 from flask_socketio import SocketIO, emit
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'hockey!'
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 current_score = {
     'A': 0,
