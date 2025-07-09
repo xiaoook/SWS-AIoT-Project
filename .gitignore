@@ -425,3 +425,11 @@ FodyWeavers.xsd
 
 # SQL
 *.db-journal
+
+# Python
+*.pyc
+*.pt
+
+# example data
+*.mp4
+*.csv
