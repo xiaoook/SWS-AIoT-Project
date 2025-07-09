@@ -1,0 +1,104 @@
+{
+    "timestamp": 1752046748.0561392,
+    "scorer": 1,
+    "score_player1": 1,
+    "score_player2": 0,
+    "issues": [
+        "Ball speed high",
+        "Paddle1 lacks ball control"
+    ],
+    "suggestions": [
+        "Improve paddle angle adjustments for better interception and deflection.",
+        "Increase aggression to gain possession."
+    ]
+}
+{
+    "timestamp": 1752046751.0946286,
+    "scorer": 1,
+    "score_player1": 2,
+    "score_player2": 0,
+    "issues": [
+        "Ball speed high",
+        "Paddle1 lacks ball control",
+        "Ball trajectory too straight"
+    ],
+    "suggestions": [
+        "Improve paddle angle adjustments for better interception and deflection.",
+        "Increase aggression to gain possession.",
+        "Apply angled shots to disrupt opponent’s rhythm."
+    ]
+}
+{
+    "timestamp": 1752046754.73825,
+    "scorer": 1,
+    "score_player1": 3,
+    "score_player2": 0,
+    "issues": [
+        "Ball speed high",
+        "Ball trajectory too straight"
+    ],
+    "suggestions": [
+        "Improve paddle angle adjustments for better interception and deflection.",
+        "Apply angled shots to disrupt opponent’s rhythm."
+    ]
+}
+{
+    "timestamp": 1752046757.830929,
+    "scorer": 1,
+    "score_player1": 4,
+    "score_player2": 0,
+    "issues": [
+        "Ball speed high",
+        "Ball trajectory too straight"
+    ],
+    "suggestions": [
+        "Improve paddle angle adjustments for better interception and deflection.",
+        "Apply angled shots to disrupt opponent’s rhythm."
+    ]
+}
+{
+    "timestamp": 1752046763.215724,
+    "scorer": 1,
+    "score_player1": 5,
+    "score_player2": 0,
+    "issues": [
+        "Ball speed high",
+        "Paddle1 lacks ball control"
+    ],
+    "suggestions": [
+        "Improve paddle angle adjustments for better interception and deflection.",
+        "Increase aggression to gain possession."
+    ]
+}
+{
+    "timestamp": 1752046767.3970263,
+    "scorer": 1,
+    "score_player1": 6,
+    "score_player2": 0,
+    "issues": [
+        "Ball speed high",
+        "Paddle1 lacks ball control",
+        "Ball trajectory too straight"
+    ],
+    "suggestions": [
+        "Improve paddle angle adjustments for better interception and deflection.",
+        "Increase aggression to gain possession.",
+        "Apply angled shots to disrupt opponent’s rhythm."
+    ]
+}
+{
+    "timestamp": 1752046774.3337476,
+    "scorer": 1,
+    "score_player1": 7,
+    "score_player2": 0,
+    "issues": [
+        "Ball speed high",
+        "Paddle1 lacks ball control",
+        "Ball trajectory too straight"
+    ],
+    "suggestions": [
+        "Improve paddle angle adjustments for better interception and deflection.",
+        "Increase aggression to gain possession.",
+        "Apply angled shots to disrupt opponent’s rhythm."
+    ]
+}
