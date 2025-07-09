@@ -123,3 +123,30 @@ def create_game(playerA: int, playerB: int) -> int:
     gid = results[0]
     logger.info(f"Game {date_str} {time_str} with id {gid} inserted successfully")
     return gid
+
+
+def retrieve_selected_game(gid: int):
+    # retrieve data from database
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("""
+        SELECT * FROM Game WHERE gid = ? """, (gid,))
+        result = cur.fetchone()
+    except sqlite3.OperationalError as e:
+        logger.error(f"Error: {e}")
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+
+    # check whether the game with {gid} exists
+    try:
+        game = dict(result)
+        logger.debug(f"found game {game}")
+    except TypeError as e:
+        logger.error(f"No game found with id {gid}")
+        return {}
+    return game

@@ -75,7 +75,7 @@ def call_retrieve_rounds(gid=None):
         "rounds": rounds
     }), 200
 
-@app.route('/newgame', methods=['POST'])
+@app.route('/games/new', methods=['POST'])
 def new_game():
     data = request.get_json()
 
@@ -113,16 +113,9 @@ def new_game():
 def goal():
     global current_score
     global current_round
+    global current_game
     team = request.args.get('team')
-
-    # error handling of gid
-    try:
-        gid = int(request.args.get('gid'))
-    except ValueError:
-        return jsonify({
-            "status": "error",
-            'message': 'gid should be an integer'
-        })
+    gid = current_game
 
     logger.debug(f'team: {team}')
     # make sure the team is right
@@ -141,6 +134,47 @@ def goal():
         "status": "error",
         "message": "team not found"
     }), 400
+
+@app.route('/games/select', methods=['GET'])
+def select_game():
+    global current_score
+    global current_round
+    global current_game
+
+    try:
+        game = int(request.args.get('game'))
+    except ValueError as e:
+        game = request.args.get('game')
+        logger.error(f'invalid game {game}, should be an integer')
+        return jsonify({
+            "status": "error",
+            'message': f'invalid game {game}, should be an integer'
+        }), 400
+
+    game = retrieve_selected_game(game)
+
+    # game not found
+    if game == {}:
+        return jsonify({
+            "status": "error",
+            "message": "game not found"
+        }), 404
+
+    # set global variables
+    current_score = {
+        'A': game['pointA'],
+        'B': game['pointB']
+    }
+    current_round = game['pointA'] + game['pointB']
+    current_game = game['gid']
+    socketio.emit('score_update', current_score)
+
+    logger.info(f'game {game["gid"]} is selected')
+
+    return jsonify({
+        "status": "success",
+        "game": game
+    }), 200
 
 if __name__ == "__main__":
     # app.run(debug=True, port=5000)
