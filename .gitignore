@@ -433,3 +433,7 @@ FodyWeavers.xsd
 # example data
 *.mp4
 *.csv
+
+.venv/
+
+com.chrome.devtools.json
