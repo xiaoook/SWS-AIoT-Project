@@ -186,6 +186,21 @@ def create_player():
         "name": name
     }), 201
 
+@app.route('/player/all', methods=['GET'])
+def all_players():
+    players = fetch_all_players()
+    if players is None:
+        return jsonify({
+            "status": "error",
+            "message": "database error"
+        }), 500
+
+    logger.info(f'Found {len(players)} players')
+    return jsonify({
+        "status": "success",
+        "players": players
+    }), 200
+
 if __name__ == "__main__":
     # app.run(debug=True, port=5000)
     socketio.run(app, debug=True, port=5000)
