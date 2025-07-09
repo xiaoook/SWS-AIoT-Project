@@ -113,16 +113,9 @@ def new_game():
 def goal():
     global current_score
     global current_round
+    global current_game
     team = request.args.get('team')
-
-    # error handling of gid
-    try:
-        gid = int(request.args.get('gid'))
-    except ValueError:
-        return jsonify({
-            "status": "error",
-            'message': 'gid should be an integer'
-        })
+    gid = current_game
 
     logger.debug(f'team: {team}')
     # make sure the team is right
