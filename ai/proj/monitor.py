@@ -248,7 +248,7 @@ class CameraTracker:
         self.prev_paddle_accs = [None, None]
 
         self.last_goal_time = 0
-        self.goal_cooldown = 0.5
+        self.goal_cooldown = 3
 
         self.score_player1 = 0
         self.score_player2 = 0
@@ -372,10 +372,11 @@ class CameraTracker:
         cv2.polylines(frame, [self.corners.reshape((-1, 1, 2))], isClosed=True, color=(156, 85, 43), thickness=3)
 
         # 球检测
-        lower_ball1 = np.array([0, 100, 100])
+        lower_ball1 = np.array([0, 70, 70])
         upper_ball1 = np.array([10, 255, 255])
-        lower_ball2 = np.array([170, 100, 100])
+        lower_ball2 = np.array([170, 70, 70])
         upper_ball2 = np.array([179, 255, 255])
+
         mask1 = cv2.inRange(hsv, lower_ball1, upper_ball1)
         mask2 = cv2.inRange(hsv, lower_ball2, upper_ball2)
         mask_ball = cv2.bitwise_or(mask1, mask2)
@@ -425,8 +426,8 @@ class CameraTracker:
             cv2.circle(frame, (int(x), int(y)), int(radius), (255, 0, 0), 2)
 
         # Paddle检测
-        lower_paddle = np.array([14, 24, 172])
-        upper_paddle = np.array([34, 255, 255])
+        lower_paddle = np.array([20, 100, 100])
+        upper_paddle = np.array([40, 255, 255])
         mask_paddle = cv2.inRange(hsv, lower_paddle, upper_paddle)
 
         paddle_uvs = [None, None]
