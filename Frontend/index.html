@@ -22,7 +22,7 @@
                     <button class="nav-btn" data-tab="game">Game Control</button>
                     <button class="nav-btn" data-tab="history">Game History</button>
                     <button class="nav-btn" data-tab="analysis">Game Analysis</button>
-                    <button class="nav-btn" data-tab="replay">Video Replay</button>
+                                                <button class="nav-btn" data-tab="replay" style="opacity: 0.7;">Video Replay ⚠️</button>
                     <button class="nav-btn" data-tab="report">Match Report</button>
                 </nav>
             </div>
@@ -32,10 +32,45 @@
             <!-- Game Control Panel -->
             <section id="game-tab" class="tab-content active">
                 <div class="container">
+                    <!-- Player Setup Section -->
+                    <div class="player-setup">
+                        <h2>🏒 Game Setup</h2>
+                        <div class="players-config">
+                            <div class="player-config">
+                                <h3>Player A</h3>
+                                <div class="player-input-group">
+                                    <select id="playerASelect" class="player-select">
+                                        <option value="">-- Select Player A --</option>
+                                    </select>
+                                    <input type="text" id="playerACustom" class="player-input" placeholder="Enter custom player name" maxlength="30" style="display: none;">
+                                    <button id="savePlayerA" class="btn btn-small btn-secondary" style="display: none;">💾 Save to Database</button>
+                                </div>
+                            </div>
+                            <div class="vs-divider">
+                                <span>VS</span>
+                            </div>
+                            <div class="player-config">
+                                <h3>Player B</h3>
+                                <div class="player-input-group">
+                                    <select id="playerBSelect" class="player-select">
+                                        <option value="">-- Select Player B --</option>
+                                    </select>
+                                    <input type="text" id="playerBCustom" class="player-input" placeholder="Enter custom player name" maxlength="30" style="display: none;">
+                                    <button id="savePlayerB" class="btn btn-small btn-secondary" style="display: none;">💾 Save to Database</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setup-actions">
+                            <button id="confirmPlayers" class="btn btn-primary">✅ Confirm Players</button>
+                            <button id="refreshPlayers" class="btn btn-secondary">🔄 Refresh Players</button>
+                            <span id="playersStatus" class="players-status">Please select or enter player names</span>
+                        </div>
+                    </div>
+                    
                     <div class="game-control">
                         <h2>Game Control Panel</h2>
                         <div class="control-panel">
-                            <button id="startGame" class="btn btn-primary">Start Game</button>
+                            <button id="startGame" class="btn btn-primary" disabled>Start Game</button>
                             <button id="pauseGame" class="btn btn-secondary" disabled>Pause Game</button>
                             <button id="endGame" class="btn btn-danger" disabled>End Game</button>
                         </div>
@@ -156,37 +191,15 @@
                 </div>
             </section>
 
-            <!-- Video Replay -->
+            <!-- Video Replay - DISABLED -->
             <section id="replay-tab" class="tab-content">
                 <div class="container">
                     <h2>Video Replay & AI Analysis</h2>
-                    <div class="replay-container">
-                        <div class="video-section">
-                            <video id="replayVideo" class="video-player" controls>
-                                <!-- Video source will be loaded dynamically when available -->
-                                <div class="video-placeholder">
-                                    <p>📹 Video replay will be available after game analysis</p>
-                                </div>
-                            </video>
-                        </div>
-                        
-                        <div class="ai-feedback-section">
-                            <h3>AI Analysis Feedback</h3>
-                            <div id="aiFeedback" class="ai-feedback">
-                                <div class="feedback-item">
-                                    <div class="feedback-header">
-                                        <span class="round-number">Select a round to view AI analysis</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="replay-controls">
-                        <h3>Select Round</h3>
-                        <div id="roundSelector" class="round-selector">
-                            <div class="no-rounds">No round data available</div>
-                        </div>
+                    <div class="disabled-section" style="text-align: center; padding: 50px; background: #f8f9fa; border-radius: 10px; margin: 20px 0;">
+                        <div style="font-size: 4rem; margin-bottom: 20px;">🚫</div>
+                        <h3 style="color: #666;">Video Replay Feature Disabled</h3>
+                        <p style="color: #888; margin: 20px 0;">This feature has been disabled to reduce server requests and improve performance.</p>
+                        <p style="color: #888; font-size: 0.9rem;">Focus on Game Control, Analysis, and Reports for optimal experience.</p>
                     </div>
                 </div>
             </section>
@@ -241,16 +254,18 @@
         <footer class="footer">
             <div class="container">
                 <p>&copy; 2024 Air_Hockey Assistant. Smart Air Hockey Training System.</p>
+                <p id="playerManagerVersion" class="version-info">PlayerManager: Loading...</p>
             </div>
         </footer>
     </div>
 
     <script src="js/websocket.js"></script>
+    <script src="js/playerManagement.js"></script>
     <script src="js/app.js"></script>
     <script src="js/gameControl.js"></script>
     <script src="js/gameHistory.js"></script>
     <script src="js/analysis.js"></script>
-    <script src="js/replay.js"></script>
+    <script src="js/replay.js"></script> <!-- Video replay functionality disabled internally -->
     <script src="js/report.js"></script>
     <script src="js/export.js"></script>
 </body>
