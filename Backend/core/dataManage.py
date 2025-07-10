@@ -229,3 +229,19 @@ def delete_selected_game(gid: int):
         if conn is not None:
             conn.close()
     return None
+
+def delete_all_games():
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        cur.execute("DELETE FROM Game")
+        cur.execute("DELETE FROM Round")
+        conn.commit()
+        logger.info(f"All games deleted")
+    except sqlite3.OperationalError as e:
+        logger.error(f"Error: {e}")
+        raise RuntimeError(f"Error: {e}")
+    finally:
+        if conn is not None:
+            conn.close()

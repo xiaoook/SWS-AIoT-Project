@@ -235,6 +235,13 @@ def delete_game():
         "status": "success"
     }), 200
 
+@app.route('/games/delete/all', methods=['DELETE'])
+def call_delete_all_games():
+    delete_all_games()
+    return jsonify({
+        "status": "success"
+    })
+
 @app.route('/player/create', methods=['POST'])
 def create_player():
     data = request.get_json()
