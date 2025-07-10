@@ -137,7 +137,8 @@ def goal():
         insert_rounds(gid, current_round, current_score) # insert the round into database
         update_game(gid, current_score)
         return jsonify({
-            "status": "success"
+            "status": "success",
+            'score': current_score
         }), 200
 
     # invalid team
@@ -186,6 +187,28 @@ def select_game():
         "status": "success",
         "game": game
     }), 200
+
+@app.route('/games/update', methods=['POST'])
+def change_game_status():
+    data = request.get_json()
+    gid = data.get('gid')
+    status = data.get('status').lower()
+    duration = data.get('duration')
+    global current_score
+    logger.debug(f'gid: {gid}, status: {status}, duration: {duration}')
+
+    # verify whether the gid is the current game
+    if gid != current_game:
+        logger.error(f'game {gid} is not the current game')
+        return jsonify({
+            "status": "error",
+            "message": f'game {gid} is not the current game'
+        }), 400
+
+    update_game(gid, current_score, status=status, duration=duration)
+    return jsonify({
+        "status": "success"
+    })
 
 @app.route('/player/create', methods=['POST'])
 def create_player():

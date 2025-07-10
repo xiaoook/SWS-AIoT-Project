@@ -181,7 +181,7 @@ def fetch_all_players():
     players = [dict(row) for row in results]
     return players
 
-def update_game(gid: int, current_score, duration = None, status: str = 'in progress') -> None:
+def update_game(gid: int, current_score: dict, duration = None, status: str = 'in progress') -> None:
     pointA, pointB = current_score["A"], current_score["B"]
     logger.debug(f"gid: {gid}, pointA: {pointA}, pointB: {pointB}, status: {status}")
     conn = None
