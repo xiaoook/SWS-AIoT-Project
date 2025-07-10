@@ -210,6 +210,17 @@ def change_game_status():
         }), 400
 
     update_game(gid, current_score, status=status, duration=duration)
+
+    global current_score
+    global current_round
+    global current_game
+
+    # initialize game after ending
+    if status == 'end':
+        current_game = 0
+        current_score = {'A': 0, 'B': 0}
+        current_round = 0
+        socketio.emit('score_update', current_score)
     return jsonify({
         "status": "success"
     })
