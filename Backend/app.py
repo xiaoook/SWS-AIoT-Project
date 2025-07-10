@@ -105,7 +105,11 @@ def new_game():
 
     # change the current game to the new game
     global current_game
+    global current_score
+    global current_round
     current_game = gid
+    current_score = {'A': 0, 'B': 0}
+    current_round = 0
 
     return jsonify({
         "status": "success",
