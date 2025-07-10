@@ -12,8 +12,8 @@ class SmartCourtApp {
             elapsedTime: 0
         };
         
-        // Game history management
-        this.gamesHistory = [];
+        // Game history management - 不再使用前端虚拟数据
+        this.gamesHistory = []; // 保留以兼容性，但不再使用
         this.currentGameId = null;
         this.gameCounter = 0;
         
@@ -103,14 +103,14 @@ class SmartCourtApp {
     }
     
     generateSampleGames() {
-        // 已禁用所有模拟游戏数据
-        // 系统现在等待真实的传感器输入
+        // 已完全禁用所有模拟游戏数据
+        // 系统现在只显示真实的数据库记录
         
-        // 清空游戏历史，从零开始
+        // 清空前端虚拟数据，确保不生成任何虚拟内容
         this.gamesHistory = [];
         this.gameCounter = 0;
         
-        console.log('Sample games disabled - starting with clean state');
+        console.log('✅ Sample games completely disabled - Game History will load from database only');
     }
     
     // Game management methods
@@ -310,8 +310,17 @@ class SmartCourtApp {
     }
     
     // Game state management
-    startGame() {
-        // Create new game ID for new game
+    async startGame() {
+        // Get player IDs from PlayerManager
+        const playerIds = window.playerManager ? window.playerManager.getCurrentPlayerIds() : null;
+        
+        // Check if players are selected
+        if (!playerIds || !playerIds.playerA || !playerIds.playerB) {
+            this.showMessage('Please select both players before starting the game', 'error');
+            return;
+        }
+        
+        // Create new game ID for new game (local backup)
         this.gameCounter++;
         this.currentGameId = `GAME-${String(this.gameCounter).padStart(3, '0')}`;
         
@@ -322,13 +331,44 @@ class SmartCourtApp {
         this.gameState.currentRound = 0;
         this.gameState.elapsedTime = 0;
         
+        // Try to create game in database
+        try {
+            const response = await fetch('http://localhost:5001/games/new', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    playerA: playerIds.playerA,
+                    playerB: playerIds.playerB
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success') {
+                    this.gameState.databaseGameId = data.gid;
+                    console.log(`✅ Game created in database with ID: ${data.gid}`);
+                    this.addLiveFeedItem(`✅ Game created in database (ID: ${data.gid})`, 'success');
+                } else {
+                    throw new Error(data.message || 'Failed to create game in database');
+                }
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('❌ Failed to create game in database:', error);
+            this.addLiveFeedItem(`⚠️ Database unavailable, game saved locally only`, 'error');
+            this.gameState.databaseGameId = null;
+        }
+        
         this.startTimer();
         this.updateGameStatus();
         this.updateScoreboard();
         this.addLiveFeedItem(`New match started! Game ID: ${this.currentGameId}`, 'score');
         
-        // Save initial game state to history
-        this.saveCurrentGameToHistory();
+        // 不要在开始时保存虚拟数据，只有游戏真正结束时才保存
+        // this.saveCurrentGameToHistory(); // 移除虚拟数据生成
         
         // 已禁用自动模拟 - 等待真实传感器输入
         // this.simulateGameplay(); // 自动模拟已禁用
@@ -352,7 +392,7 @@ class SmartCourtApp {
         this.showMessage('Match resumed', 'success');
     }
     
-    endGame() {
+    async endGame() {
         this.gameState.status = 'ended';
         this.gameState.endTime = new Date();
         this.stopTimer();
@@ -366,6 +406,41 @@ class SmartCourtApp {
         this.addLiveFeedItem(`🏆 MATCH ENDED! Player ${winner} wins ${finalScore}! (${this.currentGameId})`, 'score');
         this.showMessage(`🏆 Player ${winner} wins ${finalScore}! Game ${this.currentGameId} completed`, 'success');
         
+        // Update game in database if it was created there
+        if (this.gameState.databaseGameId) {
+            try {
+                const duration = Math.floor(this.gameState.elapsedTime / 60); // Convert to minutes
+                const response = await fetch('http://localhost:5001/games/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        gid: this.gameState.databaseGameId,
+                        status: 'ended',
+                        duration: duration
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        console.log(`✅ Game ${this.gameState.databaseGameId} saved to database successfully`);
+                        this.addLiveFeedItem(`✅ Game saved to database`, 'success');
+                    } else {
+                        throw new Error(data.message || 'Failed to update game in database');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('❌ Failed to save game to database:', error);
+                this.addLiveFeedItem(`⚠️ Failed to save game to database`, 'error');
+            }
+        } else {
+            this.addLiveFeedItem(`📝 Game saved locally only`, 'info');
+        }
+        
         // Save final game state to history
         this.saveCurrentGameToHistory();
         
@@ -375,7 +450,7 @@ class SmartCourtApp {
         }
     }
     
-    addScore(player) {
+    async addScore(player) {
         if (this.gameState.status !== 'playing') return;
         
         // Check if game should end before adding score
@@ -383,7 +458,43 @@ class SmartCourtApp {
             return; // Game already ended, don't add more scores
         }
         
-        this.gameState.scores[player]++;
+        // Convert player name to team letter for backend API
+        const team = player === 'playerA' ? 'A' : 'B';
+        
+        // Update score in database if game was created there
+        if (this.gameState.databaseGameId) {
+            try {
+                const response = await fetch(`http://localhost:5001/goal?team=${team}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        console.log(`✅ Score recorded in database: ${team} scored`);
+                        // Update local scores to match database
+                        this.gameState.scores.playerA = data.score.A || 0;
+                        this.gameState.scores.playerB = data.score.B || 0;
+                    } else {
+                        throw new Error(data.message || 'Failed to record score in database');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('❌ Failed to record score in database:', error);
+                this.addLiveFeedItem(`⚠️ Database error, score recorded locally only`, 'error');
+                // Continue with local score update as fallback
+                this.gameState.scores[player]++;
+            }
+        } else {
+            // No database game, update locally only
+            this.gameState.scores[player]++;
+        }
+        
         this.gameState.currentRound++;
         
         // Create round record
@@ -697,8 +808,8 @@ class SmartCourtApp {
         
         // 更新本地游戏状态
         this.gameState.scores = {
-            playerA: scoreData.playerA || scoreData.home || 0,
-            playerB: scoreData.playerB || scoreData.away || 0
+            playerA: scoreData.playerA || scoreData.home || scoreData.A || 0,
+            playerB: scoreData.playerB || scoreData.away || scoreData.B || 0
         };
         
         // 更新UI
@@ -715,12 +826,12 @@ class SmartCourtApp {
             
             // 自动结束游戏
             setTimeout(() => {
-                this.gameState.status = 'ended';
-                this.gameState.endTime = new Date();
-                this.updateGameStatus();
-                this.saveCurrentGameToHistory();
+                this.endGame(); // Use the async endGame method
             }, 1000);
         }
+        
+        // 保存游戏状态
+        this.saveCurrentGameToHistory();
     }
     
     // 处理WebSocket游戏状态更新
@@ -870,6 +981,53 @@ class SmartCourtApp {
                 this.showMessage('WebSocket manager error', 'error');
             }
         }
+    }
+    
+    // Database connection and game state utilities
+    async checkDatabaseConnection() {
+        try {
+            const response = await fetch('http://localhost:5001/', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                console.log('✅ Database server is available');
+                this.addLiveFeedItem('✅ Database server is available', 'success');
+                return true;
+            } else {
+                console.log('❌ Database server returned error:', response.status);
+                this.addLiveFeedItem(`❌ Database server error: ${response.status}`, 'error');
+                return false;
+            }
+        } catch (error) {
+            console.log('❌ Database server is not available:', error.message);
+            this.addLiveFeedItem('❌ Database server is not available', 'error');
+            return false;
+        }
+    }
+    
+    getDatabaseGameId() {
+        return this.gameState.databaseGameId || null;
+    }
+    
+    isGameInDatabase() {
+        return !!this.gameState.databaseGameId;
+    }
+    
+    // 获取游戏状态摘要（用于调试）
+    getGameStatusSummary() {
+        return {
+            localGameId: this.currentGameId,
+            databaseGameId: this.gameState.databaseGameId,
+            status: this.gameState.status,
+            scores: this.gameState.scores,
+            rounds: this.gameState.rounds.length,
+            isInDatabase: this.isGameInDatabase(),
+            players: window.playerManager ? window.playerManager.getCurrentPlayerIds() : null
+        };
     }
 }
 

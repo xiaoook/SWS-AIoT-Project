@@ -50,18 +50,18 @@ class GameControlManager {
         });
     }
     
-    startGame() {
+    async startGame() {
         if (window.smartCourtApp) {
             // If game is already running, show confirmation dialog
             if (window.smartCourtApp.gameState.status !== 'idle') {
                 if (confirm('A game is currently in progress. Are you sure you want to restart?')) {
                     window.smartCourtApp.resetGame();
-                    setTimeout(() => {
-                        window.smartCourtApp.startGame();
+                    setTimeout(async () => {
+                        await window.smartCourtApp.startGame();
                     }, 500);
                 }
             } else {
-                window.smartCourtApp.startGame();
+                await window.smartCourtApp.startGame();
             }
         }
         
@@ -84,13 +84,13 @@ class GameControlManager {
         this.updateButtonStates();
     }
     
-    endGame() {
+    async endGame() {
         if (window.smartCourtApp) {
             const gameState = window.smartCourtApp.gameState;
             
             if (gameState.status === 'playing' || gameState.status === 'paused') {
                 if (confirm('Are you sure you want to end the current game?')) {
-                    window.smartCourtApp.endGame();
+                    await window.smartCourtApp.endGame();
                 }
             }
         }
@@ -197,11 +197,11 @@ class GameControlManager {
     }
     
     // Add manual scoring (for testing)
-    addManualScore(player) {
+    async addManualScore(player) {
         if (window.smartCourtApp) {
             const gameState = window.smartCourtApp.gameState;
             if (gameState.status === 'playing') {
-                window.smartCourtApp.addScore(player);
+                await window.smartCourtApp.addScore(player);
             }
         }
     }
