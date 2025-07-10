@@ -231,10 +231,8 @@ class SmartCourtApp {
                 }
                 break;
             case 'replay':
-                // Refresh replay data
-                if (window.replayManager) {
-                    window.replayManager.refreshReplays();
-                }
+                // Video replay functionality disabled
+                console.log('Video replay functionality has been disabled');
                 break;
             case 'report':
                 // Refresh report data
@@ -263,7 +261,7 @@ class SmartCourtApp {
                     break;
                 case '4':
                     e.preventDefault();
-                    this.switchTab('replay');
+                    console.log('Video replay tab disabled');
                     break;
                 case '5':
                     e.preventDefault();
@@ -295,17 +293,9 @@ class SmartCourtApp {
             window.reportManager.chart.resize();
         }
         
-        // Adjust video player size
-        const videoPlayer = document.getElementById('replayVideo');
-        if (videoPlayer) {
-            if (isMobile) {
-                videoPlayer.style.height = '200px';
-            } else if (isTablet) {
-                videoPlayer.style.height = '300px';
-            } else {
-                videoPlayer.style.height = '400px';
-            }
-        }
+        // Video player functionality disabled
+        // const videoPlayer = document.getElementById('replayVideo');
+        // Video replay feature has been disabled to reduce requests
     }
     
     handleVisibilityChange() {
@@ -882,6 +872,28 @@ class SmartCourtApp {
         }
     }
 }
+
+// Add cache busting function to force reload
+function forceReload() {
+    console.log('🔄 Force reloading page to clear cache...');
+    
+    // Clear localStorage and sessionStorage
+    localStorage.removeItem('playerManagerVersion');
+    localStorage.removeItem('corsBlocked');
+    localStorage.removeItem('fetchPlayersFromDatabase_retry');
+    
+    // Force reload with cache bypass
+    window.location.reload(true);
+}
+
+// Add keyboard shortcut for force reload
+document.addEventListener('keydown', function(e) {
+    // Ctrl+Shift+R or Cmd+Shift+R to force reload
+    if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+        e.preventDefault();
+        forceReload();
+    }
+});
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
