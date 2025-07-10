@@ -32,6 +32,58 @@ class GameHistoryManager {
         }
     }
     
+    // 从数据库加载真实游戏记录
+    async loadGamesFromDatabase() {
+        try {
+            console.log('🔄 Loading games from database...');
+            
+            const response = await fetch('http://localhost:5001/games', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    limit: 100 // 获取最近100场游戏
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success' && data.games) {
+                    console.log(`✅ Loaded ${data.games.length} games from database`);
+                    
+                    // 转换数据库格式到前端格式
+                    const games = data.games.map(game => ({
+                        gameId: `GAME-${String(game.gid).padStart(3, '0')}`,
+                        gameType: game.duration > 0 ? 'Completed Match' : 'Live Match',
+                        startTime: new Date(game.date + ' ' + game.time),
+                        endTime: game.duration > 0 ? new Date(new Date(game.date + ' ' + game.time).getTime() + game.duration * 1000) : null,
+                        duration: game.duration || 0,
+                        finalScores: { 
+                            playerA: game.pointA || 0, 
+                            playerB: game.pointB || 0 
+                        },
+                        winner: game.pointA > game.pointB ? 'playerA' : 
+                               game.pointB > game.pointA ? 'playerB' : null,
+                        status: game.duration > 0 ? 'ended' : 'playing',
+                        rounds: game.rounds || [], // 如果有轮次数据
+                        databaseGameId: game.gid
+                    }));
+                    
+                    return games;
+                } else {
+                    throw new Error(data.message || 'Failed to load games from database');
+                }
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('❌ Failed to load games from database:', error);
+            console.log('💾 Using fallback: no games to display');
+            return []; // 返回空数组，不显示虚拟数据
+        }
+    }
+    
     createModal() {
         // Create modal for game details
         this.modal = document.createElement('div');
@@ -63,10 +115,11 @@ class GameHistoryManager {
         });
     }
     
-    refreshDisplay() {
+    async refreshDisplay() {
         if (!this.app) return;
         
-        const games = this.app.getGamesHistory();
+        // 从数据库获取真实的游戏记录，而不是前端虚拟数据
+        const games = await this.loadGamesFromDatabase();
         this.updateStats(games);
         this.displayGames(games);
     }
@@ -291,12 +344,7 @@ class GameHistoryManager {
     }
     
     clearAllGames() {
-        if (confirm('Are you sure you want to clear all game history? This action cannot be undone.')) {
-            this.app.gamesHistory = [];
-            this.app.currentGameId = null;
-            this.app.showMessage('All game history cleared!', 'success');
-            this.refreshDisplay();
-        }
+        alert('游戏记录保存在数据库中，请通过后端管理接口清除。\n前端不再生成虚拟数据，只显示真实的数据库记录。');
     }
     
     formatDuration(seconds) {
