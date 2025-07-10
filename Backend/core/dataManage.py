@@ -180,3 +180,35 @@ def fetch_all_players():
             conn.close()
     players = [dict(row) for row in results]
     return players
+
+def update_game(gid: int, current_score, duration = None, status: str = 'in progress') -> None:
+    pointA, pointB = current_score["A"], current_score["B"]
+    logger.debug(f"gid: {gid}, pointA: {pointA}, pointB: {pointB}, status: {status}")
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        if duration is None:
+            cur.execute("""
+            UPDATE Game 
+            SET pointA = ?, pointB = ?, status = ?
+            WHERE gid = ? """, (pointA, pointB, status, gid))
+            conn.commit()
+            logger.info(f"Game {gid} updated successfully with score {pointA} : {pointB}")
+        else:
+            cur.execute("""
+                        UPDATE Game
+                        SET pointA = ?,
+                            pointB = ?,
+                            status = ?,
+                            duration = ?
+                        WHERE gid = ? """, (pointA, pointB, status, duration, gid))
+            conn.commit()
+            logger.info(f"Game {gid} updated successfully with duration {duration}, status: {status}")
+    except sqlite3.OperationalError as e:
+        logger.error(f"Error: {e}")
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+    return None
