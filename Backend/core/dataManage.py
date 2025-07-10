@@ -212,3 +212,20 @@ def update_game(gid: int, current_score: dict, duration = None, status: str = 'i
         if conn is not None:
             conn.close()
     return None
+
+def delete_selected_game(gid: int):
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        cur.execute("DELETE FROM Game WHERE gid = ?", (gid,))
+        cur.execute("DELETE FROM Round WHERE gid = ?", (gid,))
+        conn.commit()
+        logger.info(f"Game {gid} deleted")
+    except sqlite3.OperationalError as e:
+        logger.error(f"Error: {e}")
+        raise RuntimeError(f"Error: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
+    return None

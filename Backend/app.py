@@ -210,6 +210,27 @@ def change_game_status():
         "status": "success"
     })
 
+@app.route('/games/delete', methods=['DELETE'])
+def delete_game():
+    data = request.get_json()
+    gid = data.get('gid')
+    logger.debug(f'gid: {gid}')
+
+    global current_score
+    global current_round
+    global current_game
+
+    if gid == current_game:
+        current_score = {'A': 0, 'B': 0}
+        current_round = 0
+        current_game = 0
+        socketio.emit('score_update', current_score)
+
+    delete_selected_game(gid)
+    return jsonify({
+        "status": "success"
+    }), 200
+
 @app.route('/player/create', methods=['POST'])
 def create_player():
     data = request.get_json()
