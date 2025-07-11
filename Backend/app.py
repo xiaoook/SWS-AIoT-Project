@@ -199,6 +199,8 @@ def change_game_status():
     status = data.get('status').lower()
     duration = data.get('duration')
     global current_score
+    global current_round
+    global current_game
     logger.debug(f'gid: {gid}, status: {status}, duration: {duration}')
 
     # verify whether the gid is the current game
@@ -210,10 +212,6 @@ def change_game_status():
         }), 400
 
     update_game(gid, current_score, status=status, duration=duration)
-
-    global current_score
-    global current_round
-    global current_game
 
     # initialize game after ending
     if status == 'end':
