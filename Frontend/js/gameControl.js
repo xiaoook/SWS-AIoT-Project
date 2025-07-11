@@ -7,6 +7,9 @@ class GameControlManager {
             end: null
         };
         
+        // Track player confirmation status
+        this.playersConfirmed = false;
+        
         this.init();
     }
     
@@ -20,6 +23,12 @@ class GameControlManager {
         this.buttons.start = document.getElementById('startGame');
         this.buttons.pause = document.getElementById('pauseGame');
         this.buttons.end = document.getElementById('endGame');
+        
+        // Initially disable start button until players are confirmed
+        if (this.buttons.start) {
+            this.buttons.start.disabled = true;
+            this.buttons.start.textContent = 'Confirm Players First';
+        }
     }
     
     setupEventListeners() {
@@ -107,7 +116,8 @@ class GameControlManager {
         // Update button states
         switch (status) {
             case 'idle':
-                this.setButtonState('start', true, 'Start Game');
+                // Only enable start button if players are confirmed
+                this.setButtonState('start', this.playersConfirmed, this.playersConfirmed ? 'Start Game' : 'Confirm Players First');
                 this.setButtonState('pause', false, 'Pause Game');
                 this.setButtonState('end', false, 'End Game');
                 break;
@@ -125,7 +135,8 @@ class GameControlManager {
                 break;
                 
             case 'ended':
-                this.setButtonState('start', true, 'Start New Game');
+                // Only enable start button if players are confirmed
+                this.setButtonState('start', this.playersConfirmed, this.playersConfirmed ? 'Start New Game' : 'Confirm Players First');
                 this.setButtonState('pause', false, 'Pause Game');
                 this.setButtonState('end', false, 'End Game');
                 break;
@@ -295,11 +306,20 @@ class GameControlManager {
         }, 2000);
     }
     
+    // Set player confirmation status
+    setPlayersConfirmed(confirmed) {
+        this.playersConfirmed = confirmed;
+        this.updateButtonStates();
+    }
+    
     // Reset all data
     resetAllData() {
         if (confirm('Are you sure you want to reset all data? This action cannot be undone.')) {
             localStorage.removeItem('smartCourt_autosave');
             window.smartCourtApp.resetGame();
+            
+            // Reset player confirmation status
+            this.playersConfirmed = false;
             
             // Clear other related data
             if (window.analysisManager) {

@@ -113,6 +113,18 @@
     
     .score-item {
         margin: 0 auto;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.06)) !important;
+        border: 2px solid rgba(102, 126, 234, 0.15) !important;
+    }
+    
+    .score-item .player {
+        color: #667eea !important;
+        font-weight: 600 !important;
+    }
+    
+    .score-item .score {
+        color: #2d3748 !important;
+        font-weight: 800 !important;
     }
     
     .filter-controls {
@@ -549,14 +561,20 @@
     .score-item {
         padding: 1rem;
         min-width: 120px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.06)) !important;
+        border: 2px solid rgba(102, 126, 234, 0.15) !important;
     }
     
     .score-item .player {
         font-size: 1rem;
+        color: #667eea !important;
+        font-weight: 600 !important;
     }
     
     .score-item .score {
         font-size: 2rem;
+        color: #2d3748 !important;
+        font-weight: 800 !important;
     }
     
     .chart-container {
@@ -1131,10 +1149,19 @@
     .score-item {
         padding: 0.8rem;
         min-width: 100px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.06)) !important;
+        border: 2px solid rgba(102, 126, 234, 0.15) !important;
+    }
+    
+    .score-item .player {
+        color: #667eea !important;
+        font-weight: 600 !important;
     }
     
     .score-item .score {
         font-size: 1.8rem;
+        color: #2d3748 !important;
+        font-weight: 800 !important;
     }
     
     .chart-container {
@@ -1412,6 +1439,67 @@
         gap: 0.3rem;
         width: 100%;
     }
+
+    /* Game Details Container Mobile */
+    .game-details-container {
+        gap: 1rem;
+    }
+
+    .players-score-card,
+    .rounds-history-card {
+        padding: 1.5rem;
+    }
+
+    .players-score-card h3,
+    .rounds-history-card h3 {
+        font-size: 1.2rem;
+        margin-bottom: 1rem;
+    }
+
+    .round-timeline-item {
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .round-marker {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .round-index {
+        font-size: 0.7rem;
+    }
+
+    .round-content {
+        padding: 0.8rem 1rem;
+    }
+
+    .round-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .round-details {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.3rem;
+    }
+
+    .winner-badge {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+    }
+    
+    .winner-text {
+        font-size: 1rem;
+        font-weight: 700;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .trophy {
+        font-size: 1rem;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1445,6 +1533,72 @@
     }
     
     .detail-section h4 {
+        font-size: 1rem;
+    }
+
+    /* Game Details Container Small Mobile */
+    .players-score-card,
+    .rounds-history-card {
+        padding: 1rem;
+    }
+
+    .players-score-card h3,
+    .rounds-history-card h3 {
+        font-size: 1.1rem;
+    }
+
+    .round-timeline-item {
+        gap: 0.6rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .round-marker {
+        width: 1.2rem;
+        height: 1.2rem;
+    }
+
+    .round-index {
+        font-size: 0.6rem;
+    }
+
+    .round-content {
+        padding: 0.6rem 0.8rem;
+    }
+
+    .round-title {
+        font-size: 0.9rem;
+    }
+
+    .round-score {
+        font-size: 0.8rem;
+        padding: 0.2rem 0.6rem;
+    }
+
+    .round-details {
+        font-size: 0.8rem;
+    }
+
+    .winner-badge {
+        padding: 0.5rem 1rem;
+        font-size: 0.8rem;
+    }
+    
+    .winner-text {
+        font-size: 0.9rem;
+        font-weight: 700;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .rounds-count {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+    }
+
+    .no-rounds-icon {
+        font-size: 2rem;
+    }
+
+    .no-rounds-text {
         font-size: 1rem;
     }
 }
