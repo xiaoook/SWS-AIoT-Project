@@ -3,6 +3,7 @@ class GameHistoryManager {
     constructor() {
         this.app = null;
         this.modal = null;
+        this.loadedGames = []; // Store loaded games from database
         this.init();
     }
     
@@ -32,6 +33,54 @@ class GameHistoryManager {
         }
     }
     
+    // 根据玩家ID获取玩家名字
+    async getPlayerNames(playerAId, playerBId) {
+        // 首先尝试从当前的 PlayerManager 获取
+        if (window.playerManager && window.playerManager.allPlayers) {
+            const allPlayers = window.playerManager.allPlayers;
+            const playerA = allPlayers.find(p => (p.id || p.pid) == playerAId);
+            const playerB = allPlayers.find(p => (p.id || p.pid) == playerBId);
+            
+            if (playerA && playerB) {
+                return {
+                    playerA: playerA.name,
+                    playerB: playerB.name
+                };
+            }
+        }
+        
+        // 如果 PlayerManager 中没有找到，尝试从数据库获取
+        try {
+            const response = await fetch('http://localhost:5001/player/all', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success' && data.players) {
+                    const playerA = data.players.find(p => p.pid == playerAId);
+                    const playerB = data.players.find(p => p.pid == playerBId);
+                    
+                    return {
+                        playerA: playerA ? playerA.name : `Player ${playerAId}`,
+                        playerB: playerB ? playerB.name : `Player ${playerBId}`
+                    };
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to fetch player names:', error);
+        }
+        
+        // 回退到默认名字
+        return {
+            playerA: `Player ${playerAId || 'A'}`,
+            playerB: `Player ${playerBId || 'B'}`
+        };
+    }
+    
     // 从数据库加载真实游戏记录
     async loadGamesFromDatabase() {
         try {
@@ -53,22 +102,28 @@ class GameHistoryManager {
                     console.log(`✅ Loaded ${data.games.length} games from database`);
                     
                     // 转换数据库格式到前端格式
-                    const games = data.games.map(game => ({
-                        gameId: `GAME-${String(game.gid).padStart(3, '0')}`,
-                        gameType: game.duration > 0 ? 'Completed Match' : 'Live Match',
-                        startTime: new Date(game.date + ' ' + game.time),
-                        endTime: game.duration > 0 ? new Date(new Date(game.date + ' ' + game.time).getTime() + game.duration * 1000) : null,
-                        duration: game.duration || 0,
-                        finalScores: { 
-                            playerA: game.pointA || 0, 
-                            playerB: game.pointB || 0 
-                        },
-                        winner: game.pointA > game.pointB ? 'playerA' : 
-                               game.pointB > game.pointA ? 'playerB' : null,
-                        status: game.duration > 0 ? 'ended' : 'playing',
-                        rounds: game.rounds || [], // 如果有轮次数据
-                        databaseGameId: game.gid
-                    }));
+                    const games = data.games.map((game) => {
+                        return {
+                            gameId: `GAME-${String(game.gid).padStart(3, '0')}`,
+                            gameType: game.duration > 0 ? 'Completed Match' : 'Live Match',
+                            startTime: new Date(game.date + ' ' + game.time),
+                            endTime: game.duration > 0 ? new Date(new Date(game.date + ' ' + game.time).getTime() + game.duration * 1000) : null,
+                            duration: game.duration || 0,
+                            finalScores: { 
+                                playerA: game.pointA || 0, 
+                                playerB: game.pointB || 0 
+                            },
+                            winner: game.pointA > game.pointB ? 'playerA' : 
+                                   game.pointB > game.pointA ? 'playerB' : null,
+                            status: game.duration > 0 ? 'ended' : 'playing',
+                            rounds: game.rounds || [], // 如果有轮次数据
+                            databaseGameId: game.gid,
+                            playerNames: {
+                                playerA: game.playerAname || 'Player A',
+                                playerB: game.playerBname || 'Player B'
+                            }
+                        };
+                    });
                     
                     return games;
                 } else {
@@ -118,10 +173,49 @@ class GameHistoryManager {
     async refreshDisplay() {
         if (!this.app) return;
         
-        // 从数据库获取真实的游戏记录，而不是前端虚拟数据
-        const games = await this.loadGamesFromDatabase();
-        this.updateStats(games);
-        this.displayGames(games);
+        try {
+            // 显示加载状态
+            const refreshButton = document.getElementById('refreshHistory');
+            const clearButton = document.getElementById('clearHistory');
+            const gamesContainer = document.getElementById('gamesGrid');
+            
+            if (refreshButton) {
+                refreshButton.disabled = true;
+                refreshButton.textContent = '🔄 Refreshing...';
+            }
+            if (clearButton) {
+                clearButton.disabled = true;
+            }
+            if (gamesContainer) {
+                gamesContainer.innerHTML = '<div class="loading-games">🔄 Loading games from database...</div>';
+            }
+            
+            console.log('🔄 Refreshing game history...');
+            
+            // 从数据库获取真实的游戏记录，而不是前端虚拟数据
+            const games = await this.loadGamesFromDatabase();
+            this.loadedGames = games; // Store loaded games for later use
+            this.updateStats(games);
+            this.displayGames(games);
+            
+            console.log(`✅ Game history refreshed: ${games.length} games loaded`);
+            
+        } catch (error) {
+            console.error('❌ Failed to refresh game history:', error);
+            this.app.showMessage(`Failed to refresh game history: ${error.message}`, 'error');
+        } finally {
+            // 恢复按钮状态
+            const refreshButton = document.getElementById('refreshHistory');
+            const clearButton = document.getElementById('clearHistory');
+            
+            if (refreshButton) {
+                refreshButton.disabled = false;
+                refreshButton.textContent = '🔄 Refresh';
+            }
+            if (clearButton) {
+                clearButton.disabled = false;
+            }
+        }
     }
     
     updateStats(games) {
@@ -176,48 +270,54 @@ class GameHistoryManager {
         const isActive = game.status !== 'ended';
         const isCurrent = this.app.currentGameId === game.gameId;
         
+        // 获取玩家名字
+        const playerAName = game.playerNames ? game.playerNames.playerA : 'Player A';
+        const playerBName = game.playerNames ? game.playerNames.playerB : 'Player B';
+        
+        // 计算实际的轮次数
+        const actualRounds = Math.max(game.rounds.length, game.finalScores.playerA + game.finalScores.playerB);
+        
         return `
             <div class="game-card ${game.status} ${isCurrent ? 'active' : ''}" data-game-id="${game.gameId}">
                 <div class="game-header">
-                    <div class="game-id">${game.gameId}</div>
-                    <div class="game-status ${game.status}">${game.status}</div>
+                    <div class="game-status ${game.status}">${game.status.toUpperCase()}</div>
+                    <div class="game-date">${startTime.toLocaleDateString()}</div>
                 </div>
                 
-                <div class="game-type">${game.gameType}</div>
+                <div class="game-players">
+                    <div class="player-name player-a">${playerAName}</div>
+                    <div class="vs-text">vs</div>
+                    <div class="player-name player-b">${playerBName}</div>
+                </div>
                 
                 <div class="game-score">
                     <span class="player-a-score">${game.finalScores.playerA}</span>
-                    <span class="vs">VS</span>
+                    <span class="vs">-</span>
                     <span class="player-b-score">${game.finalScores.playerB}</span>
                 </div>
                 
-                ${game.winner ? `<div class="game-winner ${game.winner}">🏆 Player ${game.winner.slice(-1)} Wins!</div>` : ''}
+                ${game.winner ? `<div class="game-winner ${game.winner}">🏆 ${game.winner === 'playerA' ? playerAName : playerBName} Wins!</div>` : ''}
                 
-                <div class="game-info">
-                    <div class="game-info-item">
-                        <span>Rounds:</span>
-                        <span>${game.rounds.length}</span>
+                <div class="game-stats">
+                    <div class="stat-item">
+                        <span class="stat-icon">🎯</span>
+                        <span class="stat-value">${actualRounds}</span>
+                        <span class="stat-label">Rounds</span>
                     </div>
-                    <div class="game-info-item">
-                        <span>Duration:</span>
-                        <span>${duration}</span>
+                    <div class="stat-item">
+                        <span class="stat-icon">⏱️</span>
+                        <span class="stat-value">${duration}</span>
+                        <span class="stat-label">Duration</span>
                     </div>
-                    <div class="game-info-item">
-                        <span>Started:</span>
-                        <span>${startTime.toLocaleTimeString()}</span>
-                    </div>
-                    <div class="game-info-item">
-                        <span>Date:</span>
-                        <span>${startTime.toLocaleDateString()}</span>
+                    <div class="stat-item">
+                        <span class="stat-icon">🕒</span>
+                        <span class="stat-value">${startTime.toLocaleTimeString()}</span>
+                        <span class="stat-label">Started</span>
                     </div>
                 </div>
                 
                 <div class="game-actions">
-                    ${isCurrent ? 
-                        '<button class="game-action-btn primary" data-action="current">Current Game</button>' :
-                        '<button class="game-action-btn" data-action="load">Load Game</button>'
-                    }
-                    <button class="game-action-btn" data-action="view">View Details</button>
+                    <button class="game-action-btn" data-action="view">Details</button>
                     <button class="game-action-btn danger" data-action="delete">Delete</button>
                 </div>
             </div>
@@ -243,6 +343,15 @@ class GameHistoryManager {
     }
     
     loadGame(gameId) {
+        // Find the game in loaded games
+        const game = this.loadedGames.find(g => g.gameId === gameId);
+        
+        if (!game) {
+            this.app.showMessage(`Game ${gameId} not found`, 'error');
+            return;
+        }
+        
+        // Load the game data into the app
         if (this.app.loadGame(gameId)) {
             this.app.showMessage(`Game ${gameId} loaded successfully!`, 'success');
             this.refreshDisplay();
@@ -251,22 +360,72 @@ class GameHistoryManager {
         }
     }
     
-    deleteGame(gameId) {
-        if (confirm(`Are you sure you want to delete game ${gameId}?`)) {
-            if (this.app.deleteGame(gameId)) {
+    async deleteGame(gameId) {
+        if (confirm(`Are you sure you want to delete game ${gameId}? This action cannot be undone.`)) {
+            // Find the delete button and disable it during deletion
+            const deleteButton = document.querySelector(`[data-game-id="${gameId}"] [data-action="delete"]`);
+            if (deleteButton) {
+                deleteButton.disabled = true;
+                deleteButton.textContent = 'Deleting...';
+            }
+            
+            try {
+                // Find the game in loaded games to get the database ID
+                const game = this.loadedGames.find(g => g.gameId === gameId);
+                if (!game) {
+                    throw new Error(`Game ${gameId} not found in loaded games`);
+                }
+                
+                const databaseGameId = game.databaseGameId;
+                console.log(`🗑️ Deleting game ${gameId} (Database ID: ${databaseGameId}) from database...`);
+                
+                const response = await fetch('http://localhost:5001/games/delete', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        gid: databaseGameId
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        console.log(`✅ Game ${gameId} deleted successfully from database`);
                 this.app.showMessage(`Game ${gameId} deleted successfully!`, 'success');
-                this.refreshDisplay();
+                        
+                        // Refresh the display to show updated list
+                        await this.refreshDisplay();
+                    } else {
+                        throw new Error(data.message || 'Failed to delete game from database');
+                    }
             } else {
-                this.app.showMessage(`Failed to delete game ${gameId}`, 'error');
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('❌ Failed to delete game from database:', error);
+                this.app.showMessage(`Failed to delete game ${gameId}: ${error.message}`, 'error');
+                
+                // Re-enable the delete button on error
+                if (deleteButton) {
+                    deleteButton.disabled = false;
+                    deleteButton.textContent = 'Delete';
+                }
             }
         }
     }
     
+
+    
     showGameDetails(gameId) {
-        const games = this.app.getGamesHistory();
-        const game = games.find(g => g.gameId === gameId);
+        const game = this.loadedGames.find(g => g.gameId === gameId);
         
-        if (!game) return;
+        if (!game) {
+            console.error(`Game ${gameId} not found in loaded games`);
+            this.app.showMessage(`Game ${gameId} not found`, 'error');
+            return;
+        }
         
         const detailsContainer = document.getElementById('gameDetails');
         detailsContainer.innerHTML = this.createGameDetailsHTML(game);
@@ -279,60 +438,91 @@ class GameHistoryManager {
         const endTime = game.endTime ? new Date(game.endTime) : null;
         const duration = this.formatDuration(game.duration);
         
+        // 获取玩家名字
+        const playerAName = game.playerNames ? game.playerNames.playerA : 'Player A';
+        const playerBName = game.playerNames ? game.playerNames.playerB : 'Player B';
+        
+        // 计算实际的轮次数
+        const actualRounds = Math.max(game.rounds.length, game.finalScores.playerA + game.finalScores.playerB);
+        
         return `
-            <div class="game-details">
-                <div class="detail-section">
-                    <h4>Game Information</h4>
-                    <div class="detail-grid">
-                        <div class="detail-item">
-                            <strong>Game ID:</strong> ${game.gameId}
-                        </div>
-                        <div class="detail-item">
+            <div class="game-details-container">
+                <!-- Game Information Card -->
+                <div class="game-info-card">
+                    <h3>🎮 Game Information</h3>
+                    <div class="game-meta">
+                        <div class="meta-item">
                             <strong>Type:</strong> ${game.gameType}
                         </div>
-                        <div class="detail-item">
-                            <strong>Status:</strong> <span class="game-status ${game.status}">${game.status}</span>
+                        <div class="meta-item">
+                            <strong>Status:</strong> ${game.status.toUpperCase()}
                         </div>
-                        <div class="detail-item">
+                        <div class="meta-item">
+                            <strong>Total Rounds:</strong> ${actualRounds}
+                        </div>
+                        <div class="meta-item">
                             <strong>Duration:</strong> ${duration}
                         </div>
-                        <div class="detail-item">
+                        <div class="meta-item">
                             <strong>Started:</strong> ${startTime.toLocaleString()}
                         </div>
-                        ${endTime ? `<div class="detail-item">
+                        ${endTime ? `<div class="meta-item">
                             <strong>Ended:</strong> ${endTime.toLocaleString()}
                         </div>` : ''}
                     </div>
                 </div>
                 
-                <div class="detail-section">
-                    <h4>Final Score</h4>
-                    <div class="score-summary">
+                <!-- Players & Final Score Card -->
+                <div class="players-score-card">
+                    <h3>🏆 Players & Final Score</h3>
+                    <div class="final-score">
                         <div class="score-item">
-                            <span class="player">Player A:</span>
+                            <span class="player">${playerAName}:</span>
                             <span class="score">${game.finalScores.playerA}</span>
                         </div>
                         <div class="score-item">
-                            <span class="player">Player B:</span>
+                            <span class="player">${playerBName}:</span>
                             <span class="score">${game.finalScores.playerB}</span>
                         </div>
-                        ${game.winner ? `<div class="winner">🏆 Player ${game.winner.slice(-1)} Wins!</div>` : ''}
                     </div>
+                    ${game.winner ? `<div class="game-winner">
+                        <div class="winner-badge">
+                            <span class="trophy">🏆</span>
+                            <span class="winner-text">${game.winner === 'playerA' ? playerAName : playerBName} Wins!</span>
+                        </div>
+                    </div>` : ''}
                 </div>
                 
-                <div class="detail-section">
-                    <h4>Round History (${game.rounds.length} rounds)</h4>
-                    <div class="rounds-list">
-                        ${game.rounds.map(round => `
-                            <div class="round-item">
-                                <div class="round-info">
-                                    <div class="round-number">Round ${round.id}</div>
-                                    <div class="round-winner">Player ${round.winner.slice(-1)} scored</div>
-                                    <div class="round-score">${round.playerAScore} - ${round.playerBScore}</div>
+                <!-- Round History Card -->
+                <div class="rounds-history-card">
+                    <h3>📊 Round History</h3>
+                    <div class="rounds-summary">
+                        <span class="rounds-count">${game.rounds.length} recorded rounds</span>
+                    </div>
+                    <div class="rounds-container">
+                        ${game.rounds.length > 0 ? 
+                            game.rounds.map((round, index) => `
+                            <div class="round-timeline-item">
+                                <div class="round-marker">
+                                    <span class="round-index">${index + 1}</span>
                                 </div>
-                                <div class="round-time">${new Date(round.timestamp).toLocaleTimeString()}</div>
+                                <div class="round-content">
+                                    <div class="round-header">
+                                        <span class="round-title">Round ${round.id}</span>
+                                        <span class="round-score">${round.playerAScore} - ${round.playerBScore}</span>
+                                    </div>
+                                    <div class="round-details">
+                                        <span class="round-winner">${round.winner === 'playerA' ? playerAName : playerBName} scored</span>
+                                        <span class="round-time">${new Date(round.timestamp).toLocaleTimeString()}</span>
+                                    </div>
+                                </div>
                             </div>
-                        `).join('')}
+                            `).join('') 
+                            : `<div class="no-rounds">
+                                <div class="no-rounds-icon">📝</div>
+                                <div class="no-rounds-text">No detailed round data available for this game.</div>
+                            </div>`
+                        }
                     </div>
                 </div>
             </div>
@@ -343,8 +533,71 @@ class GameHistoryManager {
         this.modal.classList.remove('show');
     }
     
-    clearAllGames() {
-        alert('游戏记录保存在数据库中，请通过后端管理接口清除。\n前端不再生成虚拟数据，只显示真实的数据库记录。');
+    async clearAllGames() {
+        // 确认删除操作
+        if (!confirm('Are you sure you want to delete ALL games? This action cannot be undone!')) {
+            return;
+        }
+        
+        // 二次确认
+        if (!confirm('This will permanently delete all game records from the database. Are you absolutely sure?')) {
+            return;
+        }
+        
+        try {
+            // 禁用按钮，显示加载状态
+            const clearButton = document.getElementById('clearHistory');
+            const refreshButton = document.getElementById('refreshHistory');
+            
+            if (clearButton) {
+                clearButton.disabled = true;
+                clearButton.textContent = '🗑️ Clearing...';
+            }
+            if (refreshButton) {
+                refreshButton.disabled = true;
+            }
+            
+            console.log('🗑️ Clearing all games from database...');
+            
+            // 调用后端删除所有游戏的接口
+            const response = await fetch('http://localhost:5001/games/delete/all', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success') {
+                    console.log('✅ All games deleted successfully from database');
+                    this.app.showMessage('All games have been deleted successfully!', 'success');
+                    
+                    // 刷新显示
+                    await this.refreshDisplay();
+                } else {
+                    throw new Error(data.message || 'Failed to delete all games from database');
+                }
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to clear all games:', error);
+            this.app.showMessage(`Failed to clear all games: ${error.message}`, 'error');
+        } finally {
+            // 恢复按钮状态
+            const clearButton = document.getElementById('clearHistory');
+            const refreshButton = document.getElementById('refreshHistory');
+            
+            if (clearButton) {
+                clearButton.disabled = false;
+                clearButton.textContent = '🗑️ Clear All';
+            }
+            if (refreshButton) {
+                refreshButton.disabled = false;
+            }
+        }
     }
     
     formatDuration(seconds) {

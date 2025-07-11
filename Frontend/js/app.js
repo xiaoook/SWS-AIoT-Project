@@ -301,11 +301,14 @@ class SmartCourtApp {
     handleVisibilityChange() {
         // Handle page visibility changes
         if (document.hidden) {
-            // Pause game when page is hidden
-            if (this.gameState.status === 'playing') {
-                this.pauseGame();
-                this.showMessage('Match paused automatically (page hidden)', 'info');
-            }
+            // 不再自动暂停比赛 - 让比赛可以一直进行
+            // if (this.gameState.status === 'playing') {
+            //     this.pauseGame();
+            //     this.showMessage('Match paused automatically (page hidden)', 'info');
+            // }
+            console.log('Page hidden but game continues running');
+        } else {
+            console.log('Page visible again');
         }
     }
     
@@ -349,7 +352,7 @@ class SmartCourtApp {
                 if (data.status === 'success') {
                     this.gameState.databaseGameId = data.gid;
                     console.log(`✅ Game created in database with ID: ${data.gid}`);
-                    this.addLiveFeedItem(`✅ Game created in database (ID: ${data.gid})`, 'success');
+                    this.addLiveFeedItem(`✅ Game created in database`, 'success');
                 } else {
                     throw new Error(data.message || 'Failed to create game in database');
                 }
@@ -365,7 +368,7 @@ class SmartCourtApp {
         this.startTimer();
         this.updateGameStatus();
         this.updateScoreboard();
-        this.addLiveFeedItem(`New match started! Game ID: ${this.currentGameId}`, 'score');
+        this.addLiveFeedItem(`New match started!`, 'score');
         
         // 不要在开始时保存虚拟数据，只有游戏真正结束时才保存
         // this.saveCurrentGameToHistory(); // 移除虚拟数据生成
@@ -373,7 +376,15 @@ class SmartCourtApp {
         // 已禁用自动模拟 - 等待真实传感器输入
         // this.simulateGameplay(); // 自动模拟已禁用
         
-        this.showMessage(`New match started! Game ID: ${this.currentGameId} - Waiting for sensor input`, 'success');
+        // Trigger game state change event to update button states
+        document.dispatchEvent(new CustomEvent('gameStateChange', {
+            detail: { 
+                status: this.gameState.status,
+                gameId: this.currentGameId
+            }
+        }));
+        
+        this.showMessage(`New match started! Waiting for sensor input`, 'success');
     }
     
     pauseGame() {
@@ -381,6 +392,15 @@ class SmartCourtApp {
         this.stopTimer();
         this.updateGameStatus();
         this.addLiveFeedItem('Match paused', 'info');
+        
+        // Trigger game state change event
+        document.dispatchEvent(new CustomEvent('gameStateChange', {
+            detail: { 
+                status: this.gameState.status,
+                gameId: this.currentGameId
+            }
+        }));
+        
         this.showMessage('Match paused', 'info');
     }
     
@@ -389,6 +409,15 @@ class SmartCourtApp {
         this.startTimer();
         this.updateGameStatus();
         this.addLiveFeedItem('Match resumed', 'score');
+        
+        // Trigger game state change event
+        document.dispatchEvent(new CustomEvent('gameStateChange', {
+            detail: { 
+                status: this.gameState.status,
+                gameId: this.currentGameId
+            }
+        }));
+        
         this.showMessage('Match resumed', 'success');
     }
     
@@ -403,13 +432,21 @@ class SmartCourtApp {
                       this.gameState.scores.playerA > this.gameState.scores.playerB ? 'A' : 'B';
         
         const finalScore = `${this.gameState.scores.playerA}-${this.gameState.scores.playerB}`;
-        this.addLiveFeedItem(`🏆 MATCH ENDED! Player ${winner} wins ${finalScore}! (${this.currentGameId})`, 'score');
-        this.showMessage(`🏆 Player ${winner} wins ${finalScore}! Game ${this.currentGameId} completed`, 'success');
+        this.addLiveFeedItem(`🏆 MATCH ENDED! Player ${winner} wins ${finalScore}!`, 'score');
+        this.showMessage(`🏆 Player ${winner} wins ${finalScore}! Game completed`, 'success');
+        
+        // Calculate game statistics for database
+        const totalRounds = this.gameState.rounds.length;
+        const durationInSeconds = this.gameState.elapsedTime; // Keep as seconds for accuracy
+        
+        // Get player information
+        const playerInfo = this.getCurrentPlayerInfo();
         
         // Update game in database if it was created there
         if (this.gameState.databaseGameId) {
             try {
-                const duration = Math.floor(this.gameState.elapsedTime / 60); // Convert to minutes
+                console.log(`📊 Updating game ${this.gameState.databaseGameId} - Rounds: ${totalRounds}, Duration: ${durationInSeconds}s`);
+                
                 const response = await fetch('http://localhost:5001/games/update', {
                     method: 'POST',
                     headers: {
@@ -418,7 +455,13 @@ class SmartCourtApp {
                     body: JSON.stringify({
                         gid: this.gameState.databaseGameId,
                         status: 'ended',
-                        duration: duration
+                        duration: durationInSeconds, // Send duration in seconds
+                        rounds: totalRounds,
+                        finalScores: {
+                            playerA: this.gameState.scores.playerA,
+                            playerB: this.gameState.scores.playerB
+                        },
+                        playerNames: playerInfo.names
                     })
                 });
                 
@@ -426,7 +469,7 @@ class SmartCourtApp {
                     const data = await response.json();
                     if (data.status === 'success') {
                         console.log(`✅ Game ${this.gameState.databaseGameId} saved to database successfully`);
-                        this.addLiveFeedItem(`✅ Game saved to database`, 'success');
+                        this.addLiveFeedItem(`✅ Game saved to database (${totalRounds} rounds, ${this.formatDuration(durationInSeconds)})`, 'success');
                     } else {
                         throw new Error(data.message || 'Failed to update game in database');
                     }
@@ -438,7 +481,7 @@ class SmartCourtApp {
                 this.addLiveFeedItem(`⚠️ Failed to save game to database`, 'error');
             }
         } else {
-            this.addLiveFeedItem(`📝 Game saved locally only`, 'info');
+            this.addLiveFeedItem(`📝 Game saved locally only (${totalRounds} rounds)`, 'info');
         }
         
         // Save final game state to history
@@ -448,6 +491,14 @@ class SmartCourtApp {
         if (window.reportManager) {
             window.reportManager.generateFinalReport();
         }
+        
+        // Trigger game state change event
+        document.dispatchEvent(new CustomEvent('gameStateChange', {
+            detail: { 
+                status: this.gameState.status,
+                gameId: this.currentGameId
+            }
+        }));
     }
     
     async addScore(player) {
@@ -488,7 +539,7 @@ class SmartCourtApp {
                 console.error('❌ Failed to record score in database:', error);
                 this.addLiveFeedItem(`⚠️ Database error, score recorded locally only`, 'error');
                 // Continue with local score update as fallback
-                this.gameState.scores[player]++;
+        this.gameState.scores[player]++;
             }
         } else {
             // No database game, update locally only
@@ -742,6 +793,14 @@ class SmartCourtApp {
             feedContainer.innerHTML = '';
             this.addLiveFeedItem('System ready. Waiting for game to start...', 'info');
         }
+        
+        // Trigger game state change event
+        document.dispatchEvent(new CustomEvent('gameStateChange', {
+            detail: { 
+                status: this.gameState.status,
+                gameId: this.currentGameId
+            }
+        }));
         
         this.showMessage('Game has been reset', 'success');
     }
@@ -1015,6 +1074,41 @@ class SmartCourtApp {
     
     isGameInDatabase() {
         return !!this.gameState.databaseGameId;
+    }
+    
+    // 获取当前玩家信息
+    getCurrentPlayerInfo() {
+        if (window.playerManager) {
+            const playerIds = window.playerManager.getCurrentPlayerIds();
+            const playerNames = window.playerManager.getCurrentPlayers();
+            
+            return {
+                ids: playerIds,
+                names: playerNames,
+                hasValidPlayers: !!(playerIds && playerIds.playerA && playerIds.playerB)
+            };
+        }
+        
+        return {
+            ids: { playerA: null, playerB: null },
+            names: { playerA: 'Player A', playerB: 'Player B' },
+            hasValidPlayers: false
+        };
+    }
+    
+    // 格式化时长（秒转为分:秒）
+    formatDuration(seconds) {
+        if (!seconds || seconds === 0) return '0:00';
+        
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
     }
     
     // 获取游戏状态摘要（用于调试）

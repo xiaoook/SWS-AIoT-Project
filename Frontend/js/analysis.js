@@ -141,7 +141,7 @@ class AnalysisManager {
             const startTime = new Date(game.startTime).toLocaleString();
             const status = game.status === 'ended' ? '✓' : '🔴';
             const winner = game.winner ? ` (${game.winner.slice(-1)} wins)` : '';
-            option.textContent = `${status} ${game.gameId} - ${game.gameType} - ${startTime}${winner}`;
+            option.textContent = `${status} ${game.gameType} - ${startTime}${winner}`;
             selector.appendChild(option);
         });
     }
@@ -252,13 +252,13 @@ class AnalysisManager {
         return `
             <div class="game-analysis-header">
                 <div class="game-info-card">
-                    <h3>${statusIcon} ${this.currentGame.gameId} Analysis</h3>
+                    <h3>${statusIcon} Game Analysis</h3>
                     <div class="game-meta">
                         <div class="meta-item">
                             <strong>Type:</strong> ${this.currentGame.gameType}
                         </div>
                         <div class="meta-item">
-                            <strong>Status:</strong> <span class="status-badge ${status}">${status.toUpperCase()}</span>
+                            <strong>Status:</strong> ${status.toUpperCase()}
                         </div>
                         <div class="meta-item">
                             <strong>Final Score:</strong> ${this.currentGame.finalScores.playerA} - ${this.currentGame.finalScores.playerB}

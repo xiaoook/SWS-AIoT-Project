@@ -843,9 +843,9 @@ class PlayerManager {
 
     // Enable game controls
     enableGameControls() {
-        const startGameBtn = document.getElementById('startGame');
-        if (startGameBtn) {
-            startGameBtn.disabled = false;
+        // Set player confirmation status in GameControlManager
+        if (window.gameControlManager) {
+            window.gameControlManager.setPlayersConfirmed(true);
         }
         
         let statusMsg = '';
@@ -889,6 +889,11 @@ class PlayerManager {
             playerA: false,
             playerB: false
         };
+        
+        // Reset player confirmation status in GameControlManager
+        if (window.gameControlManager) {
+            window.gameControlManager.setPlayersConfirmed(false);
+        }
         
         // Reset UI
         const playerASelect = document.getElementById('playerASelect');
