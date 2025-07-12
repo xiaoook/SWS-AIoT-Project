@@ -8,6 +8,7 @@ from Backend.logger import logger
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from flask_mqtt import Mqtt
+from Backend.config import *
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'hockey!'
@@ -15,8 +16,8 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
 # configure MQTT
-app.config['MQTT_BROKER_URL'] = '127.0.0.1'  # Mac 在局域网的IP
-app.config['MQTT_BROKER_PORT'] = 1883
+app.config['MQTT_BROKER_URL'] = BROKER_URL  # Mac 在局域网的IP
+app.config['MQTT_BROKER_PORT'] = BROKER_PORT
 app.config['MQTT_USERNAME'] = ''
 app.config['MQTT_PASSWORD'] = ''
 app.config['MQTT_KEEPALIVE'] = 60
@@ -306,4 +307,4 @@ def all_players():
 
 if __name__ == "__main__":
     # app.run(debug=True, port=5000)
-    socketio.run(app, debug=True, port=5000)
+    socketio.run(app, debug=True, port=BACKEND_PORT, host=BACKEND_URL)
