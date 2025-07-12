@@ -1,9 +1,9 @@
 import sqlite3
 from pathlib import Path
 from Backend.logger import logger
+from Backend.config import DB_FILE
 import time
 
-DB_FILE = Path.cwd() / 'Backend' / "data" / "data.db"
 
 def retrieve_games(limit: int = 10) -> list | None:
     conn = None
