@@ -51,7 +51,7 @@ class GameHistoryManager {
         
         // 如果 PlayerManager 中没有找到，尝试从数据库获取
         try {
-            const response = await fetch('http://localhost:5001/player/all', {
+            const response = await fetch(CONFIG.API_URLS.PLAYER_ALL, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -86,7 +86,7 @@ class GameHistoryManager {
         try {
             console.log('🔄 Loading games from database...');
             
-            const response = await fetch('http://localhost:5001/games', {
+            const response = await fetch(CONFIG.API_URLS.GAMES, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -379,7 +379,7 @@ class GameHistoryManager {
                 const databaseGameId = game.databaseGameId;
                 console.log(`🗑️ Deleting game ${gameId} (Database ID: ${databaseGameId}) from database...`);
                 
-                const response = await fetch('http://localhost:5001/games/delete', {
+                const response = await fetch(CONFIG.API_URLS.GAMES_DELETE, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
