@@ -1,3 +1,4 @@
+import json
 import eventlet
 eventlet.monkey_patch()
 
@@ -6,11 +7,22 @@ from Backend.core.dataManage import *
 from Backend.logger import logger
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
+from flask_mqtt import Mqtt
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'hockey!'
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
+
+# configure MQTT
+app.config['MQTT_BROKER_URL'] = '127.0.0.1'  # Mac 在局域网的IP
+app.config['MQTT_BROKER_PORT'] = 1883
+app.config['MQTT_USERNAME'] = ''
+app.config['MQTT_PASSWORD'] = ''
+app.config['MQTT_KEEPALIVE'] = 60
+app.config['MQTT_TLS_ENABLED'] = False
+
+mqtt = Mqtt(app)
 
 current_score = {
     'A': 0,
@@ -18,6 +30,19 @@ current_score = {
 }
 current_round = 0
 current_game = 0
+latest_position = {}
+
+@mqtt.on_connect()
+def handle_connect_mqtt(client, userdata, flags, rc):
+    logger.info('Connected to MQTT Broker')
+    mqtt.subscribe('game/positions')
+
+@mqtt.on_message()
+def handle_mqtt_message(client, userdata, message):
+    global latest_position
+    payload = message.payload.decode()
+    logger.debug(f'Received position: {payload}')
+    latest_position = json.loads(payload)
 
 # emit the current score when the new client connects
 @socketio.on('connect')
@@ -110,6 +135,7 @@ def new_game():
     current_game = gid
     current_score = {'A': 0, 'B': 0}
     current_round = 0
+    mqtt.publish('game/control', 'start'.encode())
 
     return jsonify({
         "status": "success",
