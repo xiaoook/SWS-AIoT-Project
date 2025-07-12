@@ -8,10 +8,10 @@ client.connect('127.0.0.1', 45677, 60)
 
 while True:
     data = {
-        "puck": {"x": random.randint(0,100), "y": random.randint(0,100)},
-        "pusher1": {"x": random.randint(0,100), "y": random.randint(0,100)},
-        "pusher2": {"x": random.randint(0,100), "y": random.randint(0,100)}
+        "puck": {"x": random.randint(0,800), "y": random.randint(0,400)},
+        "pusher1": {"x": random.randint(0,800), "y": random.randint(0,400)},
+        "pusher2": {"x": random.randint(0,800), "y": random.randint(0,400)}
     }
     payload = json.dumps(data)
     client.publish('game/positions', payload)
-    time.sleep(0.1)  # 每100ms推一次
+    time.sleep(1)  # push per 1s

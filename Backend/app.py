@@ -44,7 +44,7 @@ def handle_mqtt_message(client, userdata, message):
     payload = message.payload.decode()
     logger.debug(f'Received position: {payload}')
     latest_position = json.loads(payload)
-    emit('position_update', latest_position)
+    socketio.emit('position_update', latest_position)
 
 # emit the current score when the new client connects
 @socketio.on('connect')
