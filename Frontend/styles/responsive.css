@@ -32,9 +32,7 @@
         gap: 1.5rem;
     }
     
-    .video-player {
-        height: 300px;
-    }
+
     
     .point-breakdown {
         grid-template-columns: 1fr;
@@ -500,9 +498,7 @@
         padding: 0.1rem 0.6rem;
     }
     
-    .video-player {
-        height: 200px;
-    }
+
     
     .ai-feedback-section {
         padding: 1rem;
@@ -1129,9 +1125,7 @@
         opacity: 0.8;
     }
     
-    .video-player {
-        height: 160px;
-    }
+
     
     .round-selector {
         grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
@@ -1202,9 +1196,7 @@
         justify-content: center;
     }
     
-    .video-player {
-        height: 250px;
-    }
+
     
     .chart-container {
         height: 280px;

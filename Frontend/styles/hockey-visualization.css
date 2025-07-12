@@ -1,0 +1,556 @@
+/* 冰球可视化样式 */
+.game-visualization {
+    background: #f8f9fa;
+    border-radius: 15px;
+    padding: 15px;
+    margin: 20px 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    min-height: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.game-visualization h3 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 1.5rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* 冰球桌容器 */
+.hockey-table-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
+}
+
+/* 冰球桌主体 */
+.hockey-table {
+    position: relative;
+    background: linear-gradient(135deg, #e8f4f8 0%, #d1ecf1 100%);
+    border-radius: 20px;
+    box-shadow: 
+        inset 0 0 50px rgba(255, 255, 255, 0.5),
+        0 8px 30px rgba(0, 0, 0, 0.15);
+    padding: 15px;
+    border: 3px solid #34495e;
+    width: 100%;
+    height: 500px;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 桌子下方的控制区域 */
+.table-controls-area {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+/* 桌面表面 */
+.table-surface {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    background: linear-gradient(45deg, #ecf0f1 25%, transparent 25%),
+                linear-gradient(-45deg, #ecf0f1 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #ecf0f1 75%),
+                linear-gradient(-45deg, transparent 75%, #ecf0f1 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    border-radius: 15px;
+    border: 4px solid #2c3e50;
+    overflow: hidden;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.1);
+}
+
+/* 桌面边界 */
+.table-border {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 6px solid #e74c3c;
+    border-radius: 12px;
+    pointer-events: none;
+}
+
+/* 中心线 */
+.center-line {
+    position: absolute;
+    left: 50%;
+    top: 10%;
+    bottom: 10%;
+    width: 3px;
+    background: #3498db;
+    transform: translateX(-50%);
+    border-radius: 2px;
+}
+
+/* 球门样式 */
+.goal {
+    position: absolute;
+    top: 50%;
+    width: 8px;
+    height: 120px;
+    transform: translateY(-50%);
+}
+
+.goal-a {
+    left: -4px;
+}
+
+.goal-b {
+    right: -4px;
+}
+
+.goal-line {
+    width: 100%;
+    height: 100%;
+    background: #e74c3c;
+    border-radius: 4px;
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+
+.goal-area {
+    position: absolute;
+    width: 60px;
+    height: 140px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 2px solid #e74c3c;
+    border-radius: 8px;
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.goal-a .goal-area {
+    left: 8px;
+}
+
+.goal-b .goal-area {
+    right: 8px;
+}
+
+/* 球拍样式 */
+.paddle {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    transition: all 0.1s ease-out;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.paddle-a {
+    background: radial-gradient(circle at 30% 30%, #3498db, #2980b9);
+    border: 3px solid #2980b9;
+    box-shadow: 
+        0 0 15px rgba(52, 152, 219, 0.6),
+        inset 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.paddle-b {
+    background: radial-gradient(circle at 30% 30%, #e74c3c, #c0392b);
+    border: 3px solid #c0392b;
+    box-shadow: 
+        0 0 15px rgba(231, 76, 60, 0.6),
+        inset 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.paddle-handle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    background: #34495e;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+/* 冰球样式 */
+.puck {
+    position: absolute;
+    width: 25px;
+    height: 25px;
+    background: radial-gradient(circle at 30% 30%, #2c3e50, #1a252f);
+    border: 2px solid #1a252f;
+    border-radius: 50%;
+    transition: all 0.05s ease-out;
+    z-index: 5;
+    box-shadow: 
+        0 0 20px rgba(44, 62, 80, 0.8),
+        inset 0 0 8px rgba(255, 255, 255, 0.2);
+}
+
+.puck::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    background: #95a5a6;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* 轨迹效果 */
+.puck-trail {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(52, 152, 219, 0.3) 0%, transparent 70%);
+    animation: trail-pulse 0.5s ease-out infinite;
+    opacity: 0;
+}
+
+@keyframes trail-pulse {
+    0% {
+        opacity: 0.8;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(2.5);
+    }
+}
+
+/* 位置指示器 */
+.position-indicator {
+    position: absolute;
+    z-index: 15;
+    pointer-events: none;
+}
+
+.indicator-dot {
+    width: 8px;
+    height: 8px;
+    background: #f39c12;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(243, 156, 18, 0.8);
+}
+
+.indicator-coords {
+    position: absolute;
+    top: -25px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+/* 控制面板 */
+.visualization-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 20px 25px;
+    border-radius: 10px;
+    margin-top: 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    min-height: 60px;
+    flex-wrap: wrap;
+    gap: 20px;
+    width: 100%;
+}
+
+.control-group {
+    display: flex;
+    gap: 25px;
+    flex-wrap: wrap;
+}
+
+.control-group label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #2c3e50;
+    cursor: pointer;
+    white-space: nowrap;
+    padding: 5px 10px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+}
+
+.control-group label:hover {
+    background-color: #f8f9fa;
+}
+
+.control-group input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #3498db;
+}
+
+.status-group {
+    display: flex;
+    gap: 25px;
+    flex-wrap: wrap;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.status-label {
+    font-size: 14px;
+    color: #7f8c8d;
+    white-space: nowrap;
+}
+
+.status-value {
+    font-size: 14px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 4px;
+    min-width: 80px;
+    text-align: center;
+}
+
+.status-value.connected {
+    background: #d5fdd5;
+    color: #27ae60;
+}
+
+.status-value.disconnected {
+    background: #fdd5d5;
+    color: #e74c3c;
+}
+
+/* 位置信息面板 */
+.position-info {
+    display: flex;
+    justify-content: space-around;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    gap: 20px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.info-section {
+    text-align: center;
+    min-width: 120px;
+    flex: 1;
+}
+
+.info-section h4 {
+    margin: 0 0 12px 0;
+    color: #2c3e50;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.position-data {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.position-data span {
+    font-size: 14px;
+    color: #34495e;
+    background: #f8f9fa;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    white-space: nowrap;
+}
+
+/* 动画效果 */
+.paddle:hover {
+    transform: scale(1.1);
+    filter: brightness(1.2);
+}
+
+.puck.moving .puck-trail {
+    opacity: 1;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+    .visualization-controls {
+        flex-direction: column;
+        gap: 20px;
+        padding: 20px;
+    }
+    
+    .control-group {
+        justify-content: center;
+        gap: 20px;
+    }
+    
+    .status-group {
+        justify-content: center;
+        gap: 20px;
+    }
+    
+    .game-visualization {
+        min-height: auto;
+    }
+    
+
+    
+    .hockey-table {
+        height: 420px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .game-visualization {
+        min-height: auto;
+        padding: 12px;
+    }
+    
+
+    
+    .hockey-table {
+        padding: 12px;
+        height: 380px;
+    }
+    
+
+    
+    .paddle {
+        width: 35px;
+        height: 35px;
+    }
+    
+    .puck {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .visualization-controls {
+        padding: 15px;
+        gap: 15px;
+    }
+    
+    .position-info {
+        padding: 15px;
+        gap: 15px;
+    }
+}
+
+@media (max-width: 768px) {
+    .game-visualization {
+        min-height: auto;
+        padding: 10px;
+    }
+    
+
+    
+    .hockey-table {
+        padding: 10px;
+        height: 320px;
+    }
+    
+
+    
+    .visualization-controls {
+        padding: 15px;
+        gap: 15px;
+        flex-direction: column;
+    }
+    
+    .control-group {
+        gap: 15px;
+        justify-content: center;
+    }
+    
+    .status-group {
+        gap: 15px;
+        justify-content: center;
+    }
+    
+    .position-info {
+        flex-direction: column;
+        gap: 20px;
+        padding: 15px;
+    }
+}
+
+@media (max-width: 576px) {
+    .game-visualization {
+        min-height: auto;
+        padding: 8px;
+    }
+    
+
+    
+    .hockey-table {
+        padding: 8px;
+        height: 280px;
+    }
+    
+
+    
+    .paddle {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .puck {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .visualization-controls {
+        padding: 12px;
+        gap: 12px;
+        flex-direction: column;
+    }
+    
+    .control-group {
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+    }
+    
+    .status-group {
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+    }
+    
+    .status-item {
+        min-width: 200px;
+        justify-content: center;
+    }
+    
+    .position-info {
+        padding: 12px;
+        gap: 15px;
+    }
+    
+    .info-section {
+        min-width: 100%;
+    }
+} 

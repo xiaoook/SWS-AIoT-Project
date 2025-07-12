@@ -230,10 +230,7 @@ class SmartCourtApp {
                     }, 100);
                 }
                 break;
-            case 'replay':
-                // Video replay functionality disabled
-                console.log('Video replay functionality has been disabled');
-                break;
+
             case 'report':
                 // Refresh report data
                 if (window.reportManager) {
@@ -259,10 +256,7 @@ class SmartCourtApp {
                     e.preventDefault();
                     this.switchTab('analysis');
                     break;
-                case '4':
-                    e.preventDefault();
-                    console.log('Video replay tab disabled');
-                    break;
+
                 case '5':
                     e.preventDefault();
                     this.switchTab('report');
@@ -293,9 +287,7 @@ class SmartCourtApp {
             window.reportManager.chart.resize();
         }
         
-        // Video player functionality disabled
-        // const videoPlayer = document.getElementById('replayVideo');
-        // Video replay feature has been disabled to reduce requests
+
     }
     
     handleVisibilityChange() {
@@ -1031,7 +1023,7 @@ class SmartCourtApp {
                     if (!newStatus.isConnected) {
                         this.addLiveFeedItem('❌ Connection failed after timeout', 'error');
                         this.addLiveFeedItem('💡 Please ensure backend server is running:', 'info');
-                        this.addLiveFeedItem('   Backend should be on port 5001', 'info');
+                        this.addLiveFeedItem(`   Backend should be on port ${CONFIG.BACKEND_PORT}`, 'info');
                         this.showMessage('Failed to connect - check backend server', 'error');
                     }
                 }, 5000); // 5秒超时

@@ -379,7 +379,7 @@ class HardwareConnection {
         document.body.appendChild(indicator);
     }
     
-    connect(url = 'ws://localhost:8080') {
+    connect(url = `ws://localhost:${CONFIG.FRONTEND_PORT}`) {
         try {
             this.ws = new WebSocket(url);
             
