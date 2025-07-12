@@ -2,7 +2,7 @@
 class WebSocketManager {
     constructor() {
         this.socket = null;
-        this.serverUrl = 'http://localhost:5001'; // 使用5001端口避免AirTunes冲突
+        this.serverUrl = CONFIG.BACKEND_URL; // 使用配置的后端URL
         this.isConnected = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;

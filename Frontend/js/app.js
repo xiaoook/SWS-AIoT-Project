@@ -336,7 +336,7 @@ class SmartCourtApp {
         
         // Try to create game in database
         try {
-            const response = await fetch('http://localhost:5001/games/new', {
+            const response = await fetch(CONFIG.API_URLS.GAMES_NEW, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -447,7 +447,7 @@ class SmartCourtApp {
             try {
                 console.log(`📊 Updating game ${this.gameState.databaseGameId} - Rounds: ${totalRounds}, Duration: ${durationInSeconds}s`);
                 
-                const response = await fetch('http://localhost:5001/games/update', {
+                const response = await fetch(CONFIG.API_URLS.GAMES_UPDATE, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -515,7 +515,7 @@ class SmartCourtApp {
         // Update score in database if game was created there
         if (this.gameState.databaseGameId) {
             try {
-                const response = await fetch(`http://localhost:5001/goal?team=${team}`, {
+                const response = await fetch(`${CONFIG.API_URLS.GOAL}?team=${team}`, {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json',
@@ -1045,7 +1045,7 @@ class SmartCourtApp {
     // Database connection and game state utilities
     async checkDatabaseConnection() {
         try {
-            const response = await fetch('http://localhost:5001/', {
+            const response = await fetch(CONFIG.API_URLS.ROOT, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
