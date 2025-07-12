@@ -11,10 +11,42 @@ class WebSocketManager {
             onScoreUpdate: null,
             onGameStatus: null,
             onRoundUpdate: null,
-            onConnectionStatus: null
+            onConnectionStatus: null,
+            onPositionUpdate: null
         };
         
+        // 事件监听器存储
+        this.eventListeners = {};
+        
         this.init();
+    }
+    
+    // 添加事件监听器
+    on(event, callback) {
+        if (!this.eventListeners[event]) {
+            this.eventListeners[event] = [];
+        }
+        this.eventListeners[event].push(callback);
+    }
+    
+    // 移除事件监听器
+    off(event, callback) {
+        if (this.eventListeners[event]) {
+            this.eventListeners[event] = this.eventListeners[event].filter(cb => cb !== callback);
+        }
+    }
+    
+    // 触发事件
+    emit(event, data) {
+        if (this.eventListeners[event]) {
+            this.eventListeners[event].forEach(callback => {
+                try {
+                    callback(data);
+                } catch (error) {
+                    console.error(`Error in event listener for ${event}:`, error);
+                }
+            });
+        }
     }
     
     init() {
@@ -78,6 +110,7 @@ class WebSocketManager {
             this.isConnected = true;
             this.reconnectAttempts = 0;
             this.updateConnectionStatus('connected');
+            this.emit('connect');
         });
         
         // 连接断开
@@ -85,6 +118,7 @@ class WebSocketManager {
             console.log('WebSocket disconnected');
             this.isConnected = false;
             this.updateConnectionStatus('disconnected');
+            this.emit('disconnect');
             this.attemptReconnect();
         });
         
@@ -92,6 +126,12 @@ class WebSocketManager {
         this.socket.on('score_update', (current_score) => {
             console.log('Score update received:', current_score);
             this.handleScoreUpdate(current_score);
+        });
+        
+        // 接收位置更新 - 来自MQTT
+        this.socket.on('position_update', (position_data) => {
+            console.log('Position update received:', position_data);
+            this.handlePositionUpdate(position_data);
         });
         
         // 连接错误
@@ -156,6 +196,17 @@ class WebSocketManager {
         // 不再显示通用的比分更新消息，只在进球时显示特定消息
         // const message = `Score Update: ${convertedScore.playerA} - ${convertedScore.playerB}`;
         // this.showMessage(message, 'score');
+    }
+    
+    // 处理位置更新 - 来自MQTT数据
+    handlePositionUpdate(positionData) {
+        // 触发位置更新事件
+        this.emit('position_update', positionData);
+        
+        // 调用位置更新回调（兼容旧API）
+        if (this.callbacks.onPositionUpdate) {
+            this.callbacks.onPositionUpdate(positionData);
+        }
     }
     
     // 更新比分显示
@@ -338,6 +389,7 @@ class WebSocketManager {
 
 // 创建全局WebSocket管理器实例
 window.wsManager = new WebSocketManager();
+window.websocketManager = window.wsManager; // 为冰球可视化模块提供别名
 
 // 导出WebSocket管理器
 if (typeof module !== 'undefined' && module.exports) {

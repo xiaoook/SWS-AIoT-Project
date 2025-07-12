@@ -42,8 +42,8 @@ class PlayerManager {
         
         // Log HTTP API operation
         console.log('🌐 Operating in HTTP API mode');
-        console.log('Frontend: http://localhost:8080');
-        console.log('Backend: http://localhost:5001');
+        console.log('Frontend:', CONFIG.FRONTEND_URL);
+        console.log('Backend:', CONFIG.BACKEND_URL);
         console.log('Using HTTP POST/GET requests for data management');
         
         // Load players using safe methods only
@@ -113,7 +113,7 @@ class PlayerManager {
             
             // Method 1: Try with CORS mode first
             try {
-                response = await fetch('http://localhost:5001/player/all', {
+                response = await fetch(CONFIG.API_URLS.PLAYER_ALL, {
                     method: 'GET',
                     mode: 'cors',
                     headers: {
@@ -134,7 +134,7 @@ class PlayerManager {
             if (!data) {
                 try {
                     console.log('🔄 Trying no-cors mode...');
-                    response = await fetch('http://localhost:5001/player/all', {
+                    response = await fetch(CONFIG.API_URLS.PLAYER_ALL, {
                         method: 'GET',
                         mode: 'no-cors'
                     });
@@ -218,7 +218,7 @@ class PlayerManager {
             };
             
             // Make the request
-            script.src = `http://localhost:5001/player/all?callback=${callbackName}`;
+            script.src = `${CONFIG.API_URLS.PLAYER_ALL}?callback=${callbackName}`;
             document.head.appendChild(script);
             
             // Timeout after 5 seconds
@@ -242,7 +242,7 @@ class PlayerManager {
             
             // Method 1: Try with CORS mode first
             try {
-                const response = await fetch('http://localhost:5001/player/create', {
+                const response = await fetch(CONFIG.API_URLS.PLAYER_CREATE, {
                     method: 'POST',
                     mode: 'cors',
                     headers: {
@@ -267,7 +267,7 @@ class PlayerManager {
             if (!success) {
                 try {
                     console.log('🔄 Trying no-cors POST...');
-                    const response = await fetch('http://localhost:5001/player/create', {
+                    const response = await fetch(CONFIG.API_URLS.PLAYER_CREATE, {
                         method: 'POST',
                         mode: 'no-cors',
                         headers: {
@@ -341,7 +341,7 @@ class PlayerManager {
             const form = document.createElement('form');
             form.target = iframe.name;
             form.method = 'POST';
-            form.action = 'http://localhost:5001/player/create';
+            form.action = CONFIG.API_URLS.PLAYER_CREATE;
             form.style.display = 'none';
             
             // Create input field

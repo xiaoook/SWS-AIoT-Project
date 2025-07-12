@@ -560,7 +560,7 @@ class GameHistoryManager {
             console.log('🗑️ Clearing all games from database...');
             
             // 调用后端删除所有游戏的接口
-            const response = await fetch('http://localhost:5001/games/delete/all', {
+            const response = await fetch(CONFIG.API_URLS.GAMES_DELETE_ALL, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
