@@ -3,6 +3,8 @@ import numpy as np
 import time
 import math
 import csv
+import mediapipe as mp
+import random
 
 class FieldDetector:
     def __init__(self, video_source):
@@ -17,10 +19,11 @@ class FieldDetector:
             if not ret:
                 return None
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            lower_gray = 210 - 10
-            upper_gray = 230 + 10
-            mask = cv2.inRange(gray, lower_gray, upper_gray)
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            lower_hsv = np.array([0, 0, 170])
+            upper_hsv = np.array([180, 30, 255])
+            mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
+
             kernel = np.ones((5,5), np.uint8)
             mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -39,13 +42,24 @@ class FieldDetector:
                 continue
 
             all_points = np.array(all_points)
-            sum_coords = all_points.sum(axis=1)
-            diff_coords = np.diff(all_points, axis=1).reshape(-1)
+            top_k = 50  # 7%或至少20个点
 
-            top_left = all_points[np.argmin(sum_coords)]
-            bottom_right = all_points[np.argmax(sum_coords)]
-            top_right = all_points[np.argmin(diff_coords)]
-            bottom_left = all_points[np.argmax(diff_coords)]
+            def select_corner(points, key_func, top_k, x_extreme, y_extreme, largest=False):
+                keys = key_func(points)
+                if largest:
+                    idx = np.argsort(keys)[-top_k:]  # 取 keys 最大的top_k个点
+                else:
+                    idx = np.argsort(keys)[:top_k]   # 取 keys 最小的top_k个点
+                selected = points[idx]
+                x_val = selected[:, 0].min() if x_extreme == 'min' else selected[:, 0].max()
+                y_val = selected[:, 1].min() if y_extreme == 'min' else selected[:, 1].max()
+                return np.array([x_val, y_val])
+
+            top_left = select_corner(all_points, lambda pts: pts[:, 0] + pts[:, 1], top_k, 'min', 'min', largest=False)
+            bottom_right = select_corner(all_points, lambda pts: pts[:, 0] + pts[:, 1], top_k, 'max', 'max', largest=True)
+            top_right = select_corner(all_points, lambda pts: pts[:, 0] - pts[:, 1], top_k, 'min', 'max', largest=False)
+            bottom_left = select_corner(all_points, lambda pts: pts[:, 0] - pts[:, 1], top_k, 'max', 'min', largest=True)
+
 
             self.corner_points = np.array([top_left, top_right, bottom_right, bottom_left], dtype=np.int32)
             print("检测到四个角点")
@@ -54,6 +68,46 @@ class FieldDetector:
     def release(self):
         self.cap.release()
         cv2.destroyAllWindows()
+
+def extract_red_objects(frame, hsv, lower_red1, upper_red1, lower_red2, upper_red2):
+    mask_red1 = cv2.inRange(hsv, lower_red1, upper_red1)
+    mask_red2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    mask_red = cv2.bitwise_or(mask_red1, mask_red2)
+
+    blurred = cv2.GaussianBlur(mask_red, (5, 5), 0)
+    contours, _ = cv2.findContours(blurred, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    red_objects = []
+    for c in contours:
+        (x, y), radius = cv2.minEnclosingCircle(c)
+        contour_area = cv2.contourArea(c)
+        circle_area = math.pi * radius * radius
+
+        if contour_area < 150:
+            continue
+        if radius < 10 or radius > 100:
+            continue
+        if circle_area <= 0:
+            continue
+        circularity = contour_area / circle_area
+        if circularity < 0.5:
+            continue
+
+        b, g, r = frame[int(y), int(x)]
+        if r < 80 or r < g or r < b:
+            continue
+
+        red_objects.append((contour_area, (x, y), radius, c))
+
+    return red_objects
+def compute_speed_and_angle(prev_uv, curr_uv, dt):
+    if prev_uv is None or curr_uv is None or dt == 0:
+        return 0.0, 0.0
+    dx = curr_uv[0] - prev_uv[0]
+    dy = curr_uv[1] - prev_uv[1]
+    speed = math.sqrt(dx**2 + dy**2) / dt
+    angle = math.degrees(math.atan2(dy, dx))
+    return speed, angle
 
 class CameraTracker:
     def __init__(self, video_source):
@@ -65,40 +119,84 @@ class CameraTracker:
         self.cap = self.detector.cap
 
         self.prev_ball_uv = None
-        self.prev_time = None
-        self.prev_ball_speed = None
-
         self.prev_paddle_uvs = [None, None]
-        self.prev_paddle_speeds = [None, None]
-        self.prev_paddle_accs = [None, None]
 
+        self.ball_radius_fixed = None
+        self.paddle_radii_fixed = [None, None]
+
+        self.prev_time = None
         self.last_goal_time = 0
-        self.goal_cooldown = 0.5
+        self.goal_cooldown = 2
 
         self.score_player1 = 0
         self.score_player2 = 0
 
         self.csv_file = open("tracking_data.csv", mode="w", newline="")
         self.csv_writer = csv.writer(self.csv_file)
+        self.game_id = 1
+        self.round_id = 1
+        self.last_goal_time = time.time()
+        self.last_round_time = time.time()
+        self.last_game_time = time.time()
+
         self.csv_writer.writerow([
             "timestamp",
-            "ball_u","ball_v","ball_speed","ball_acc","ball_dir",
-            "paddle1_u","paddle1_v","paddle1_speed","paddle1_acc","paddle1_dir",
-            "paddle2_u","paddle2_v","paddle2_speed","paddle2_acc","paddle2_dir",
-            "dist_ball_paddle1","dist_ball_paddle2",
-            "dist_paddle1_paddle2",
-            "dist_ball_goal",
-            "in_goal",
-            "scorer"
+            "ball_u", "ball_v", "ball_speed", "ball_angle",
+            "paddle1_u", "paddle1_v", "paddle1_speed", "paddle1_angle",
+            "paddle2_u", "paddle2_v", "paddle2_speed", "paddle2_angle",
+            "in_goal", "scorer", "round_id", "game_id"
         ])
+
+        self.ball_lower_red1 = np.array([160, 150, 150])
+        self.ball_upper_red1 = np.array([180, 255, 255])
+        self.ball_lower_red2 = np.array([0, 150, 150])
+        self.ball_upper_red2 = np.array([10, 255, 255])
+
+        self.paddle_lower_red1 = np.array([160, 100, 100])
+        self.paddle_upper_red1 = np.array([180, 255, 255])
+        self.paddle_lower_red2 = np.array([0, 100, 100])
+        self.paddle_upper_red2 = np.array([10, 255, 255])
+
+        self.mp_hands = mp.solutions.hands
+        self.mp_drawing = mp.solutions.drawing_utils
+        self.hands = self.mp_hands.Hands(static_image_mode=False,
+                                        max_num_hands=4,
+                                        min_detection_confidence=0.1,
+                                        min_tracking_confidence=0.1)
+        self.wrist_history = [[], []]  # 两只手腕位置历史（像素）
+        self.max_history_len = 15  # 取最近15帧（大概0.5秒）
+        self.ball_radius_fixed = 40
+        self.paddle_radii_fixed = [45, 45]
+
 
     def compute_normalized(self, pt):
         TL, TR, BR, BL = self.corners
         src_quad = np.array([TL, TR, BR, BL], dtype=np.float32)
-        dst_quad = np.array([[0,0],[1,0],[1,1],[0,1]], dtype=np.float32)
+        dst_quad = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
         M = cv2.getPerspectiveTransform(src_quad, dst_quad)
         uv = cv2.perspectiveTransform(np.array([[[pt[0], pt[1]]]], dtype=np.float32), M)
-        return uv[0,0]
+        return uv[0, 0]
+    
+    def update_game_state(self, curr_time):
+        in_goal = False
+        scorer = 0
+
+        # 模拟进球（每5秒进1球）
+        if curr_time - self.last_goal_time > 5:
+            in_goal = True
+            scorer = random.choice([1, 2])
+            self.last_goal_time = curr_time
+
+            # 进球后开始下一轮
+            self.round_id += 1
+
+        # 每10轮进入下一局游戏
+        if self.round_id % 10 == 0 and curr_time - self.last_game_time > 2:
+            self.game_id += 1
+            self.last_game_time = curr_time
+
+        return int(in_goal), scorer, self.round_id, self.game_id
+
 
     def process_frame(self):
         ret, frame = self.cap.read()
@@ -107,237 +205,183 @@ class CameraTracker:
 
         curr_time = time.time()
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        cv2.polylines(frame, [self.corners.reshape((-1, 1, 2))], isClosed=True, color=(156, 85, 43), thickness=3)
 
-        cv2.polylines(frame, [self.corners.reshape((-1,1,2))], isClosed=True, color=(156,85,43), thickness=3)
+        red_objects = extract_red_objects(
+            frame, hsv,
+            self.ball_lower_red1, self.ball_upper_red1,
+            self.ball_lower_red2, self.ball_upper_red2
+        )
+        red_objects = sorted(red_objects, key=lambda x: -x[0])  # 按面积降序
+        used_indices = set()
 
-        # 球检测（结合颜色、边缘、RGB阈值）
-        # 先用HSV筛选颜色范围
-        lower_ball_hsv = np.array([160, 100, 100])
-        upper_ball_hsv = np.array([180, 255, 255])
-        mask_color = cv2.inRange(hsv, lower_ball_hsv, upper_ball_hsv)
+        h, w, _ = frame.shape
 
-        # 在mask上做高斯模糊+边缘检测
-        blurred = cv2.GaussianBlur(mask_color, (5, 5), 0)
-        edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
-
-        ball_uv = None
-        ball_speed = None
-        ball_acc = None
-        ball_dir = None
-
-        ball_contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        ball_candidates = []
-        for c in ball_contours:
-            area = cv2.contourArea(c)
-            if area < 50:
-                continue
-            (x, y), radius = cv2.minEnclosingCircle(c)
-            if radius < 5 or radius > 50:
-                continue
-
-            # 检查中心RGB是否接近 #c7010d
-            b, g, r = frame[int(y), int(x)]
-            # 方式1: RGB阈值
-            if not (r >= 150 and g <= 30 and b <= 50):
-                continue
-            # 方式2: RGB色差
-            target_rgb = np.array([199,1,13])
-            pixel_rgb = np.array([r,g,b])
-            color_distance = np.linalg.norm(pixel_rgb - target_rgb)
-            if color_distance > 80:
-                continue
-
-            uv = self.compute_normalized((int(x), int(y)))
-            ball_candidates.append((c, uv, (x, y, radius)))
-
-        if ball_candidates:
-            c, uv, (x, y, radius) = max(ball_candidates, key=lambda t: cv2.contourArea(t[0]))
-            ball_uv = uv
-            cv2.circle(frame, (int(x), int(y)), int(radius), (255,0,0), 2)
-
-            if self.prev_ball_uv is not None and self.prev_time is not None:
-                dt = curr_time - self.prev_time
-                dxdy = ball_uv - self.prev_ball_uv
-                dist = np.linalg.norm(dxdy)
-                if dt > 0:
-                    ball_speed = dist / dt
-                    if self.prev_ball_speed is not None:
-                        ball_acc = (ball_speed - self.prev_ball_speed) / dt
-                    ball_dir = math.degrees(math.atan2(dxdy[1], dxdy[0]))
-            self.prev_ball_uv = ball_uv
-            self.prev_ball_speed = ball_speed
-
-        # Paddle检测
-        lower_paddle = np.array([14,24,172])
-        upper_paddle = np.array([34,255,255])
-        mask_paddle = cv2.inRange(hsv, lower_paddle, upper_paddle)
+        # 手部检测及有效性判断
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        result = self.hands.process(rgb_frame)
 
         paddle_uvs = [None, None]
-        paddle_speeds = [None, None]
-        paddle_accs = [None, None]
-        paddle_dirs = [None, None]
+        paddle_centers_px = [None, None]
 
-        dt = curr_time - self.prev_time if self.prev_time else 1e-5
+        if result.multi_hand_landmarks:
+            for hand_landmarks in result.multi_hand_landmarks:
+                # 判断手有效点数量
+                valid_points_count = 0
+                for lm in hand_landmarks.landmark:
+                    x_px = int(lm.x * w)
+                    y_px = int(lm.y * h)
+                    uv = self.compute_normalized((x_px, y_px))
+                    if 0 <= uv[0] <= 1 and 0 <= uv[1] <= 1:
+                        valid_points_count += 1
+                        if valid_points_count >= 5:
+                            break
+                if valid_points_count < 3:
+                    continue
 
-        paddle_contours, _ = cv2.findContours(mask_paddle, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        upper_half = []
-        lower_half = []
+                # 画手部连接线
+                self.mp_drawing.draw_landmarks(
+                    frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS,
+                    self.mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2, circle_radius=2),
+                    self.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2)
+                )
 
-        for c in paddle_contours:
-            (x,y), radius = cv2.minEnclosingCircle(c)
-            uv = self.compute_normalized((int(x), int(y)))
-            if uv[1] < 0.5:
-                upper_half.append((c, uv, (x,y,radius)))
-            else:
-                lower_half.append((c, uv, (x,y,radius)))
+                # 取食指中间关节坐标 landmark 8
+                lm = hand_landmarks.landmark[8]
+                x_f = int(lm.x * w)
+                y_f = int(lm.y * h)
+                uv_f = self.compute_normalized((x_f, y_f))
 
-        if upper_half:
-            c, uv, (x,y,radius) = max(upper_half, key=lambda t: cv2.contourArea(t[0]))
-            paddle_uvs[0] = uv
-
-            prev_uv = self.prev_paddle_uvs[0]
-            prev_speed = self.prev_paddle_speeds[0]
-            prev_acc = self.prev_paddle_accs[0]
-
-            if prev_uv is not None:
-                speed = np.linalg.norm(uv - prev_uv) / dt
-                if prev_speed is not None:
-                    acc = (speed - prev_speed) / dt
+                # 按u坐标划分左右半场，分别赋值给paddle1和paddle2
+                if uv_f[1] < 0.5:
+                    if paddle_uvs[0] is None:
+                        paddle_uvs[0] = uv_f
+                        paddle_centers_px[0] = (x_f, y_f)
                 else:
-                    acc = None
-                dir_angle = math.degrees(math.atan2((uv - prev_uv)[1], (uv - prev_uv)[0]))
-            else:
-                speed = acc = dir_angle = None
+                    if paddle_uvs[1] is None:
+                        paddle_uvs[1] = uv_f
+                        paddle_centers_px[1] = (x_f, y_f)
 
-            paddle_speeds[0] = speed
-            paddle_accs[0] = acc
-            paddle_dirs[0] = dir_angle
-            self.prev_paddle_uvs[0] = uv
-            self.prev_paddle_speeds[0] = speed
-            self.prev_paddle_accs[0] = acc
+        MIN_DIST_TO_PADDLE = 40  # 球与拍子的最小距离阈值，防止球被误判为拍子附近物体
 
-            cv2.circle(frame, (int(x), int(y)), int(radius), (0,0,255), 2)
-            cv2.putText(frame, "Paddle1", (int(x)+5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+        # 球的检测：半径不能超过固定球半径
+        ball_uv = None
+        for idx, (area, (x, y), radius, contour) in enumerate(red_objects):
+            if radius > self.ball_radius_fixed:
+                continue  # 排除半径过大的物体
 
-        if lower_half:
-            c, uv, (x,y,radius) = max(lower_half, key=lambda t: cv2.contourArea(t[0]))
-            paddle_uvs[1] = uv
+            # 球不能靠近拍子
+            too_close = False
+            for paddle_center in paddle_centers_px:
+                if paddle_center is not None:
+                    dist_to_paddle = math.hypot(x - paddle_center[0], y - paddle_center[1])
+                    if dist_to_paddle < MIN_DIST_TO_PADDLE:
+                        too_close = True
+                        break
+            if too_close:
+                continue
+            if ball_uv is None:
+                ball_uv = self.prev_ball_uv
+            if paddle_uvs[0] is None:
+                paddle_uvs[0] = self.prev_paddle_uvs[0]
+                paddle_centers_px[0] = None  # 无像素坐标时保持None或上次坐标自己保存
+            if paddle_uvs[1] is None:
+                paddle_uvs[1] = self.prev_paddle_uvs[1]
+                paddle_centers_px[1] = None
+                ball_uv = self.compute_normalized((x, y))
+            # 画球，半径固定
+            cv2.circle(frame, (int(x), int(y)), int(self.ball_radius_fixed), (255, 0, 0), 2)
+            used_indices.add(idx)
+            break
 
-            prev_uv = self.prev_paddle_uvs[1]
-            prev_speed = self.prev_paddle_speeds[1]
-            prev_acc = self.prev_paddle_accs[1]
+        # 画拍子，使用固定半径
+        for i in [0, 1]:
+            if paddle_centers_px[i] is not None:
+                color = (0, 0, 255) if i == 0 else (0, 165, 255)
+                cv2.circle(frame, paddle_centers_px[i], int(self.paddle_radii_fixed[i]), color, 2)
+                cv2.putText(frame, f"Paddle{i+1}", (paddle_centers_px[i][0] + 5, paddle_centers_px[i][1] - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-            if prev_uv is not None:
-                speed = np.linalg.norm(uv - prev_uv) / dt
-                if prev_speed is not None:
-                    acc = (speed - prev_speed) / dt
-                else:
-                    acc = None
-                dir_angle = math.degrees(math.atan2((uv - prev_uv)[1], (uv - prev_uv)[0]))
-            else:
-                speed = acc = dir_angle = None
-
-            paddle_speeds[1] = speed
-            paddle_accs[1] = acc
-            paddle_dirs[1] = dir_angle
-            self.prev_paddle_uvs[1] = uv
-            self.prev_paddle_speeds[1] = speed
-            self.prev_paddle_accs[1] = acc
-
-            cv2.circle(frame, (int(x), int(y)), int(radius), (0,165,255), 2)
-            cv2.putText(frame, "Paddle2", (int(x)+5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,165,255), 2)
-
+        # 速度和角度计算
+        dt = curr_time - self.prev_time if self.prev_time else 0.033
+        ball_speed, ball_angle = compute_speed_and_angle(self.prev_ball_uv, ball_uv, dt)
+        paddle1_speed, paddle1_angle = compute_speed_and_angle(self.prev_paddle_uvs[0], paddle_uvs[0], dt)
+        paddle2_speed, paddle2_angle = compute_speed_and_angle(self.prev_paddle_uvs[1], paddle_uvs[1], dt)
         self.prev_time = curr_time
+        self.prev_ball_uv = ball_uv
+        self.prev_paddle_uvs = paddle_uvs
 
-        dist_ball_p1 = np.linalg.norm(ball_uv - paddle_uvs[0]) if ball_uv is not None and paddle_uvs[0] is not None else None
-        dist_ball_p2 = np.linalg.norm(ball_uv - paddle_uvs[1]) if ball_uv is not None and paddle_uvs[1] is not None else None
+        # 判定进球
+        #in_goal = False
+        #scorer = 0
+        #if ball_uv is not None and 0.4 < ball_uv[0] < 0.6 and (ball_uv[1] < 0.03 or ball_uv[1] > 0.97) and (curr_time - self.last_goal_time > self.goal_cooldown):
+        #    in_goal = True
+        #    scorer = 2 if ball_uv[1] < 0.03 else 1
+        #    if scorer == 1:
+        #        self.score_player1 += 1
+        #    else:
+        #        self.score_player2 += 1
+        #    self.last_goal_time = curr_time
+        # 模拟进球信号（每5秒进1球）
+        in_goal, scorer, self.round_id, self.game_id = self.update_game_state(curr_time)
 
-        dist_paddle_paddle = np.linalg.norm(paddle_uvs[0] - paddle_uvs[1]) if paddle_uvs[0] is not None and paddle_uvs[1] is not None else None
-        dist_ball_goal = min(abs(ball_uv[1] - 0.0), abs(ball_uv[1] - 1.0)) if ball_uv is not None else None
 
-        in_goal = False
-        scorer = 0
-        if ball_uv is not None:
-            if 0.3 < ball_uv[0] < 0.7 and (ball_uv[1] < 0.05 or ball_uv[1] > 0.95) and (curr_time - self.last_goal_time > self.goal_cooldown):
-                in_goal = True
-                scorer = 2 if ball_uv[1] < 0.05 else 1
-                if scorer == 1:
-                    self.score_player1 += 1
-                else:
-                    self.score_player2 += 1
-                self.last_goal_time = curr_time
 
-        self.csv_writer.writerow([
+        # 写入CSV
+        row_data = [
             curr_time,
             ball_uv[0] if ball_uv is not None else None,
             ball_uv[1] if ball_uv is not None else None,
             ball_speed,
-            ball_acc,
-            ball_dir,
+            ball_angle,
             paddle_uvs[0][0] if paddle_uvs[0] is not None else None,
             paddle_uvs[0][1] if paddle_uvs[0] is not None else None,
-            paddle_speeds[0],
-            paddle_accs[0],
-            paddle_dirs[0],
+            paddle1_speed,
+            paddle1_angle,
             paddle_uvs[1][0] if paddle_uvs[1] is not None else None,
             paddle_uvs[1][1] if paddle_uvs[1] is not None else None,
-            paddle_speeds[1],
-            paddle_accs[1],
-            paddle_dirs[1],
-            dist_ball_p1,
-            dist_ball_p2,
-            dist_paddle_paddle,
-            dist_ball_goal,
+            paddle2_speed,
+            paddle2_angle,
             int(in_goal),
-            scorer
-        ])
+            scorer,
+            self.round_id,
+            self.game_id
+        ]
 
-        h,w,_ = frame.shape
-        extended = np.ones((h, w+200, 3), dtype=np.uint8)*255
-        extended[:, 200:] = frame
+        # 只有全部字段非 None 时才写入
+        if all(val is not None for val in row_data):
+            self.csv_writer.writerow(row_data)
+
+
+        # 扩展画布，画分数信息
+        extended = np.ones((h, w + 250, 3), dtype=np.uint8) * 255
+        extended[:, 250:] = frame
         frame = extended
 
         y = 20
+
         def put(text):
             nonlocal y
-            cv2.putText(frame, text, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0,0,0), 2)
+            cv2.putText(frame, text, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
             y += 25
 
-        put(f"Score: P1 {self.score_player1} - P2 {self.score_player2}")
         put(f"Timestamp: {curr_time:.2f}")
         if ball_uv is not None:
             put(f"Ball (u,v): ({ball_uv[0]:.2f},{ball_uv[1]:.2f})")
-        if ball_speed is not None:
-            put(f"Ball Speed: {ball_speed:.3f}")
-        if ball_acc is not None:
-            put(f"Ball Acc: {ball_acc:.3f}")
-        if ball_dir is not None:
-            put(f"Ball Dir: {ball_dir:.1f}")
-        if dist_ball_goal is not None:
-            put(f"Dist Ball-Goal: {dist_ball_goal:.3f}")
-        if dist_ball_p1 is not None:
-            put(f"Dist Ball-P1: {dist_ball_p1:.3f}")
-        if dist_ball_p2 is not None:
-            put(f"Dist Ball-P2: {dist_ball_p2:.3f}")
-        if dist_paddle_paddle is not None:
-            put(f"Dist Paddle1-Paddle2: {dist_paddle_paddle:.3f}")
+        put(f"Ball speed: {ball_speed:.3f} / angle: {ball_angle:.1f}")
+        for i in [0, 1]:
+            if paddle_uvs[i] is not None:
+                speed = paddle1_speed if i == 0 else paddle2_speed
+                angle = paddle1_angle if i == 0 else paddle2_angle
+                put(f"Paddle{i+1} speed: {speed:.3f} / angle: {angle:.1f}")
 
-        for idx in [0,1]:
-            if paddle_uvs[idx] is not None:
-                put(f"Paddle{idx+1} (u,v): ({paddle_uvs[idx][0]:.2f},{paddle_uvs[idx][1]:.2f})")
-                if paddle_speeds[idx] is not None:
-                    put(f"Paddle{idx+1} Speed: {paddle_speeds[idx]:.3f}")
-                if paddle_accs[idx] is not None:
-                    put(f"Paddle{idx+1} Acc: {paddle_accs[idx]:.3f}")
-                if paddle_dirs[idx] is not None:
-                    put(f"Paddle{idx+1} Dir: {paddle_dirs[idx]:.1f}")
-            else:
-                put(f"Paddle{idx+1} not detected")
-
+        for i in [0, 1]:
+            if paddle_uvs[i] is not None:
+                put(f"Paddle{i+1} (u,v): ({paddle_uvs[i][0]:.2f},{paddle_uvs[i][1]:.2f}) Radius: {self.paddle_radii_fixed[i]:.1f}")
         if in_goal:
             put("GOAL!")
-
+        put(f"Round: {self.round_id} / Game: {self.game_id}")
+        put(f"Scorer (sim): {scorer} / Goal: {in_goal}")
         cv2.imshow("Tracking", frame)
         cv2.waitKey(1)
         return True
@@ -348,7 +392,7 @@ class CameraTracker:
         cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    video_path = "/home/mkbk/code/nus/proj/videos/final1.mp4"
+    video_path = "/home/mkbk/code/nus/proj/SWS-AIoT-Project/ai/f2.mp4"  # 改成你的路径或摄像头索引
     tracker = CameraTracker(video_path)
     try:
         while True:
