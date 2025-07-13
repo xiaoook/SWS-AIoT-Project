@@ -26,7 +26,7 @@
     width: 100%;
 }
 
-/* 冰球桌主体 */
+/* 冰球桌主体 - 保持2:1长宽比（匹配MQTT 800:400坐标系统） */
 .hockey-table {
     position: relative;
     background: linear-gradient(135deg, #e8f4f8 0%, #d1ecf1 100%);
@@ -37,11 +37,38 @@
     padding: 15px;
     border: 3px solid #34495e;
     width: 100%;
-    height: 500px;
+    max-width: 1000px; /* 最大宽度限制 */
+    margin: 0 auto; /* 居中显示 */
     flex-shrink: 0;
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+/* 现代浏览器：使用aspect-ratio保持2:1比例 */
+@supports (aspect-ratio: 2 / 1) {
+    .hockey-table {
+        aspect-ratio: 2 / 1; /* 固定2:1长宽比，匹配真实冰球场地比例 */
+    }
+}
+
+/* 旧浏览器备用方案：使用padding-bottom技巧 */
+@supports not (aspect-ratio: 2 / 1) {
+    .hockey-table {
+        height: 0;
+        padding-bottom: 50%; /* 50% = 1/2，创建2:1比例 */
+        padding-top: 15px;
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+    
+    .hockey-table .table-surface {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
+    }
 }
 
 /* 桌子下方的控制区域 */
@@ -140,8 +167,8 @@
     right: 8px;
 }
 
-/* 球拍样式 */
-.paddle {
+/* 推杆样式 */
+.pusher {
     position: absolute;
     width: 40px;
     height: 40px;
@@ -151,7 +178,7 @@
     z-index: 10;
 }
 
-.paddle-a {
+.pusher-a {
     background: radial-gradient(circle at 30% 30%, #3498db, #2980b9);
     border: 3px solid #2980b9;
     box-shadow: 
@@ -159,7 +186,7 @@
         inset 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
-.paddle-b {
+.pusher-b {
     background: radial-gradient(circle at 30% 30%, #e74c3c, #c0392b);
     border: 3px solid #c0392b;
     box-shadow: 
@@ -167,7 +194,7 @@
         inset 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
-.paddle-handle {
+.pusher-handle {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -228,11 +255,40 @@
     }
 }
 
-/* 位置指示器 */
+/* 鼠标坐标显示 - 在信息面板中 */
+#mouseCoordinatesSection {
+    background: #fff8e1 !important;
+    border: 2px solid #ffc107 !important;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+#mouseCoordinatesSection h4 {
+    color: #f57f17 !important;
+}
+
+#mouseCoordinatesSection .position-data span {
+    background: #fff3cd !important;
+    border: 1px solid #ffc107 !important;
+    color: #856404 !important;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 隐藏的位置指示器样式 (备用) */
 .position-indicator {
     position: absolute;
     z-index: 15;
     pointer-events: none;
+    display: none !important; /* 强制隐藏避免遮挡 */
 }
 
 .indicator-dot {
@@ -385,7 +441,7 @@
 }
 
 /* 动画效果 */
-.paddle:hover {
+.pusher:hover {
     transform: scale(1.1);
     filter: brightness(1.2);
 }
@@ -416,10 +472,8 @@
         min-height: auto;
     }
     
-
-    
     .hockey-table {
-        height: 420px;
+        max-width: 900px; /* 中等屏幕最大宽度 */
     }
 }
 
@@ -429,16 +483,12 @@
         padding: 12px;
     }
     
-
-    
     .hockey-table {
         padding: 12px;
-        height: 380px;
+        max-width: 800px; /* 平板屏幕最大宽度 */
     }
     
-
-    
-    .paddle {
+    .pusher {
         width: 35px;
         height: 35px;
     }
@@ -465,14 +515,10 @@
         padding: 10px;
     }
     
-
-    
     .hockey-table {
         padding: 10px;
-        height: 320px;
+        max-width: 600px; /* 小屏幕最大宽度 */
     }
-    
-
     
     .visualization-controls {
         padding: 15px;
@@ -503,16 +549,12 @@
         padding: 8px;
     }
     
-
-    
     .hockey-table {
         padding: 8px;
-        height: 280px;
+        max-width: 480px; /* 手机屏幕最大宽度 */
     }
     
-
-    
-    .paddle {
+    .pusher {
         width: 30px;
         height: 30px;
     }
