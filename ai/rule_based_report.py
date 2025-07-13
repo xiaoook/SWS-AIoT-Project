@@ -100,6 +100,43 @@ def analyze_game(df_all, game_id):
         }
     }
 
+def get_round_report_dict(df_all, game_id, round_id):
+    df = df_all[(df_all["game_id"] == game_id) & (df_all["round_id"] == round_id)]
+    if df.empty:
+        return {"error": f"No data found for game {game_id}, round {round_id}"}
+
+    row = summarize_data(df)
+    return {
+        "game_id": int(game_id),
+        "round_id": int(round_id),
+        "paddle1": {
+            **judge_keywords_and_advice(row, "paddle1"),
+            "status": judge_status(row, "paddle1")
+        },
+        "paddle2": {
+            **judge_keywords_and_advice(row, "paddle2"),
+            "status": judge_status(row, "paddle2")
+        }
+    }
+
+def get_game_report_dict(df_all, game_id):
+    df = df_all[df_all["game_id"] == game_id]
+    if df.empty:
+        return {"error": f"No data found for game {game_id}"}
+
+    row = summarize_data(df)
+    return {
+        "game_id": int(game_id),
+        "paddle1": {
+            **judge_keywords_and_advice(row, "paddle1"),
+            "status": judge_status(row, "paddle1")
+        },
+        "paddle2": {
+            **judge_keywords_and_advice(row, "paddle2"),
+            "status": judge_status(row, "paddle2")
+        }
+    }
+
 # 示例调用方式
 if __name__ == "__main__":
     df_all = pd.read_csv("tracking_data.csv")

@@ -167,6 +167,10 @@ class CameraTracker:
         self.max_history_len = 15  # 取最近15帧（大概0.5秒）
         self.ball_radius_fixed = 40
         self.paddle_radii_fixed = [45, 45]
+        self.in_goal = 0
+        self.scorer = 0
+        self.round_id = 1
+        self.game_id = 1
 
 
     def compute_normalized(self, pt):
@@ -177,25 +181,15 @@ class CameraTracker:
         uv = cv2.perspectiveTransform(np.array([[[pt[0], pt[1]]]], dtype=np.float32), M)
         return uv[0, 0]
     
-    def update_game_state(self, curr_time):
-        in_goal = False
-        scorer = 0
-
-        # 模拟进球（每5秒进1球）
-        if curr_time - self.last_goal_time > 5:
-            in_goal = True
-            scorer = random.choice([1, 2])
-            self.last_goal_time = curr_time
-
-            # 进球后开始下一轮
-            self.round_id += 1
-
-        # 每10轮进入下一局游戏
-        if self.round_id % 10 == 0 and curr_time - self.last_game_time > 2:
-            self.game_id += 1
-            self.last_game_time = curr_time
-
-        return int(in_goal), scorer, self.round_id, self.game_id
+    def update_game_state(self, in_goal=None, scorer=None, round_id=None, game_id=None):
+        if in_goal is not None:
+            self.in_goal = int(in_goal)
+        if scorer is not None:
+            self.scorer = scorer
+        if round_id is not None:
+            self.round_id = round_id
+        if game_id is not None:
+            self.game_id = game_id
 
 
     def process_frame(self):
@@ -323,7 +317,6 @@ class CameraTracker:
         #        self.score_player2 += 1
         #    self.last_goal_time = curr_time
         # 模拟进球信号（每5秒进1球）
-        in_goal, scorer, self.round_id, self.game_id = self.update_game_state(curr_time)
 
 
 
@@ -342,8 +335,8 @@ class CameraTracker:
             paddle_uvs[1][1] if paddle_uvs[1] is not None else None,
             paddle2_speed,
             paddle2_angle,
-            int(in_goal),
-            scorer,
+            int(self.in_goal),
+            self.scorer,
             self.round_id,
             self.game_id
         ]
@@ -378,10 +371,10 @@ class CameraTracker:
         for i in [0, 1]:
             if paddle_uvs[i] is not None:
                 put(f"Paddle{i+1} (u,v): ({paddle_uvs[i][0]:.2f},{paddle_uvs[i][1]:.2f}) Radius: {self.paddle_radii_fixed[i]:.1f}")
-        if in_goal:
+        if self.in_goal:
             put("GOAL!")
         put(f"Round: {self.round_id} / Game: {self.game_id}")
-        put(f"Scorer (sim): {scorer} / Goal: {in_goal}")
+        put(f"Scorer (sim): {self.scorer} / Goal: {self.in_goal}")
         cv2.imshow("Tracking", frame)
         cv2.waitKey(1)
         return True
@@ -391,12 +384,41 @@ class CameraTracker:
         self.csv_file.close()
         cv2.destroyAllWindows()
 
-if __name__ == "__main__":
-    video_path = "/home/mkbk/code/nus/proj/SWS-AIoT-Project/ai/f2.mp4"  # 改成你的路径或摄像头索引
-    tracker = CameraTracker(video_path)
+def main():
+    video_source = "/home/mkbk/code/nus/proj/SWS-AIoT-Project/ai/f2.mp4"  # 或者替换为视频路径，例如 "sample.mp4"
+    tracker = CameraTracker(video_source)
+
     try:
         while True:
+            # 模拟传入游戏状态参数
+            curr_time = time.time()
+            if curr_time - tracker.last_goal_time > 5:
+                in_goal = True
+                scorer = 1 if int(curr_time) % 2 == 0 else 2
+                tracker.round_id += 1
+                if tracker.round_id > 5:
+                    tracker.round_id = 1
+                    tracker.game_id += 1
+                tracker.last_goal_time = curr_time
+            else:
+                in_goal = False
+                scorer = 0
+
+            # 传入参数
+            tracker.update_game_state(
+                in_goal=in_goal,
+                scorer=scorer,
+                round_id=tracker.round_id,
+                game_id=tracker.game_id
+            )
+
+            # 处理当前帧
             if not tracker.process_frame():
                 break
+    except KeyboardInterrupt:
+        print("退出程序")
     finally:
         tracker.release()
+
+if __name__ == "__main__":
+    main()
