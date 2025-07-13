@@ -142,26 +142,28 @@
                                         <div class="goal-area"></div>
                                     </div>
                                     
-                                    <!-- Paddle A -->
-                                    <div id="paddleA" class="paddle paddle-a">
-                                        <div class="paddle-handle"></div>
-                                    </div>
-                                    
-                                    <!-- Paddle B -->
-                                    <div id="paddleB" class="paddle paddle-b">
-                                        <div class="paddle-handle"></div>
-                                    </div>
+                                                                <!-- Pusher A -->
+                            <div id="pusherA" class="pusher pusher-a">
+                                <div class="pusher-handle"></div>
+                            </div>
+                            
+                            <!-- Pusher B -->
+                            <div id="pusherB" class="pusher pusher-b">
+                                <div class="pusher-handle"></div>
+                            </div>
                                     
                                     <!-- Puck -->
                                     <div id="puck" class="puck">
                                         <div class="puck-trail"></div>
                                     </div>
                                     
-                                    <!-- Position Indicator -->
+                                    <!-- Position Indicator - Hidden to avoid obstruction -->
+                                    <!-- 
                                     <div class="position-indicator" id="positionIndicator" style="display: none;">
                                         <div class="indicator-dot"></div>
                                         <div class="indicator-coords"></div>
                                     </div>
+                                    -->
                                 </div>
                             </div>
                             
@@ -193,10 +195,10 @@
                             <!-- Position Information Display Below Controls -->
                             <div class="position-info">
                                 <div class="info-section">
-                                    <h4>Paddle A</h4>
+                                    <h4>Pusher A</h4>
                                     <div class="position-data">
-                                        <span>X: <span id="paddleAX">--</span></span>
-                                        <span>Y: <span id="paddleAY">--</span></span>
+                                        <span>X: <span id="pusherAX">--</span></span>
+                                        <span>Y: <span id="pusherAY">--</span></span>
                                     </div>
                                 </div>
                                 <div class="info-section">
@@ -208,10 +210,17 @@
                                     </div>
                                 </div>
                                 <div class="info-section">
-                                    <h4>Paddle B</h4>
+                                    <h4>Pusher B</h4>
                                     <div class="position-data">
-                                        <span>X: <span id="paddleBX">--</span></span>
-                                        <span>Y: <span id="paddleBY">--</span></span>
+                                        <span>X: <span id="pusherBX">--</span></span>
+                                        <span>Y: <span id="pusherBY">--</span></span>
+                                    </div>
+                                </div>
+                                <div class="info-section" id="mouseCoordinatesSection" style="display: none;">
+                                    <h4>Mouse Position</h4>
+                                    <div class="position-data">
+                                        <span>X: <span id="mouseX">--</span></span>
+                                        <span>Y: <span id="mouseY">--</span></span>
                                     </div>
                                 </div>
                             </div>

@@ -5,25 +5,32 @@ class HockeyVisualization {
         this.isPaused = false;
         this.showTrails = true;
         this.showCoordinates = false;
+        this.isWebSocketConnected = false;
+        
+        // MQTT coordinate system (from Backend/test_mqtt.py)
+        this.mqttCoordinates = {
+            width: 800,   // MQTT x range: 0-800
+            height: 400   // MQTT y range: 0-400
+        };
         
         // Element references
         this.tableSurface = null;
-        this.paddleA = null;
-        this.paddleB = null;
+        this.pusherA = null;
+        this.pusherB = null;
         this.puck = null;
         this.positionIndicator = null;
         
         // Position data (will be updated after initialization)
         this.currentPositions = {
-            paddleA: { x: 100, y: 200 },
-            paddleB: { x: 700, y: 200 },
+            pusherA: { x: 100, y: 200 },
+            pusherB: { x: 700, y: 200 },
             puck: { x: 400, y: 200 }
         };
         
         // Position history (for trails)
         this.positionHistory = {
-            paddleA: [],
-            paddleB: [],
+            pusherA: [],
+            pusherB: [],
             puck: []
         };
         
@@ -37,7 +44,7 @@ class HockeyVisualization {
         this.lastPuckTime = Date.now();
         this.puckSpeed = 0;
         
-        console.log('🏒 HockeyVisualization initialized');
+        console.log('🏒 HockeyVisualization initialized with MQTT coordinate system:', this.mqttCoordinates);
     }
 
     // Initialize visualization system
@@ -59,13 +66,19 @@ class HockeyVisualization {
     // Initialize DOM elements
     initializeElements() {
         this.tableSurface = document.getElementById('hockeyTable');
-        this.paddleA = document.getElementById('paddleA');
-        this.paddleB = document.getElementById('paddleB');
+        this.pusherA = document.getElementById('pusherA');
+        this.pusherB = document.getElementById('pusherB');
         this.puck = document.getElementById('puck');
-        this.positionIndicator = document.getElementById('positionIndicator');
+        // Note: positionIndicator is no longer used to avoid obstruction
         
-        if (!this.tableSurface || !this.paddleA || !this.paddleB || !this.puck) {
+        if (!this.tableSurface || !this.pusherA || !this.pusherB || !this.puck) {
             throw new Error('Required DOM elements not found');
+        }
+        
+        // Initialize mouse coordinates section as hidden
+        const mouseSection = document.getElementById('mouseCoordinatesSection');
+        if (mouseSection) {
+            mouseSection.style.display = 'none';
         }
         
         // Set initial positions based on table dimensions
@@ -91,7 +104,12 @@ class HockeyVisualization {
         if (showCoordinatesCheckbox) {
             showCoordinatesCheckbox.addEventListener('change', (e) => {
                 this.showCoordinates = e.target.checked;
-                this.positionIndicator.style.display = this.showCoordinates ? 'block' : 'none';
+                
+                // Hide mouse coordinates section when coordinates are disabled
+                if (!this.showCoordinates) {
+                    this.clearMouseCoordinatesDisplay();
+                }
+                
                 console.log('📍 Coordinates display:', this.showCoordinates ? 'enabled' : 'disabled');
             });
         }
@@ -103,29 +121,37 @@ class HockeyVisualization {
             });
         }
         
-        // Mouse hover to show coordinates
+        // Mouse hover to show coordinates in info panel
         if (this.tableSurface) {
             this.tableSurface.addEventListener('mousemove', (e) => {
                 if (this.showCoordinates) {
                     const rect = this.tableSurface.querySelector('.table-surface').getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
-                    this.updatePositionIndicator(x, y);
+                    this.updateMouseCoordinatesDisplay(x, y);
                 }
             });
             
             this.tableSurface.addEventListener('mouseleave', () => {
-                if (this.positionIndicator) {
-                    this.positionIndicator.style.display = 'none';
+                if (this.showCoordinates) {
+                    this.clearMouseCoordinatesDisplay();
                 }
             });
         }
         
-        // Window resize handler
+        // Window resize handler - maintain coordinate system proportions
         window.addEventListener('resize', () => {
             setTimeout(() => {
-                this.setInitialPositions();
+                // Update visual positions to maintain proportions after resize
                 this.updateVisualPositions();
+                
+                // Update position displays with new dimensions
+                Object.keys(this.currentPositions).forEach(object => {
+                    const pos = this.currentPositions[object];
+                    this.updatePositionDisplay(object, pos.x, pos.y);
+                });
+                
+                console.log('🔄 Window resized - coordinate system updated');
             }, 100);
         });
         
@@ -144,35 +170,99 @@ class HockeyVisualization {
             // Listen for connection status changes
             window.websocketManager.on('connect', () => {
                 this.updateConnectionStatus(true);
+                this.onWebSocketConnected();
             });
             
             window.websocketManager.on('disconnect', () => {
                 this.updateConnectionStatus(false);
+                this.onWebSocketDisconnected();
             });
+            
+            // Check if WebSocket is already connected
+            if (window.websocketManager.isConnected) {
+                this.onWebSocketConnected();
+            } else {
+                // Wait for real WebSocket connection - no fallback mode
+                console.log('⏳ Waiting for WebSocket connection...');
+                this.showWaitingForConnection();
+            }
             
             console.log('🔌 WebSocket connection listeners set up');
         } else {
-            console.warn('⚠️ WebSocket manager not available, using demo mode');
-            this.startDemoMode();
+            console.warn('⚠️ WebSocket manager not available - waiting for connection');
+            this.showWaitingForConnection();
         }
     }
 
-    // Handle position update data
+    // Handle WebSocket connection established
+    onWebSocketConnected() {
+        this.isWebSocketConnected = true;
+        this.stopDemoMode();
+        console.log('✅ WebSocket connected - Using real MQTT data');
+        
+        // Show connection status
+        const statusElement = document.getElementById('mqttStatus');
+        if (statusElement) {
+            statusElement.textContent = 'Connected - Real Data';
+            statusElement.className = 'status-value connected';
+        }
+    }
+
+    // Handle WebSocket disconnection
+    onWebSocketDisconnected() {
+        this.isWebSocketConnected = false;
+        console.log('❌ WebSocket disconnected - Waiting for reconnection');
+        
+        // Show waiting status - no fallback mode
+        this.showWaitingForConnection();
+    }
+
+    // Show waiting for connection status
+    showWaitingForConnection() {
+        const statusElement = document.getElementById('mqttStatus');
+        if (statusElement) {
+            statusElement.textContent = 'Waiting for Connection';
+            statusElement.className = 'status-value disconnected';
+        }
+        
+        // Reset update rate display
+        const rateElement = document.getElementById('updateRate');
+        if (rateElement) {
+            rateElement.textContent = '0 Hz';
+        }
+        
+        console.log('⏳ Waiting for WebSocket connection...');
+    }
+
+    // Legacy method - no longer used (no demo mode)
+    stopDemoMode() {
+        // No demo mode to stop - only real data mode
+        console.log('ℹ️ No demo mode to stop - using real data only');
+    }
+
+    // Handle position update data - ONLY from backend WebSocket
     handlePositionUpdate(data) {
-        if (this.isPaused) return;
+        // Only process data when WebSocket is connected and not paused
+        if (this.isPaused || !this.isWebSocketConnected) return;
         
         try {
-            // Parse position data
-            if (data.paddleA) {
-                this.updatePosition('paddleA', data.paddleA.x, data.paddleA.y);
+            // Parse and convert position data from backend MQTT (pusher1/pusher2 format)
+            if (data.pusher1) {
+                // Convert MQTT coordinates to display coordinates
+                const convertedPos = this.convertMqttToDisplayCoordinates(data.pusher1.x, data.pusher1.y);
+                this.updatePosition('pusherA', convertedPos.x, convertedPos.y);
             }
             
-            if (data.paddleB) {
-                this.updatePosition('paddleB', data.paddleB.x, data.paddleB.y);
+            if (data.pusher2) {
+                // Convert MQTT coordinates to display coordinates
+                const convertedPos = this.convertMqttToDisplayCoordinates(data.pusher2.x, data.pusher2.y);
+                this.updatePosition('pusherB', convertedPos.x, convertedPos.y);
             }
             
             if (data.puck) {
-                this.updatePuckPosition(data.puck.x, data.puck.y);
+                // Convert MQTT coordinates to display coordinates
+                const convertedPos = this.convertMqttToDisplayCoordinates(data.puck.x, data.puck.y);
+                this.updatePuckPosition(convertedPos.x, convertedPos.y);
             }
             
             // Update frequency statistics
@@ -190,14 +280,53 @@ class HockeyVisualization {
         }
     }
 
-    // Get current table dimensions
+    // Get current table dimensions - maintaining 2:1 aspect ratio
     getTableDimensions() {
         if (!this.tableSurface) return { width: 800, height: 400 };
         
-        const rect = this.tableSurface.getBoundingClientRect();
+        const tableSurfaceElement = this.tableSurface.querySelector('.table-surface');
+        if (!tableSurfaceElement) return { width: 800, height: 400 };
+        
+        const rect = tableSurfaceElement.getBoundingClientRect();
+        
+        // Ensure we maintain exact 2:1 ratio even if CSS has minor differences
+        const width = rect.width;
+        const height = width / 2; // Force 2:1 ratio
+        
+        console.log(`🏒 Table dimensions: ${width}x${height} (ratio: ${(width/height).toFixed(2)}:1)`);
+        
         return {
-            width: rect.width,
-            height: rect.height
+            width: width,
+            height: height
+        };
+    }
+    
+    // Convert MQTT coordinates to frontend display coordinates
+    // MQTT: (0,0) to (800,400) → Display: (0,0) to (width, height)
+    // Maintains proportional positioning across all screen sizes
+    convertMqttToDisplayCoordinates(mqttX, mqttY) {
+        const displayDimensions = this.getTableDimensions();
+        
+        // Calculate scale factors - both should be equal due to 2:1 aspect ratio
+        const scaleX = displayDimensions.width / this.mqttCoordinates.width;
+        const scaleY = displayDimensions.height / this.mqttCoordinates.height;
+        
+        // Verify scale factors are equal (indicating proper aspect ratio maintenance)
+        if (Math.abs(scaleX - scaleY) > 0.01) {
+            console.warn(`⚠️ Scale factor mismatch: X=${scaleX.toFixed(3)}, Y=${scaleY.toFixed(3)}`);
+        }
+        
+        // Convert coordinates
+        const displayX = mqttX * scaleX;
+        const displayY = mqttY * scaleY;
+        
+        // Ensure coordinates are within display bounds
+        const boundedX = Math.max(0, Math.min(displayDimensions.width, displayX));
+        const boundedY = Math.max(0, Math.min(displayDimensions.height, displayY));
+        
+        return {
+            x: boundedX,
+            y: boundedY
         };
     }
 
@@ -206,28 +335,31 @@ class HockeyVisualization {
         const dimensions = this.getTableDimensions();
         const centerY = dimensions.height / 2;
         
+        // Verify aspect ratio is correct
+        const aspectRatio = dimensions.width / dimensions.height;
+        if (Math.abs(aspectRatio - 2.0) > 0.1) {
+            console.warn(`⚠️ Aspect ratio deviation detected: ${aspectRatio.toFixed(2)}:1 (expected 2:1)`);
+        }
+        
+        // Set initial positions in display coordinates
         this.currentPositions = {
-            paddleA: { x: dimensions.width * 0.2, y: centerY },
-            paddleB: { x: dimensions.width * 0.8, y: centerY },
+            pusherA: { x: dimensions.width * 0.2, y: centerY },
+            pusherB: { x: dimensions.width * 0.8, y: centerY },
             puck: { x: dimensions.width * 0.5, y: centerY }
         };
         
         // Update last puck position for speed calculation
         this.lastPuckPosition = { x: dimensions.width * 0.5, y: centerY };
+        
+        console.log('🎯 Initial positions set for display dimensions:', dimensions);
+        console.log('🏒 Coordinate system verification:');
+        console.log(`   MQTT: ${this.mqttCoordinates.width}x${this.mqttCoordinates.height} (${this.mqttCoordinates.width/this.mqttCoordinates.height}:1)`);
+        console.log(`   Display: ${dimensions.width.toFixed(0)}x${dimensions.height.toFixed(0)} (${aspectRatio.toFixed(2)}:1)`);
     }
 
-    // Update object position
+    // Update object position (coordinates already converted from MQTT to display)
     updatePosition(object, x, y) {
-        // Get current table dimensions
-        const dimensions = this.getTableDimensions();
-        const maxX = dimensions.width;
-        const maxY = dimensions.height;
-        
-        // Ensure coordinates are within valid range
-        x = Math.max(0, Math.min(maxX, x));
-        y = Math.max(0, Math.min(maxY, y));
-        
-        // Update current position
+        // Update current position (coordinates are already in display coordinate system)
         this.currentPositions[object] = { x, y };
         
         // Add to history (for trails)
@@ -243,7 +375,7 @@ class HockeyVisualization {
         // Update visual positions
         this.updateVisualPositions();
         
-        // Update position info display
+        // Update position info display (show both display and MQTT coordinates)
         this.updatePositionDisplay(object, x, y);
     }
 
@@ -283,18 +415,18 @@ class HockeyVisualization {
     updateVisualPositions() {
         if (!this.isInitialized) return;
         
-        // Update paddle A position
-        if (this.paddleA) {
-            const pos = this.currentPositions.paddleA;
-            this.paddleA.style.left = `${pos.x - 20}px`; // Subtract radius
-            this.paddleA.style.top = `${pos.y - 20}px`;
+        // Update pusher A position
+        if (this.pusherA) {
+            const pos = this.currentPositions.pusherA;
+            this.pusherA.style.left = `${pos.x - 20}px`; // Subtract radius
+            this.pusherA.style.top = `${pos.y - 20}px`;
         }
         
-        // Update paddle B position
-        if (this.paddleB) {
-            const pos = this.currentPositions.paddleB;
-            this.paddleB.style.left = `${pos.x - 20}px`;
-            this.paddleB.style.top = `${pos.y - 20}px`;
+        // Update pusher B position
+        if (this.pusherB) {
+            const pos = this.currentPositions.pusherB;
+            this.pusherB.style.left = `${pos.x - 20}px`;
+            this.pusherB.style.top = `${pos.y - 20}px`;
         }
         
         // Update puck position
@@ -305,17 +437,34 @@ class HockeyVisualization {
         }
     }
 
-    // Update position indicator
-    updatePositionIndicator(x, y) {
-        if (this.positionIndicator && this.showCoordinates) {
-            this.positionIndicator.style.left = `${x}px`;
-            this.positionIndicator.style.top = `${y}px`;
-            this.positionIndicator.style.display = 'block';
-            
-            const coordsElement = this.positionIndicator.querySelector('.indicator-coords');
-            if (coordsElement) {
-                coordsElement.textContent = `(${Math.round(x)}, ${Math.round(y)})`;
-            }
+    // Update mouse coordinates display in info panel
+    updateMouseCoordinatesDisplay(x, y) {
+        if (!this.showCoordinates) return;
+        
+        // Calculate MQTT coordinates from display coordinates
+        const dimensions = this.getTableDimensions();
+        const mqttX = (x / dimensions.width) * this.mqttCoordinates.width;
+        const mqttY = (y / dimensions.height) * this.mqttCoordinates.height;
+        
+        // Update mouse coordinates in info panel
+        const mouseXElement = document.getElementById('mouseX');
+        const mouseYElement = document.getElementById('mouseY');
+        
+        if (mouseXElement) mouseXElement.textContent = `${Math.round(mqttX)} (${Math.round(x)}px)`;
+        if (mouseYElement) mouseYElement.textContent = `${Math.round(mqttY)} (${Math.round(y)}px)`;
+        
+        // Show mouse coordinates section
+        const mouseSection = document.getElementById('mouseCoordinatesSection');
+        if (mouseSection) {
+            mouseSection.style.display = 'block';
+        }
+    }
+    
+    // Clear mouse coordinates display
+    clearMouseCoordinatesDisplay() {
+        const mouseSection = document.getElementById('mouseCoordinatesSection');
+        if (mouseSection) {
+            mouseSection.style.display = 'none';
         }
     }
 
@@ -324,8 +473,14 @@ class HockeyVisualization {
         const xElement = document.getElementById(`${object}X`);
         const yElement = document.getElementById(`${object}Y`);
         
-        if (xElement) xElement.textContent = Math.round(x);
-        if (yElement) yElement.textContent = Math.round(y);
+        // Calculate MQTT coordinates from display coordinates for reference
+        const dimensions = this.getTableDimensions();
+        const mqttX = (x / dimensions.width) * this.mqttCoordinates.width;
+        const mqttY = (y / dimensions.height) * this.mqttCoordinates.height;
+        
+        // Display both coordinate systems
+        if (xElement) xElement.textContent = `${Math.round(mqttX)} (${Math.round(x)}px)`;
+        if (yElement) yElement.textContent = `${Math.round(mqttY)} (${Math.round(y)}px)`;
     }
 
     // Update speed display
@@ -374,62 +529,26 @@ class HockeyVisualization {
         const now = Date.now();
         const maxAge = 5000; // 5 seconds
         
-        ['paddleA', 'paddleB', 'puck'].forEach(object => {
+        ['pusherA', 'pusherB', 'puck'].forEach(object => {
             this.positionHistory[object] = this.positionHistory[object].filter(
                 pos => now - pos.timestamp < maxAge
             );
         });
     }
 
-    // Demo mode (when no WebSocket connection is available)
-    startDemoMode() {
-        console.log('🎮 Starting demo mode');
-        
-        let time = 0;
-        const demoInterval = setInterval(() => {
-            if (this.isPaused) return;
-            
-            time += 0.1;
-            
-            // Get current table dimensions for demo
-            const dimensions = this.getTableDimensions();
-            const centerX = dimensions.width / 2;
-            const centerY = dimensions.height / 2;
-            
-            // Simulate data with dynamic scaling
-            const paddleAX = dimensions.width * 0.2 + Math.sin(time) * (dimensions.width * 0.08);
-            const paddleAY = centerY + Math.cos(time * 0.5) * (dimensions.height * 0.3);
-            
-            const paddleBX = dimensions.width * 0.8 + Math.sin(time + Math.PI) * (dimensions.width * 0.08);
-            const paddleBY = centerY + Math.cos(time * 0.5 + Math.PI) * (dimensions.height * 0.3);
-            
-            const puckX = centerX + Math.sin(time * 2) * (dimensions.width * 0.35);
-            const puckY = centerY + Math.cos(time * 1.5) * (dimensions.height * 0.35);
-            
-            // Simulate position updates
-            this.handlePositionUpdate({
-                paddleA: { x: paddleAX, y: paddleAY },
-                paddleB: { x: paddleBX, y: paddleBY },
-                puck: { x: puckX, y: puckY }
-            });
-            
-        }, 50); // 20Hz update frequency
-        
-        // Simulate connection status
-        setTimeout(() => this.updateConnectionStatus(true), 1000);
-    }
+    // No demo mode - only real data from backend
 
     // Reset visualization
     reset() {
         this.currentPositions = {
-            paddleA: { x: 100, y: 200 },
-            paddleB: { x: 700, y: 200 },
+            pusherA: { x: 100, y: 200 },
+            pusherB: { x: 700, y: 200 },
             puck: { x: 400, y: 200 }
         };
         
         this.positionHistory = {
-            paddleA: [],
-            paddleB: [],
+            pusherA: [],
+            pusherB: [],
             puck: []
         };
         
@@ -450,7 +569,7 @@ class HockeyVisualization {
 // Global instance
 let hockeyVisualization = null;
 
-// Initialize when DOM is loaded
+        // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Wait a bit to ensure other components are loaded
     setTimeout(() => {
@@ -461,8 +580,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Expose to global scope for other modules to use
             window.hockeyVisualization = hockeyVisualization;
             
-            // Start demo mode automatically for display
-            hockeyVisualization.startDemoMode();
+            // Only real data from backend - no simulation
+            console.log('🔌 Ready to receive real data from backend...');
         }
     }, 1000);
 });
