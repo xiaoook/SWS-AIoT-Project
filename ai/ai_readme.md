@@ -45,6 +45,9 @@
      round_id=tracker.round_id,
      game_id=tracker.game_id
  )
+ ###  latest = tracker.latest_data
+ - **说明**：调用即可获取球和球拍的实时位置，为字典形式
+
  ```
 
  ---

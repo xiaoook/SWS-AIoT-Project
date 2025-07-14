@@ -68,7 +68,13 @@ class FieldDetector:
     def release(self):
         self.cap.release()
         cv2.destroyAllWindows()
-
+def estimate_position(prev_uv, speed, angle_deg, dt):
+    if prev_uv is None or speed is None or angle_deg is None:
+        return None, None
+    angle_rad = math.radians(angle_deg)
+    du = speed * math.cos(angle_rad) * dt
+    dv = speed * math.sin(angle_rad) * dt
+    return prev_uv[0] + du, prev_uv[1] + dv
 def extract_red_objects(frame, hsv, lower_red1, upper_red1, lower_red2, upper_red2):
     mask_red1 = cv2.inRange(hsv, lower_red1, upper_red1)
     mask_red2 = cv2.inRange(hsv, lower_red2, upper_red2)
@@ -138,6 +144,7 @@ class CameraTracker:
         self.last_goal_time = time.time()
         self.last_round_time = time.time()
         self.last_game_time = time.time()
+        self.latest_data = None
 
         self.csv_writer.writerow([
             "timestamp",
@@ -282,7 +289,7 @@ class CameraTracker:
             if paddle_uvs[1] is None:
                 paddle_uvs[1] = self.prev_paddle_uvs[1]
                 paddle_centers_px[1] = None
-                ball_uv = self.compute_normalized((x, y))
+            ball_uv = self.compute_normalized((x, y))
             # 画球，半径固定
             cv2.circle(frame, (int(x), int(y)), int(self.ball_radius_fixed), (255, 0, 0), 2)
             used_indices.add(idx)
@@ -377,6 +384,28 @@ class CameraTracker:
         put(f"Scorer (sim): {self.scorer} / Goal: {self.in_goal}")
         cv2.imshow("Tracking", frame)
         cv2.waitKey(1)
+        ball_u, ball_v = (ball_uv[0], ball_uv[1]) if ball_uv is not None else estimate_position(self.prev_ball_uv, ball_speed, ball_angle, dt)
+        p1_u, p1_v = (paddle_uvs[0][0], paddle_uvs[0][1]) if paddle_uvs[0] is not None else estimate_position(self.prev_paddle_uvs[0], paddle1_speed, paddle1_angle, dt)
+        p2_u, p2_v = (paddle_uvs[1][0], paddle_uvs[1][1]) if paddle_uvs[1] is not None else estimate_position(self.prev_paddle_uvs[1], paddle2_speed, paddle2_angle, dt)
+
+
+        self.latest_data = {
+            "timestamp": float(curr_time),
+            "ball": {
+                "u": float(ball_u) if ball_u is not None else None,
+                "v": float(ball_v) if ball_v is not None else None
+            },
+            "paddle1": {
+                "u": float(p1_u) if p1_u is not None else None,
+                "v": float(p1_v) if p1_v is not None else None
+            },
+            "paddle2": {
+                "u": float(p2_u) if p2_u is not None else None,
+                "v": float(p2_v) if p2_v is not None else None
+            }
+        }
+
+
         return True
 
     def release(self):
@@ -385,7 +414,7 @@ class CameraTracker:
         cv2.destroyAllWindows()
 
 def main():
-    video_source = "/home/mkbk/code/nus/proj/SWS-AIoT-Project/ai/f2.mp4"  # 或者替换为视频路径，例如 "sample.mp4"
+    video_source = "rtsp://172.22.116.251:8554/stream_in"# 或者替换为视频路径，例如 "sample.mp4"
     tracker = CameraTracker(video_source)
 
     try:
@@ -415,6 +444,7 @@ def main():
             # 处理当前帧
             if not tracker.process_frame():
                 break
+
     except KeyboardInterrupt:
         print("退出程序")
     finally:
