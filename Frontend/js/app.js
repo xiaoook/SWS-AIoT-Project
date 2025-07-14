@@ -17,13 +17,20 @@ class SmartCourtApp {
         this.currentGameId = null;
         this.gameCounter = 0;
         
-        this.init();
+        // 异步初始化
+        this.init().catch(error => {
+            console.error('Initialization failed:', error);
+        });
     }
     
-    init() {
+    async init() {
         this.setupEventListeners();
         this.setupTabNavigation();
         this.initializeComponents();
+        
+        // 确保页面刷新后得分重置为0
+        await this.forceResetScores();
+        
         this.initializeWebSocket();
         this.showMessage('System initialized, ready to start the game!', 'success');
     }
@@ -47,6 +54,19 @@ class SmartCourtApp {
         
         document.getElementById('checkConnection')?.addEventListener('click', () => {
             this.checkWebSocketConnection();
+        });
+        
+        // Game control buttons
+        document.getElementById('startGame')?.addEventListener('click', () => {
+            this.startGame();
+        });
+        
+        document.getElementById('pauseGame')?.addEventListener('click', () => {
+            this.pauseGame();
+        });
+        
+        document.getElementById('endGame')?.addEventListener('click', () => {
+            this.endGame();
         });
         
         // Global keyboard events
@@ -306,12 +326,9 @@ class SmartCourtApp {
     
     // Game state management
     async startGame() {
-        // Get player IDs from PlayerManager
-        const playerIds = window.playerManager ? window.playerManager.getCurrentPlayerIds() : null;
-        
-        // Check if players are selected
-        if (!playerIds || !playerIds.playerA || !playerIds.playerB) {
-            this.showMessage('Please select both players before starting the game', 'error');
+        // Check if players are confirmed
+        if (!window.arePlayersConfirmed || !window.arePlayersConfirmed()) {
+            this.showMessage('Please confirm players before starting the game', 'error');
             return;
         }
         
@@ -674,15 +691,43 @@ class SmartCourtApp {
     }
     
     updateScoreboard() {
+        const scoreA = this.gameState.scores.playerA;
+        const scoreB = this.gameState.scores.playerB;
+        
+        // 更新主得分板
         const scoreAElement = document.getElementById('scoreA');
         const scoreBElement = document.getElementById('scoreB');
         
         if (scoreAElement) {
-            scoreAElement.textContent = this.gameState.scores.playerA;
+            scoreAElement.textContent = scoreA;
         }
         if (scoreBElement) {
-            scoreBElement.textContent = this.gameState.scores.playerB;
+            scoreBElement.textContent = scoreB;
         }
+        
+        // 更新头部导航栏得分
+        const headerScoreA = document.getElementById('headerScoreA');
+        const headerScoreB = document.getElementById('headerScoreB');
+        
+        if (headerScoreA) {
+            headerScoreA.textContent = scoreA;
+        }
+        if (headerScoreB) {
+            headerScoreB.textContent = scoreB;
+        }
+        
+        // 更新移动端得分
+        const mobileScoreA = document.getElementById('mobileScoreA');
+        const mobileScoreB = document.getElementById('mobileScoreB');
+        
+        if (mobileScoreA) {
+            mobileScoreA.textContent = scoreA;
+        }
+        if (mobileScoreB) {
+            mobileScoreB.textContent = scoreB;
+        }
+        
+        console.log('Scoreboard updated:', { playerA: scoreA, playerB: scoreB });
     }
     
     addLiveFeedItem(message, type = 'info') {
@@ -727,6 +772,25 @@ class SmartCourtApp {
     }
     
     showMessage(message, type = 'info') {
+        // Check if a message with the same content already exists
+        const existingMessages = document.querySelectorAll('.message');
+        for (let existingMessage of existingMessages) {
+            if (existingMessage.textContent === message) {
+                return; // Don't show duplicate message
+            }
+        }
+        
+        // Clear existing messages of the same type to prevent stacking
+        const existingMessagesOfType = document.querySelectorAll(`.message.${type}`);
+        existingMessagesOfType.forEach(msg => {
+            msg.classList.add('fade-out');
+            setTimeout(() => {
+                if (msg.parentNode) {
+                    msg.remove();
+                }
+            }, 300);
+        });
+        
         // Create message element
         const messageElement = document.createElement('div');
         messageElement.className = `message ${type}`;
@@ -762,6 +826,96 @@ class SmartCourtApp {
     }
     
     // Reset game
+    // 强制重置所有得分显示为0（页面刷新后使用）
+    async forceResetScores() {
+        console.log('Force resetting all scores to 0...');
+        
+        // 设置重置时间戳，防止WebSocket立即覆盖
+        this.lastResetTime = Date.now();
+        
+        // 重置游戏状态
+        this.gameState.scores = { playerA: 0, playerB: 0 };
+        this.gameState.status = 'idle';
+        this.gameState.rounds = [];
+        this.gameState.currentRound = 0;
+        this.gameState.elapsedTime = 0;
+        
+        // 强制更新所有得分显示元素
+        const scoreElements = [
+            'scoreA', 'scoreB',
+            'headerScoreA', 'headerScoreB', 
+            'mobileScoreA', 'mobileScoreB'
+        ];
+        
+        scoreElements.forEach(elementId => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = '0';
+                console.log(`Reset ${elementId} to 0`);
+            }
+        });
+        
+        // 更新游戏状态显示
+        this.updateGameStatus();
+        this.updateTimer();
+        
+        // 清除任何可能保存的状态
+        this.clearPersistedState();
+        
+        // 调用全局得分同步函数确保一致性
+        if (window.updateScore) {
+            window.updateScore('A', 0);
+            window.updateScore('B', 0);
+        }
+        
+        // 重置后端得分状态（异步操作）
+        try {
+            await this.resetBackendScores();
+            console.log('Backend scores also reset');
+        } catch (error) {
+            console.error('Failed to reset backend scores:', error);
+        }
+        
+        console.log('All scores force reset to 0');
+    }
+    
+    // 清除可能保存的状态
+    clearPersistedState() {
+        // 清除可能的localStorage数据
+        try {
+            localStorage.removeItem('gameScores');
+            localStorage.removeItem('currentGame');
+            localStorage.removeItem('gameState');
+        } catch (e) {
+            console.log('No persisted state to clear');
+        }
+    }
+    
+    // 重置后端得分状态
+    async resetBackendScores() {
+        try {
+            const backendUrl = window.CONFIG?.BACKEND_URL || 'http://localhost:5000';
+            const response = await fetch(`${backendUrl}/reset/scores`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Backend scores reset:', result);
+                return true;
+            } else {
+                console.error('Failed to reset backend scores:', response.status);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error resetting backend scores:', error);
+            return false;
+        }
+    }
+
     resetGame() {
         this.stopTimer();
         this.gameState = {
@@ -856,6 +1010,12 @@ class SmartCourtApp {
     // 处理WebSocket比分更新
     handleWebSocketScoreUpdate(scoreData) {
         console.log('Handling score update:', scoreData);
+        
+        // 检查是否刚刚重置，避免在重置后立即被WebSocket覆盖
+        if (this.lastResetTime && (Date.now() - this.lastResetTime) < 3000) {
+            console.log('Ignoring WebSocket score update - recent reset detected (within 3 seconds)');
+            return;
+        }
         
         // 更新本地游戏状态
         this.gameState.scores = {
@@ -979,6 +1139,12 @@ class SmartCourtApp {
     
     // 模拟进球（用于测试）
     simulateGoalA() {
+        // 检查确认状态
+        if (!window.arePlayersConfirmed || !window.arePlayersConfirmed()) {
+            this.showMessage('Please confirm players first!', 'error');
+            return;
+        }
+        
         if (window.wsManager) {
             window.wsManager.simulateGoal('playerA');
         } else {
@@ -987,6 +1153,12 @@ class SmartCourtApp {
     }
     
     simulateGoalB() {
+        // 检查确认状态
+        if (!window.arePlayersConfirmed || !window.arePlayersConfirmed()) {
+            this.showMessage('Please confirm players first!', 'error');
+            return;
+        }
+        
         if (window.wsManager) {
             window.wsManager.simulateGoal('playerB');
         } else {

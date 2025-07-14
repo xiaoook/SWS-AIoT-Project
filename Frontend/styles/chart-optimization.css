@@ -1,0 +1,122 @@
+/* Chart Container Optimization */
+.chart-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    background: #ffffff;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.chart-container canvas {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+}
+
+/* Error Statistics Section Specific Styles */
+.error-statistics-section {
+    margin-bottom: 2rem;
+}
+
+.error-statistics-section .chart-container {
+    min-height: 300px;
+    padding: 1rem;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e9ecef;
+}
+
+/* No Data Display Enhancement */
+.chart-no-data {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 2rem;
+    text-align: center;
+    color: #6c757d;
+}
+
+.chart-no-data .no-data-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.6;
+}
+
+.chart-no-data .no-data-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.chart-no-data .no-data-subtitle {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Responsive Chart Improvements */
+@media (max-width: 768px) {
+    .chart-container {
+        min-height: 250px;
+        padding: 0.75rem;
+    }
+    
+    .error-statistics-section .chart-container {
+        min-height: 250px;
+        padding: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .chart-container {
+        min-height: 220px;
+        padding: 0.5rem;
+    }
+    
+    .error-statistics-section .chart-container {
+        min-height: 220px;
+        padding: 0.5rem;
+    }
+    
+    .chart-no-data .no-data-icon {
+        font-size: 2.5rem;
+    }
+    
+    .chart-no-data .no-data-title {
+        font-size: 1rem;
+    }
+    
+    .chart-no-data .no-data-subtitle {
+        font-size: 0.8rem;
+    }
+}
+
+/* Chart Legend Improvements */
+.chart-container .chartjs-legend {
+    padding-top: 1rem;
+}
+
+.chart-container .chartjs-legend ul {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.chart-container .chartjs-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    color: #495057;
+}
+
+/* Prevent text overflow */
+.chart-container * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+} 
