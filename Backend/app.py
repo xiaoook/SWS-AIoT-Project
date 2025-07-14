@@ -25,6 +25,22 @@ app.config['MQTT_TLS_ENABLED'] = False
 
 mqtt = Mqtt(app)
 
+def try_connect(retries=5, delay=2):
+    for _ in range(retries):
+        try:
+            mqtt.client.connect(BROKER_URL, BROKER_PORT, 60)
+            print("Connected to MQTT broker")
+            return True
+        except Exception as e:
+            print(f"Connect failed: {e}, retrying in {delay}s...")
+            time.sleep(delay)
+    return False
+
+if not try_connect():
+    print("Failed to connect MQTT broker after retries")
+else:
+    mqtt.client.loop_start()
+
 current_score = {
     'A': 0,
     'B': 0
@@ -138,7 +154,7 @@ def new_game():
     current_game = gid
     current_score = {'A': 0, 'B': 0}
     current_round = 0
-    mqtt.publish('game/control', 'start'.encode())
+    mqtt.publish('game/status', 'in progress'.encode(), retain=True)
 
     return jsonify({
         "status": "success",
@@ -241,6 +257,7 @@ def change_game_status():
         }), 400
 
     update_game(gid, current_score, status=status, duration=duration)
+    mqtt.publish('game/status', status.encode(), retain=True)
 
     # initialize game after ending
     if status == 'end':

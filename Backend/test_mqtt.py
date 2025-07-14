@@ -4,7 +4,7 @@ import json
 import random
 
 client = mqtt.Client()
-client.connect('127.0.0.1', 45677, 60)
+client.connect('127.0.0.1', 45679, 60)
 
 while True:
     data = {
