@@ -84,6 +84,22 @@ class ReportManager {
         const canvas = document.getElementById('errorChart');
         if (!canvas) return;
         
+        const container = canvas.parentElement;
+        
+        // Hide no data display if it exists
+        const noDataDiv = container.querySelector('.chart-no-data');
+        if (noDataDiv) {
+            noDataDiv.style.display = 'none';
+        }
+        
+        // Show canvas
+        canvas.style.display = 'block';
+        
+        // Set canvas dimensions to match container
+        const containerRect = container.getBoundingClientRect();
+        canvas.width = containerRect.width || 400;
+        canvas.height = containerRect.height || 300;
+        
         const ctx = canvas.getContext('2d');
         
         if (this.chart) {
@@ -110,7 +126,25 @@ class ReportManager {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'bottom'
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                size: 12
+                            },
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
                     }
                 }
             }
@@ -121,24 +155,51 @@ class ReportManager {
         const canvas = document.getElementById('errorChart');
         if (!canvas) return;
         
-        const ctx = canvas.getContext('2d');
+        const container = canvas.parentElement;
         
         if (this.chart) {
             this.chart.destroy();
         }
         
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#999';
-        ctx.font = '16px Arial';
-        ctx.textAlign = 'center';
-                    ctx.fillText('No Data Available', canvas.width / 2, canvas.height / 2);
+        // Hide canvas and show no data message
+        canvas.style.display = 'none';
+        
+        // Create or update no data display
+        let noDataDiv = container.querySelector('.chart-no-data');
+        if (!noDataDiv) {
+            noDataDiv = document.createElement('div');
+            noDataDiv.className = 'chart-no-data';
+            container.appendChild(noDataDiv);
+        }
+        
+        noDataDiv.innerHTML = `
+            <div class="no-data-icon">📊</div>
+            <div class="no-data-title">No Data Available</div>
+            <div class="no-data-subtitle">Complete a match to see error statistics</div>
+        `;
+        
+        noDataDiv.style.display = 'flex';
     }
     
     showNoErrorChart() {
         const canvas = document.getElementById('errorChart');
         if (!canvas) return;
+        
+        const container = canvas.parentElement;
+        
+        // Hide no data display if it exists
+        const noDataDiv = container.querySelector('.chart-no-data');
+        if (noDataDiv) {
+            noDataDiv.style.display = 'none';
+        }
+        
+        // Show canvas
+        canvas.style.display = 'block';
+        
+        // Set canvas dimensions to match container
+        const containerRect = container.getBoundingClientRect();
+        canvas.width = containerRect.width || 400;
+        canvas.height = containerRect.height || 300;
         
         const ctx = canvas.getContext('2d');
         
@@ -162,7 +223,20 @@ class ReportManager {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'bottom'
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                size: 14
+                            },
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'No errors detected!';
+                            }
+                        }
                     }
                 }
             }
@@ -232,10 +306,35 @@ class ReportManager {
     
     initializeChart() {
         const canvas = document.getElementById('errorChart');
-        if (canvas) {
-            canvas.width = 400;
-            canvas.height = 400;
-        }
+        if (!canvas) return;
+        
+        // Set up canvas dimensions responsively
+        const container = canvas.parentElement;
+        const resizeCanvas = () => {
+            const containerRect = container.getBoundingClientRect();
+            const containerStyles = window.getComputedStyle(container);
+            const paddingLeft = parseFloat(containerStyles.paddingLeft) || 0;
+            const paddingRight = parseFloat(containerStyles.paddingRight) || 0;
+            const paddingTop = parseFloat(containerStyles.paddingTop) || 0;
+            const paddingBottom = parseFloat(containerStyles.paddingBottom) || 0;
+            
+            // Calculate available space
+            const availableWidth = containerRect.width - paddingLeft - paddingRight;
+            const availableHeight = containerRect.height - paddingTop - paddingBottom;
+            
+            // Set canvas dimensions
+            canvas.width = Math.max(availableWidth, 300);
+            canvas.height = Math.max(availableHeight, 200);
+        };
+        
+        // Initial resize
+        resizeCanvas();
+        
+        // Add resize listener
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Initialize with no data chart
+        this.showNoDataChart();
     }
     
     clearReports() {
@@ -256,6 +355,23 @@ class ReportManager {
             `;
         }
         
+        // Clear error chart and any existing chart
+        if (this.chart) {
+            this.chart.destroy();
+            this.chart = null;
+        }
+        
+        // Clear any existing no data displays
+        const canvas = document.getElementById('errorChart');
+        if (canvas) {
+            const container = canvas.parentElement;
+            const noDataDiv = container.querySelector('.chart-no-data');
+            if (noDataDiv) {
+                noDataDiv.remove();
+            }
+        }
+        
+        // Show no data chart
         this.showNoDataChart();
         
         const suggestionsContainer = document.getElementById('aiSuggestions');

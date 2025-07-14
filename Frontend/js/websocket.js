@@ -2,11 +2,11 @@
 class WebSocketManager {
     constructor() {
         this.socket = null;
-        this.serverUrl = CONFIG.BACKEND_URL; // 使用配置的后端URL
+        this.serverUrl = CONFIG.BACKEND_URL; // Use configured backend URL
         this.isConnected = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
-        this.reconnectDelay = 3000; // 3秒重连延迟
+        this.reconnectDelay = 3000; // 3 second reconnect delay
         this.callbacks = {
             onScoreUpdate: null,
             onGameStatus: null,
@@ -15,13 +15,13 @@ class WebSocketManager {
             onPositionUpdate: null
         };
         
-        // 事件监听器存储
+        // Event listener storage
         this.eventListeners = {};
         
         this.init();
     }
     
-    // 添加事件监听器
+    // Add event listener
     on(event, callback) {
         if (!this.eventListeners[event]) {
             this.eventListeners[event] = [];
@@ -29,14 +29,14 @@ class WebSocketManager {
         this.eventListeners[event].push(callback);
     }
     
-    // 移除事件监听器
+    // Remove event listener
     off(event, callback) {
         if (this.eventListeners[event]) {
             this.eventListeners[event] = this.eventListeners[event].filter(cb => cb !== callback);
         }
     }
     
-    // 触发事件
+    // Trigger event
     emit(event, data) {
         if (this.eventListeners[event]) {
             this.eventListeners[event].forEach(callback => {
@@ -50,18 +50,18 @@ class WebSocketManager {
     }
     
     init() {
-        // 添加Socket.IO客户端库
+        // Add Socket.IO client library
         this.loadSocketIOClient();
     }
     
     loadSocketIOClient() {
-        // 检查是否已加载Socket.IO
+        // Check if Socket.IO is already loaded
         if (typeof io !== 'undefined') {
             this.connect();
             return;
         }
         
-        // 动态加载Socket.IO客户端 - 使用v4兼容版本
+        // Dynamically load Socket.IO client - Use v4 compatible version
         const script = document.createElement('script');
         script.src = 'https://cdn.socket.io/4.0.0/socket.io.min.js';
         script.onload = () => {
@@ -76,10 +76,10 @@ class WebSocketManager {
     }
     
     connect() {
-        // 直接尝试Socket.IO连接，避免CORS问题
+        // Try Socket.IO connection directly, avoid CORS issues
         try {
             console.log('Connecting to WebSocket server...');
-            // 使用兼容的Socket.IO v4配置
+            // Use compatible Socket.IO v4 configuration
             this.socket = io(this.serverUrl, {
                 transports: ['polling', 'websocket'],
                 upgrade: true,
@@ -100,20 +100,27 @@ class WebSocketManager {
         }
     }
     
-    // 删除了checkServerAvailable方法 - 避免CORS问题
-    // Socket.IO会自己处理连接检查
+            // Removed checkServerAvailable method - avoid CORS issues
+        // Socket.IO handles connection checking itself
     
     setupEventListeners() {
-        // 连接成功
+        // Connection successful
         this.socket.on('connect', () => {
             console.log('WebSocket connected successfully');
             this.isConnected = true;
             this.reconnectAttempts = 0;
             this.updateConnectionStatus('connected');
             this.emit('connect');
+            
+            // Sync score display once after successful connection
+            setTimeout(() => {
+                if (window.syncAllScores) {
+                    window.syncAllScores();
+                }
+            }, 1000);
         });
         
-        // 连接断开
+        // Connection disconnected
         this.socket.on('disconnect', () => {
             console.log('WebSocket disconnected');
             this.isConnected = false;
@@ -122,39 +129,39 @@ class WebSocketManager {
             this.attemptReconnect();
         });
         
-        // 接收实时比分更新 - 匹配后端格式
+        // Receive real-time score updates - Match backend format
         this.socket.on('score_update', (current_score) => {
             console.log('Score update received:', current_score);
             this.handleScoreUpdate(current_score);
         });
         
-        // 接收位置更新 - 来自MQTT
+        // Receive position updates - From MQTT
         this.socket.on('position_update', (position_data) => {
             console.log('Position update received:', position_data);
             this.handlePositionUpdate(position_data);
         });
         
-        // 连接错误
+        // Connection error
         this.socket.on('connect_error', (error) => {
             console.error('WebSocket connection error:', error);
             console.error('Error details:', error.message, error.description, error.context);
             this.handleConnectionError();
         });
         
-        // 重连失败
+        // Reconnection failed
         this.socket.on('reconnect_failed', () => {
             console.error('WebSocket reconnection failed');
             this.updateConnectionStatus('error');
             this.showConnectionError('Failed to reconnect to server');
         });
         
-        // 重连尝试
+        // Reconnection attempt
         this.socket.on('reconnect_attempt', (attemptNumber) => {
             console.log(`WebSocket reconnect attempt #${attemptNumber}`);
             this.updateConnectionStatus('connecting');
         });
         
-        // 详细的连接事件处理
+        // Detailed connection event handling
         this.socket.on('connect_error', (error) => {
             console.error('Connection error details:', error);
             this.addLiveFeedItem(`Connection failed: ${error.message || 'Unknown error'}`, 'error');
@@ -170,81 +177,155 @@ class WebSocketManager {
             this.addLiveFeedItem(`Socket error: ${error}`, 'error');
         });
         
-        // 服务器消息
+        // Server messages
         this.socket.on('message', (message) => {
             console.log('Server message:', message);
             this.showMessage(message, 'info');
         });
+
+        // Goal success feedback
+        this.socket.on('goal_success', (data) => {
+            console.log('Goal success:', data);
+            this.showMessage(`Goal scored by Team ${data.team}! Score: ${data.score.A} - ${data.score.B}`, 'success');
+            this.addLiveFeedItem(`🎉 Team ${data.team} scored! Current score: ${data.score.A} - ${data.score.B}`, 'success');
+        });
+
+        // Error messages
+        this.socket.on('error', (data) => {
+            console.error('Server error:', data);
+            this.showMessage(data.message || 'Unknown error', 'error');
+            this.addLiveFeedItem(`❌ Error: ${data.message || 'Unknown error'}`, 'error');
+        });
     }
     
-    // 处理比分更新 - 适配后端的 {A: 0, B: 0} 格式
+    // Handle score update - Adapt backend {A: 0, B: 0} format
     handleScoreUpdate(scoreData) {
-        // 后端发送的格式是 {A: 0, B: 0}，需要转换为前端格式
+        // Backend sends format {A: 0, B: 0}, need to convert to frontend format
         const convertedScore = {
             playerA: scoreData.A || 0,
             playerB: scoreData.B || 0
         };
         
-        // 更新UI中的比分显示
+        // Update score display in UI
         this.updateScoreDisplay(convertedScore);
         
-        // 调用回调函数
+        // Call callback function
         if (this.callbacks.onScoreUpdate) {
             this.callbacks.onScoreUpdate(convertedScore);
         }
         
-        // 不再显示通用的比分更新消息，只在进球时显示特定消息
+        // No longer show generic score update messages, only specific messages when scoring
         // const message = `Score Update: ${convertedScore.playerA} - ${convertedScore.playerB}`;
         // this.showMessage(message, 'score');
     }
     
-    // 处理位置更新 - 来自MQTT数据
+    // Handle position update - From MQTT data
     handlePositionUpdate(positionData) {
-        // 触发位置更新事件
+        // Trigger position update event
         this.emit('position_update', positionData);
         
-        // 调用位置更新回调（兼容旧API）
+        // Call position update callback (compatible with old API)
         if (this.callbacks.onPositionUpdate) {
             this.callbacks.onPositionUpdate(positionData);
         }
     }
     
-    // 更新比分显示
+    // Update score display
     updateScoreDisplay(scoreData) {
         const playerAScore = scoreData.playerA || 0;
         const playerBScore = scoreData.playerB || 0;
         
-        // 更新计分板
+        console.log('UpdateScoreDisplay called with:', {
+            original: scoreData,
+            converted: { playerA: playerAScore, playerB: playerBScore }
+        });
+        
+        // Update main scoreboard
         const scoreAElement = document.getElementById('scoreA');
         const scoreBElement = document.getElementById('scoreB');
         
         if (scoreAElement) {
             scoreAElement.textContent = playerAScore;
-            // 添加动画效果
+            console.log('Updated scoreA element to:', playerAScore);
+            // Add animation effect
             scoreAElement.classList.add('score-updated');
             setTimeout(() => scoreAElement.classList.remove('score-updated'), 500);
         }
         
         if (scoreBElement) {
             scoreBElement.textContent = playerBScore;
-            // 添加动画效果
+            console.log('Updated scoreB element to:', playerBScore);
+            // Add animation effect
             scoreBElement.classList.add('score-updated');
             setTimeout(() => scoreBElement.classList.remove('score-updated'), 500);
         }
+
+        // Update header navigation score display - Enhanced debugging
+        const headerScoreA = document.getElementById('headerScoreA');
+        const headerScoreB = document.getElementById('headerScoreB');
+        if (headerScoreA) {
+            headerScoreA.textContent = playerAScore;
+            console.log('Updated headerScoreA to:', playerAScore, 'Element found:', !!headerScoreA);
+        } else {
+            console.error('headerScoreA element not found!');
+        }
+        if (headerScoreB) {
+            headerScoreB.textContent = playerBScore;
+            console.log('Updated headerScoreB to:', playerBScore, 'Element found:', !!headerScoreB);
+        } else {
+            console.error('headerScoreB element not found!');
+        }
+
+        // Update mobile score display
+        const mobileScoreA = document.getElementById('mobileScoreA');
+        const mobileScoreB = document.getElementById('mobileScoreB');
+        if (mobileScoreA) {
+            mobileScoreA.textContent = playerAScore;
+            console.log('Updated mobileScoreA to:', playerAScore);
+        }
+        if (mobileScoreB) {
+            mobileScoreB.textContent = playerBScore;
+            console.log('Updated mobileScoreB to:', playerBScore);
+        }
         
-        // 更新应用状态
+        // Call global update function (if exists)
+        if (window.updateScoresFromWebSocket) {
+            window.updateScoresFromWebSocket({ playerA: playerAScore, playerB: playerBScore });
+        }
+        
+        // Update application state
         if (window.smartCourtApp && window.smartCourtApp.gameState) {
             window.smartCourtApp.gameState.scores = {
                 playerA: playerAScore,
                 playerB: playerBScore
             };
             
-            // 更新UI
+            // Update UI
             window.smartCourtApp.updateScoreboard();
         }
+        
+        // Final backup update mechanism - Force update all score elements directly
+        setTimeout(() => {
+            const allScoreElements = {
+                'scoreA': playerAScore,
+                'scoreB': playerBScore,
+                'headerScoreA': playerAScore,
+                'headerScoreB': playerBScore,
+                'mobileScoreA': playerAScore,
+                'mobileScoreB': playerBScore
+            };
+            
+            Object.entries(allScoreElements).forEach(([elementId, score]) => {
+                const element = document.getElementById(elementId);
+                if (element && element.textContent !== score.toString()) {
+                    element.textContent = score;
+                    console.log(`Backup update: ${elementId} set to ${score}`);
+                }
+            });
+        }, 100);
     }
     
-    // 连接状态更新
+    // Connection status update
     updateConnectionStatus(status) {
         const statusIndicator = document.getElementById('wsStatus');
         if (statusIndicator) {
@@ -256,11 +337,11 @@ class WebSocketManager {
             this.callbacks.onConnectionStatus(status);
         }
         
-        // 根据连接状态更新UI
+        // Update UI based on connection status
         this.updateUIConnectionState(status);
     }
     
-    // 更新UI连接状态
+    // Update UI connection status
     updateUIConnectionState(status) {
         const gameControls = document.querySelectorAll('.control-panel button');
         const isConnected = status === 'connected';
@@ -270,7 +351,7 @@ class WebSocketManager {
                 button.disabled = false;
                 button.classList.remove('disabled');
             } else {
-                // 只有在断开连接时禁用特定按钮
+                // Only disable specific buttons when disconnected
                 if (button.id === 'startGame') {
                     button.disabled = true;
                     button.classList.add('disabled');
@@ -279,14 +360,14 @@ class WebSocketManager {
         });
     }
     
-    // 处理连接错误
+    // Handle connection error
     handleConnectionError() {
         this.isConnected = false;
         this.updateConnectionStatus('error');
         this.attemptReconnect();
     }
     
-    // 尝试重新连接
+            // Try to reconnect
     attemptReconnect() {
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
@@ -301,12 +382,12 @@ class WebSocketManager {
         }
     }
     
-    // 显示连接错误
+    // Show connection error
     showConnectionError(message) {
         this.showMessage(`Connection Error: ${message}`, 'error');
     }
     
-    // 显示消息
+    // Show message
     showMessage(message, type = 'info') {
         if (window.smartCourtApp && window.smartCourtApp.showMessage) {
             window.smartCourtApp.showMessage(message, type);
@@ -315,60 +396,50 @@ class WebSocketManager {
         }
     }
     
-    // 添加实时feed项
+    // Add live feed item
     addLiveFeedItem(message, type = 'info') {
         if (window.smartCourtApp && window.smartCourtApp.addLiveFeedItem) {
             window.smartCourtApp.addLiveFeedItem(message, type);
         }
     }
     
-    // 发送进球到后端 - 避免CORS问题，使用本地分数管理
+    // Send goal to backend - Avoid CORS issues, use local score management
     simulateGoal(team) {
-        // 后端期望的是 'A' 或 'B' 而不是 'playerA' 或 'playerB'
+        // Check confirmation status (double protection)
+        if (!window.arePlayersConfirmed || !window.arePlayersConfirmed()) {
+            this.showMessage('Please confirm players first!', 'error');
+            this.addLiveFeedItem('❌ Players not confirmed - Cannot score', 'error');
+            return;
+        }
+        
+        // Backend expects 'A' or 'B' instead of 'playerA' or 'playerB'
         const backendTeam = team === 'playerA' ? 'A' : 'B';
         
-        // 直接在本地更新分数，避免CORS问题
-        const localScore = {
-            A: 0,
-            B: 0
-        };
-        
-        // 从当前显示的分数获取状态
-        const scoreAElement = document.getElementById('scoreA');
-        const scoreBElement = document.getElementById('scoreB');
-        
-        if (scoreAElement && scoreBElement) {
-            localScore.A = parseInt(scoreAElement.textContent) || 0;
-            localScore.B = parseInt(scoreBElement.textContent) || 0;
+        // Check WebSocket connection
+        if (!this.socket || !this.socket.connected) {
+            this.showMessage('WebSocket not connected. Cannot send goal event.', 'error');
+            this.addLiveFeedItem('❌ WebSocket disconnected - goal not recorded', 'error');
+            return;
         }
         
-        // 更新对应队伍的分数
-        localScore[backendTeam] += 1;
+        // Send goal event to backend via WebSocket
+        console.log(`Sending goal event to backend for team ${backendTeam}`);
+        this.socket.emit('goal', { team: backendTeam });
         
-        // 手动触发分数更新
-        this.handleScoreUpdate(localScore);
+        // Show sending message
+        this.addLiveFeedItem(`⚡ Sending goal for Team ${backendTeam}...`, 'info');
         
-        // 显示成功消息
-        this.showMessage(`Goal scored by ${team}! Score: ${localScore.A} - ${localScore.B}`, 'success');
-        
-        console.log(`Local score updated: Team ${backendTeam}, Score:`, localScore);
-        
-        // 如果WebSocket连接正常，尝试通知后端（可选）
-        if (this.socket && this.socket.connected) {
-            // 可以在这里发送WebSocket消息给后端，但不依赖它
-            this.socket.emit('goal', { team: backendTeam });
-            console.log(`Goal notification sent to backend for team ${backendTeam}`);
-        }
+        // Note: No longer update score locally, wait for backend score_update event
     }
     
-    // 设置回调函数
+    // Set callback function
     setCallback(event, callback) {
         if (this.callbacks.hasOwnProperty(event)) {
             this.callbacks[event] = callback;
         }
     }
     
-    // 断开连接
+    // Disconnect
     disconnect() {
         if (this.socket) {
             this.socket.disconnect();
@@ -377,7 +448,7 @@ class WebSocketManager {
         }
     }
     
-    // 获取连接状态
+    // Get connection status
     getConnectionStatus() {
         return {
             isConnected: this.isConnected,
@@ -387,11 +458,11 @@ class WebSocketManager {
     }
 }
 
-// 创建全局WebSocket管理器实例
+// Create global WebSocket manager instance
 window.wsManager = new WebSocketManager();
-window.websocketManager = window.wsManager; // 为冰球可视化模块提供别名
+window.websocketManager = window.wsManager; // Provide alias for hockey visualization module
 
-// 导出WebSocket管理器
+// Export WebSocket manager
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = WebSocketManager;
 } 

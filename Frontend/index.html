@@ -4,122 +4,1259 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Air_Hockey Assistant</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'apple-blue': '#007AFF',
+                        'apple-green': '#34C759',
+                        'apple-orange': '#FF9500',
+                        'apple-red': '#FF3B30',
+                        'apple-purple': '#AF52DE',
+                        'apple-gray': {
+                            50: '#F9FAFB',
+                            100: '#F3F4F6',
+                            200: '#E5E7EB',
+                            300: '#D1D5DB',
+                            400: '#9CA3AF',
+                            500: '#6B7280',
+                            600: '#4B5563',
+                            700: '#374151',
+                            800: '#1F2937',
+                            900: '#111827',
+                        }
+                    },
+                    fontFamily: {
+                        'system': ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Icons', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif']
+                    },
+                    backdropBlur: {
+                        'xs': '2px',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'bounce-gentle': 'bounceGentle 2s infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Original CSS (fallback) -->
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/responsive.css">
     <link rel="stylesheet" href="styles/hockey-visualization.css">
+    <link rel="stylesheet" href="styles/chart-optimization.css">
+    
+    <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Advanced UI Styles: Material Design + Apple HIG + Tailwind UI -->
+    <style>
+        /* Advanced Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes bounceGentle {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(180deg); }
+        }
+        @keyframes ripple {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(4); opacity: 0; }
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: 200px 0; }
+        }
+        
+        /* Glass Morphism (Apple HIG) */
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.95);
+            border-color: rgba(0, 122, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Material Design Ripple Effect */
+        .ripple-effect {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .ripple-effect::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s;
+        }
+        
+        .ripple-effect:active::after {
+            width: 300px;
+            height: 300px;
+        }
+        
+        /* Apple-style Button */
+        .apple-button {
+            position: relative;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+        
+        .apple-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .apple-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .apple-button:hover::before {
+            left: 100%;
+        }
+        
+        .apple-button:active {
+            transform: scale(0.98);
+        }
+        
+        /* Tooltip Styles */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            z-index: 9998;
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            text-align: center;
+            border-radius: 8px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 9999;
+            top: 100%;
+            left: 50%;
+            margin-left: -100px;
+            margin-top: 20px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .tooltip .tooltiptext::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: transparent transparent rgba(0, 0, 0, 0.9) transparent;
+            filter: drop-shadow(0 -2px 4px rgba(0, 0, 0, 0.1));
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+
+        
+        /* Card Hover Effects */
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 122, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007AFF, #5AC8FA);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        
+        /* Shimmer Loading Effect */
+        .shimmer {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200px 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        /* Status Indicator */
+        .status-indicator {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .status-indicator::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-indicator.online::before {
+            background: #34C759;
+        }
+        
+        .status-indicator.offline::before {
+            background: #FF3B30;
+        }
+        
+        .status-indicator.connecting::before {
+            background: #FF9500;
+        }
+        
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .modal-overlay.show .modal-content {
+            transform: scale(1) translateY(0);
+        }
+        
+        /* Notification Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 1001;
+            transform: translateX(400px);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast.success {
+            background: rgba(52, 199, 89, 0.9);
+        }
+        
+        .toast.error {
+            background: rgba(255, 59, 48, 0.9);
+        }
+        
+        .toast.warning {
+            background: rgba(255, 149, 0, 0.9);
+        }
+        
+        /* Scrollbar Customization */
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: rgba(0, 122, 255, 0.3);
+            border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 122, 255, 0.5);
+        }
+        
+        /* Mode Button Active State */
+        .mode-btn.active {
+            background: linear-gradient(135deg, white, #f8fafc) !important;
+            border-color: #e2e8f0 !important;
+        }
+        
+        .mode-btn.active:hover {
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
+        }
+        
+        .mode-btn.active .text-xl {
+            color: #1f2937 !important;
+        }
+        
+        .mode-btn.active .text-sm {
+            color: #4b5563 !important;
+        }
+
+        /* Advanced Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-10px);
+            }
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: -200px 0;
+            }
+            100% {
+                background-position: 200px 0;
+            }
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes gradient {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        /* Enhanced Glass Card */
+        .glass-card {
+            animation: fadeInUp 0.8s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.1),
+                transparent
+            );
+            transition: left 0.8s;
+        }
+
+        .glass-card:hover::before {
+            left: 100%;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Enhanced Button Animations */
+        .apple-button {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .apple-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+            transition: all 0.5s ease-out;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+        }
+
+        .apple-button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .apple-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .apple-button:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        /* Animated Icons */
+        .animated-icon {
+            display: inline-block;
+            transition: transform 0.3s ease;
+        }
+
+        .apple-button:hover .animated-icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        /* Loading Animation */
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: rotate 1s linear infinite;
+        }
+
+        /* Staggered Animation */
+        .staggered-animation {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .staggered-animation:nth-child(1) { animation-delay: 0.1s; }
+        .staggered-animation:nth-child(2) { animation-delay: 0.2s; }
+        .staggered-animation:nth-child(3) { animation-delay: 0.3s; }
+        .staggered-animation:nth-child(4) { animation-delay: 0.4s; }
+        .staggered-animation:nth-child(5) { animation-delay: 0.5s; }
+
+        /* Floating Elements */
+        .float-animation {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* Gradient Background Animation */
+        .animated-gradient {
+            background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+
+        /* Enhanced Tooltips */
+        .tooltip .tooltiptext {
+            animation: scaleIn 0.2s ease-out;
+            transform-origin: center bottom;
+        }
+
+        /* Card Hover Effects */
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-hover::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s;
+        }
+
+        .card-hover:hover::after {
+            transform: translateX(100%);
+        }
+
+        /* Navigation Animation */
+        .nav-btn {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1));
+            transition: width 0.3s ease;
+        }
+
+        .nav-btn:hover::before {
+            width: 100%;
+        }
+
+        /* Status Indicator Animation */
+        .status-indicator {
+            position: relative;
+        }
+
+        .status-indicator::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: inherit;
+            background: inherit;
+            animation: pulse 2s infinite;
+            opacity: 0.6;
+        }
+
+        /* Modal Animations */
+        .modal-overlay {
+            backdrop-filter: blur(10px);
+            animation: fadeInUp 0.3s ease-out;
+        }
+
+        .modal-overlay.show {
+            animation: fadeInUp 0.3s ease-out;
+        }
+
+        /* Enhanced Ripple Effect */
+        .enhanced-ripple {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .enhanced-ripple::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transform: translate(-50%, -50%);
+            transition: width 0.4s ease-out, height 0.4s ease-out;
+        }
+
+        .enhanced-ripple:active::after {
+            width: 200px;
+            height: 200px;
+        }
+
+        /* Page Transition */
+        .page-transition {
+            animation: slideInLeft 0.5s ease-out;
+        }
+
+        /* Smooth Scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Loading States */
+        .loading-shimmer {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200px 100%;
+            animation: shimmer 2s infinite;
+        }
+
+        /* Interactive Elements */
+        .interactive-glow:hover {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+            filter: brightness(1.1);
+        }
+
+        /* Micro-interactions */
+        .micro-bounce:hover {
+            animation: bounce 0.6s ease-in-out;
+        }
+
+        /* Typography Animation */
+        .typing-animation {
+            overflow: hidden;
+            white-space: nowrap;
+            animation: typing 2s steps(40, end), blink 1s infinite step-end;
+        }
+
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 100% }
+        }
+
+        @keyframes blink {
+            0%, 50% { border-color: transparent }
+            51%, 100% { border-color: #3b82f6 }
+        }
+
+        /* Ripple Styles */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            transform: scale(0);
+            animation: ripple-animation 0.6s linear;
+            pointer-events: none;
+        }
+
+        @keyframes ripple-animation {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        /* Advanced Hover Effects */
+        .glow-on-hover {
+            transition: all 0.3s ease;
+        }
+
+        .glow-on-hover:hover {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+            transform: scale(1.02);
+        }
+
+        /* Page Loading Animation */
+        .page-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s ease;
+        }
+
+        .page-loader.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .page-loader .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Floating Action Panel */
+        .floating-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .floating-main-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .floating-main-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        .floating-menu {
+            position: absolute;
+            bottom: 70px;
+            right: 0;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .floating-panel.open .floating-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .floating-action-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            color: #333;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+                 .floating-action-btn:hover {
+             transform: scale(1.1);
+             background: rgba(59, 130, 246, 0.9);
+             color: white;
+         }
+
+         .floating-action-btn:disabled,
+         .floating-action-btn[style*="opacity: 0.5"] {
+             pointer-events: none;
+             filter: grayscale(50%);
+         }
+
+         .floating-action-btn:disabled:hover,
+         .floating-action-btn[style*="opacity: 0.5"]:hover {
+             transform: none;
+             background: rgba(255, 255, 255, 0.95);
+             color: #333;
+         }
+
+        /* Mobile Score Bar */
+        .mobile-score-bar {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            right: 0;
+            z-index: 40;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 8px 16px;
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+
+                 .mobile-score-bar.show {
+             transform: translateY(0);
+         }
+
+         /* Quick Action Buttons */
+         .quick-action-btn {
+             transition: all 0.2s ease;
+             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+         }
+
+         .quick-action-btn:hover {
+             transform: translateY(-1px);
+             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+         }
+
+         .quick-action-btn:active {
+             transform: translateY(0);
+         }
+
+         .quick-action-btn:disabled {
+             pointer-events: none;
+             filter: grayscale(50%);
+         }
+
+         .quick-action-btn:disabled:hover {
+             transform: none;
+             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+         }
+
+         /* Score Update Animation */
+         .score-updated {
+             animation: scoreUpdate 0.5s ease-out;
+         }
+
+         @keyframes scoreUpdate {
+             0% {
+                 transform: scale(1);
+                 color: inherit;
+             }
+             50% {
+                 transform: scale(1.2);
+                 color: #10b981;
+                 text-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+             }
+             100% {
+                 transform: scale(1);
+                 color: inherit;
+             }
+         }
+    </style>
 </head>
-<body>
-    <div id="app">
-        <header class="header">
-            <div class="container">
-                <h1 class="logo">
-                    <span class="logo-icon">🏒</span>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-purple-50 font-system">
+    <div id="app" class="min-h-screen">
+        <header class="glass-morphism sticky top-0 z-50 border-b border-white/20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo -->
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-apple-blue rounded-full flex items-center justify-center animate-bounce-gentle float-animation">
+                            <span class="text-white text-xl">🥏</span>
+                        </div>
+                        <h1 class="text-xl font-bold text-apple-blue staggered-animation">
                     Air Hockey Assistant
                 </h1>
-                <nav class="nav">
-                    <button class="nav-btn" data-tab="game">Game Control</button>
-                    <button class="nav-btn" data-tab="history">Game History</button>
-                    <button class="nav-btn" data-tab="analysis">Game Analysis</button>
-                    <button class="nav-btn" data-tab="report">Match Report</button>
-                </nav>
-            </div>
-        </header>
-
-        <main class="main">
-            <!-- Game Control Panel -->
-            <section id="game-tab" class="tab-content active">
-                <div class="container">
-                    <!-- Player Setup Section -->
-                    <div class="player-setup">
-                        <h2>🏒 Game Setup</h2>
-                        <div class="players-config">
-                            <div class="player-config">
-                                <h3>Player A</h3>
-                                <div class="player-input-group">
-                                    <select id="playerASelect" class="player-select">
-                                        <option value="">-- Select Player A --</option>
-                                    </select>
-                                    <input type="text" id="playerACustom" class="player-input" placeholder="Enter custom player name" maxlength="30" style="display: none;">
-                                    <button id="savePlayerA" class="btn btn-small btn-secondary" style="display: none;">💾 Save to Database</button>
-                                </div>
+                    </div>
+                    
+                    <!-- Live Score in Header -->
+                    <div class="hidden md:flex items-center space-x-4 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20 cursor-pointer hover:bg-white/20 transition-all duration-200" onclick="scrollToLiveScore()" title="Click to view Live Score">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                <span class="text-white text-xs font-bold">A</span>
                             </div>
-                            <div class="vs-divider">
-                                <span>VS</span>
-                            </div>
-                            <div class="player-config">
-                                <h3>Player B</h3>
-                                <div class="player-input-group">
-                                    <select id="playerBSelect" class="player-select">
-                                        <option value="">-- Select Player B --</option>
-                                    </select>
-                                    <input type="text" id="playerBCustom" class="player-input" placeholder="Enter custom player name" maxlength="30" style="display: none;">
-                                    <button id="savePlayerB" class="btn btn-small btn-secondary" style="display: none;">💾 Save to Database</button>
-                                </div>
-                            </div>
+                            <span id="headerScoreA" class="text-apple-blue font-bold text-lg">0</span>
                         </div>
-                        <div class="setup-actions">
-                            <button id="confirmPlayers" class="btn btn-primary">✅ Confirm Players</button>
-                            <button id="refreshPlayers" class="btn btn-secondary">🔄 Refresh Players</button>
-                            <span id="playersStatus" class="players-status">Please select or enter player names</span>
+                        <div class="text-gray-400 text-sm">-</div>
+                        <div class="flex items-center space-x-2">
+                            <span id="headerScoreB" class="text-red-500 font-bold text-lg">0</span>
+                            <div class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                                <span class="text-white text-xs font-bold">B</span>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="game-control">
-                        <h2>Game Control Panel</h2>
-                        <div class="control-panel">
-                            <button id="startGame" class="btn btn-primary" disabled>Start Game</button>
-                            <button id="pauseGame" class="btn btn-secondary" disabled>Pause Game</button>
-                            <button id="endGame" class="btn btn-danger" disabled>End Game</button>
+                    <!-- Navigation -->
+                    <nav class="hidden md:flex space-x-2">
+                        <div class="tooltip">
+                            <button class="nav-btn apple-button ripple-effect enhanced-ripple interactive-glow px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 text-apple-blue bg-white/50 hover:bg-apple-blue hover:text-white border border-white/30" data-tab="game">
+                                <span class="flex items-center space-x-2">
+                                    <span class="animated-icon">🎮</span>
+                                    <span>Game Control</span>
+                                </span>
+                            </button>
+                            <span class="tooltiptext">Manage game state and controls</span>
+                        </div>
+                        <div class="tooltip">
+                            <button class="nav-btn apple-button ripple-effect px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 text-gray-600 hover:bg-apple-blue hover:text-white border border-white/30" data-tab="history">
+                                <span class="flex items-center space-x-2">
+                                    <span>📚</span>
+                                    <span>Game History</span>
+                                </span>
+                            </button>
+                            <span class="tooltiptext">View historical match records</span>
+                        </div>
+                        <div class="tooltip">
+                            <button class="nav-btn apple-button ripple-effect px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 text-gray-600 hover:bg-apple-blue hover:text-white border border-white/30" data-tab="analysis">
+                                <span class="flex items-center space-x-2">
+                                    <span>📊</span>
+                                    <span>Game Analysis</span>
+                                </span>
+                            </button>
+                            <span class="tooltiptext">Deep analysis of match data</span>
+                        </div>
+                        <div class="tooltip">
+                            <button class="nav-btn apple-button ripple-effect px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 text-gray-600 hover:bg-apple-blue hover:text-white border border-white/30" data-tab="report">
+                                <span class="flex items-center space-x-2">
+                                    <span>📋</span>
+                                    <span>Match Report</span>
+                                </span>
+                            </button>
+                            <span class="tooltiptext">Generate match reports</span>
+                        </div>
+                </nav>
+                    
+                    <!-- Mobile menu button -->
+                    <div class="md:hidden">
+                        <button type="button" class="apple-button bg-white/20 p-2 rounded-lg text-gray-600 hover:text-apple-blue">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6">
+            <!-- Game Control Panel -->
+            <section id="game-tab" class="tab-content active animate-fade-in page-transition">
+                <div class="max-w-7xl mx-auto space-y-6">
+                    <!-- Player Setup Section -->
+                    <div class="glass-card card-hover rounded-2xl p-6 md:p-8 shadow-xl">
+                        <div class="text-center mb-8">
+                            <h2 class="text-3xl font-bold text-apple-blue mb-2">🥏 Game Setup</h2>
+                            <p class="text-gray-600">Configure players to start your air hockey match</p>
+                            <div class="progress-bar mt-4">
+                                <div class="progress-fill" style="width: 0%" id="setupProgress"></div>
+                            </div>
                         </div>
                         
-                        <div class="websocket-controls">
-                            <h4>WebSocket Test Controls</h4>
-                            <div class="test-buttons">
-                                <button id="simulateGoalA" class="btn btn-export">Player A Goal</button>
-                                <button id="simulateGoalB" class="btn btn-export">Player B Goal</button>
-                                <button id="checkConnection" class="btn btn-secondary">Check Connection</button>
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+                            <!-- Player A -->
+                            <div class="player-config space-y-4">
+                                <div class="text-center">
+                                    <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg float-animation interactive-glow">
+                                        <span class="text-white text-2xl font-bold">A</span>
+                                    </div>
+                                    <h3 class="text-lg font-semibold text-gray-800">Player A</h3>
+                                </div>
+                                <div class="player-input-group space-y-3">
+                                    <select id="playerASelect" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-apple-blue/20 transition-all duration-200 bg-white/70 backdrop-blur-sm">
+                                        <option value="">-- Select Player A --</option>
+                                    </select>
+                                    <input type="text" id="playerACustom" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-apple-blue/20 transition-all duration-200 bg-white/70 backdrop-blur-sm" placeholder="Enter custom player name" maxlength="30" style="display: none;">
+                                    <button id="savePlayerA" class="w-full apple-button bg-apple-orange text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-orange-600" style="display: none;">💾 Save to Database</button>
+                                </div>
+                            </div>
+                            
+                            <!-- VS Divider -->
+                            <div class="flex justify-center">
+                                <div class="w-20 h-20 bg-gradient-to-br from-apple-blue to-blue-600 rounded-full flex items-center justify-center shadow-lg animate-pulse float-animation interactive-glow">
+                                    <span class="text-white font-bold text-lg">VS</span>
+                            </div>
+                            </div>
+                            
+                            <!-- Player B -->
+                            <div class="player-config space-y-4">
+                                <div class="text-center">
+                                    <div class="w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg float-animation interactive-glow">
+                                        <span class="text-white text-2xl font-bold">B</span>
+                                    </div>
+                                    <h3 class="text-lg font-semibold text-gray-800">Player B</h3>
+                                </div>
+                                <div class="player-input-group space-y-3">
+                                    <select id="playerBSelect" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-apple-blue/20 transition-all duration-200 bg-white/70 backdrop-blur-sm">
+                                        <option value="">-- Select Player B --</option>
+                                    </select>
+                                    <input type="text" id="playerBCustom" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-apple-blue/20 transition-all duration-200 bg-white/70 backdrop-blur-sm" placeholder="Enter custom player name" maxlength="30" style="display: none;">
+                                    <button id="savePlayerB" class="w-full apple-button bg-apple-orange text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-orange-600" style="display: none;">💾 Save to Database</button>
+                                </div>
                             </div>
                         </div>
                         
-                        <div class="game-status">
-                            <div class="status-indicator">
-                                <span class="status-label">Game Status:</span>
-                                <span id="gameStatus" class="status-value">Not Started</span>
+                        <!-- Setup Actions -->
+                        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8 pt-6 pb-12 border-t border-gray-200">
+                            <div class="tooltip">
+                                <button id="confirmPlayers" class="apple-button ripple-effect enhanced-ripple interactive-glow bg-apple-green text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-600 flex items-center space-x-2 min-w-[160px] justify-center">
+                                    <span class="animated-icon">✅</span>
+                                    <span>Confirm Players</span>
+                                </button>
+                                <span class="tooltiptext">Confirm selected players to start game</span>
                             </div>
-                            <div class="timer">
-                                <span class="timer-label">Game Time:</span>
-                                <span id="gameTimer" class="timer-value">00:00</span>
+                            <div class="tooltip">
+                                <button id="refreshPlayers" class="apple-button ripple-effect enhanced-ripple interactive-glow bg-gray-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-gray-600 flex items-center space-x-2 min-w-[160px] justify-center">
+                                    <span class="animated-icon">🔄</span>
+                                    <span>Refresh Players</span>
+                                </button>
+                                <span class="tooltiptext">Refresh player list</span>
                             </div>
-                            <div class="connection-status">
-                                <span class="connection-label">Server:</span>
-                                <span id="wsStatus" class="ws-status disconnected">Disconnected</span>
+                            <span id="playersStatus" class="text-sm text-gray-600 italic">Please select or enter player names</span>
+                            <div id="confirmationStatus" class="mt-2 text-center">
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                                    <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                    Players Not Confirmed
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+
+
+                    <!-- Game Control Panel -->
+                    <div class="glass-card rounded-2xl p-6 md:p-8 shadow-xl mt-6">
+                        <div class="text-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-2 staggered-animation">🎮 Game Control Panel</h2>
+                            <p class="text-gray-600">Manage your air hockey match</p>
+                        </div>
+                        
+                        <!-- Main Game Controls -->
+                        <div class="flex flex-wrap justify-center gap-4 mb-8">
+                            <div class="tooltip">
+                                <button id="startGame" class="apple-button ripple-effect enhanced-ripple interactive-glow micro-bounce bg-apple-green text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-green-600 flex items-center space-x-3 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                    <span class="text-2xl animated-icon">▶️</span>
+                                    <span>Start Game</span>
+                                </button>
+                                <span class="tooltiptext">Start a new air hockey match</span>
+                            </div>
+                            <div class="tooltip">
+                                <button id="pauseGame" class="apple-button ripple-effect enhanced-ripple interactive-glow micro-bounce bg-apple-orange text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-orange-600 flex items-center space-x-3 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                    <span class="text-2xl animated-icon">⏸️</span>
+                                    <span>Pause Game</span>
+                                </button>
+                                <span class="tooltiptext">Pause current match</span>
+                            </div>
+                            <div class="tooltip">
+                                <button id="endGame" class="apple-button ripple-effect enhanced-ripple interactive-glow micro-bounce bg-apple-red text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-red-600 flex items-center space-x-3 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                    <span class="text-2xl animated-icon">⏹️</span>
+                                    <span>End Game</span>
+                                </button>
+                                <span class="tooltiptext">End current match</span>
+                            </div>
+                        </div>
+                        
+                        <!-- WebSocket Test Controls -->
+                        <div class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 mb-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4 text-center">🔗 WebSocket Test Controls</h4>
+                            <div class="flex flex-wrap justify-center gap-3">
+                                <button id="simulateGoalA" class="apple-button bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 flex items-center space-x-2">
+                                    <span>🥅</span>
+                                    <span>Player A Goal</span>
+                                </button>
+                                <button id="simulateGoalB" class="apple-button bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 flex items-center space-x-2">
+                                    <span>🥅</span>
+                                    <span>Player B Goal</span>
+                                </button>
+                                <button id="checkConnection" class="apple-button bg-gray-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-600 flex items-center space-x-2">
+                                    <span>🔍</span>
+                                    <span>Check Connection</span>
+                                </button>
+
+                            </div>
+
+                            </div>
+                        
+                        <!-- Game Status Dashboard -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+                                <div class="text-center">
+                                    <div class="text-blue-600 font-medium text-sm mb-1">Game Status</div>
+                                    <div id="gameStatus" class="text-blue-800 font-bold text-lg">Not Started</div>
+                                </div>
+                            </div>
+                            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+                                <div class="text-center">
+                                    <div class="text-green-600 font-medium text-sm mb-1">Game Time</div>
+                                    <div id="gameTimer" class="text-green-800 font-bold text-lg font-mono">00:00</div>
+                                </div>
+                            </div>
+                            <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
+                                <div class="text-center">
+                                    <div class="text-purple-600 font-medium text-sm mb-1">Server Status</div>
+                                    <span id="wsStatus" class="status-indicator offline inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                                        <span class="w-2 h-2 bg-red-500 rounded-full mr-2 float-animation"></span>
+                                        Disconnected
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="scoreboard">
-                        <h3>Live Score</h3>
-                        <div class="score-display">
-                            <div class="player-score">
-                                <div class="player-name">Player A</div>
-                                <div class="score" id="scoreA">0</div>
+                                        <!-- Live Scoreboard -->
+                    <div class="glass-card card-hover rounded-2xl p-6 md:p-8 pb-8 md:pb-10 shadow-xl">
+                        <div class="text-center mb-8">
+                            <h3 class="text-2xl font-bold text-apple-blue mb-2">🏆 Live Score</h3>
+                            <p class="text-gray-600">Real-time match score</p>
+                        </div>
+                        
+                        <div class="flex items-center justify-center space-x-10 mb-4">
+                                                        <!-- Player A Score -->
+                            <div class="text-center tooltip py-2">
+                                <div class="w-20 h-20 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 float-animation interactive-glow">
+                                    <span class="text-white text-2xl font-bold">A</span>
+                                </div>
+                                <div class="text-gray-600 font-medium mb-2">Player A</div>
+                                <div id="scoreA" class="text-6xl font-black text-blue-600 font-mono transition-all duration-500 hover:scale-110">0</div>
+                                <span class="tooltiptext">Player A current score</span>
                             </div>
-                            <div class="vs">VS</div>
-                            <div class="player-score">
-                                <div class="player-name">Player B</div>
-                                <div class="score" id="scoreB">0</div>
+                            
+                                                        <!-- VS Indicator -->
+                            <div class="text-center py-2">
+                                <div class="w-16 h-16 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center shadow-lg animate-pulse float-animation interactive-glow">
+                                    <span class="text-white font-bold text-sm">VS</span>
+                                </div>
+                            </div>
+
+                            <!-- Player B Score -->
+                            <div class="text-center tooltip py-2">
+                                <div class="w-20 h-20 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 float-animation interactive-glow">
+                                    <span class="text-white text-2xl font-bold">B</span>
+                                </div>
+                                <div class="text-gray-600 font-medium mb-2">Player B</div>
+                                <div id="scoreB" class="text-6xl font-black text-red-600 font-mono transition-all duration-500 hover:scale-110">0</div>
+                                <span class="tooltiptext">Player B current score</span>
                             </div>
                         </div>
+                        
+                        <!-- Extra spacing for tooltips -->
+                        <div class="h-4"></div>
                     </div>
 
 
 
                     <!-- Real-time Game Visualization -->
                     <div class="game-visualization">
-                        <h3>🏒 Real-time Game View</h3>
+                        <h3>🥏 Real-time Game View</h3>
                         <div class="hockey-table-container">
                             <!-- Hockey Table Surface -->
                             <div id="hockeyTable" class="hockey-table">
@@ -227,14 +1364,21 @@
                         </div>
                     </div>
 
-                    <div class="live-feed">
-                        <h3>Live Match Feed</h3>
-                        <div id="liveFeed" class="feed-container">
-                            <div class="feed-item info">
-                                <div class="feed-item-icon">ℹ️</div>
-                                <div class="feed-item-content">
-                                    <div class="feed-item-time">--:--:--</div>
-                                    <div class="feed-item-message">Waiting for game to start...</div>
+                    <!-- Live Match Feed -->
+                    <div class="glass-card rounded-2xl p-6 md:p-8 shadow-xl">
+                        <div class="text-center mb-6">
+                            <h3 class="text-2xl font-bold text-apple-blue mb-2">📺 Live Match Feed</h3>
+                            <p class="text-gray-600">Real-time game events and updates</p>
+                                </div>
+                        
+                        <div id="liveFeed" class="space-y-3 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                            <div class="feed-item info bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 flex items-start space-x-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                                    <span class="text-white text-sm">ℹ️</span>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="text-xs text-blue-600 font-medium mb-1">--:--:--</div>
+                                    <div class="text-sm text-blue-800">Waiting for game to start...</div>
                                 </div>
                             </div>
                         </div>
@@ -243,61 +1387,113 @@
             </section>
 
             <!-- Game History -->
-            <section id="history-tab" class="tab-content">
-                <div class="container">
-                    <h2>🎮 Game History</h2>
-                    <div class="history-controls">
-                        <div class="history-toolbar">
-                            <div class="info-display">
-                                <span id="totalGames" class="info-item">Total Games: 0</span>
-                                <span id="completedGames" class="info-item">Completed: 0</span>
-                                <span id="activeGames" class="info-item">Active: 0</span>
+            <section id="history-tab" class="tab-content animate-fade-in page-transition">
+                <div class="max-w-7xl mx-auto space-y-6">
+                    <div class="glass-card card-hover rounded-2xl p-6 md:p-8 shadow-xl">
+                        <div class="text-center mb-8">
+                            <h2 class="text-3xl font-bold text-apple-blue mb-2 staggered-animation">📚 Game History</h2>
+                            <p class="text-gray-600">View and manage your match history</p>
                             </div>
-                            <div class="action-controls">
-                                <button id="refreshHistory" class="btn btn-secondary">🔄 Refresh</button>
-                                <button id="clearHistory" class="btn btn-danger">🗑️ Clear All</button>
+                        
+                        <!-- History Stats -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                            <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200 staggered-animation interactive-glow">
+                                <div class="text-center">
+                                    <div class="text-blue-600 font-medium text-sm mb-1">Total Games</div>
+                                    <div id="totalGames" class="text-blue-800 font-bold text-2xl">0</div>
+                                </div>
+                            </div>
+                            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200 staggered-animation interactive-glow">
+                                <div class="text-center">
+                                    <div class="text-green-600 font-medium text-sm mb-1">Completed</div>
+                                    <div id="completedGames" class="text-green-800 font-bold text-2xl">0</div>
+                                </div>
+                            </div>
+                            <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200 staggered-animation interactive-glow">
+                                <div class="text-center">
+                                    <div class="text-orange-600 font-medium text-sm mb-1">Active</div>
+                                    <div id="activeGames" class="text-orange-800 font-bold text-2xl">0</div>
                             </div>
                         </div>
                     </div>
                     
+                        <!-- Action Controls -->
+                        <div class="flex flex-wrap justify-center gap-4 mb-8">
+                            <button id="refreshHistory" class="apple-button enhanced-ripple interactive-glow bg-apple-green text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-600 flex items-center space-x-2">
+                                <span class="animated-icon">🔄</span>
+                                <span>Refresh</span>
+                            </button>
+                            <button id="clearHistory" class="apple-button enhanced-ripple interactive-glow bg-apple-red text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-600 flex items-center space-x-2">
+                                <span class="animated-icon">🗑️</span>
+                                <span>Clear All</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Games Grid -->
                     <div class="games-container">
-                        <div id="gamesGrid" class="games-grid">
-                            <div class="no-games">No games found. Start a new game to see history.</div>
+                            <div id="gamesGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div class="no-games col-span-full text-center py-16">
+                                    <div class="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                                        <span class="text-gray-400 text-3xl">🥏</span>
+                                    </div>
+                                    <h3 class="text-gray-700 text-xl font-semibold mb-2">No games found</h3>
+                                    <p class="text-gray-500 text-base mb-4">Start a new game to see history</p>
+                                    <div class="inline-flex items-center px-4 py-2 bg-apple-blue text-white rounded-lg text-sm font-medium">
+                                        <span class="mr-2">🎮</span>
+                                        <span>Go to Game Control</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- Game Analysis -->
-            <section id="analysis-tab" class="tab-content">
-                <div class="container">
-                    <h2>Game Analysis Dashboard</h2>
-                    <div class="analysis-controls">
-                        <div class="analysis-toolbar">
-                            <!-- Simplified to 3 core analysis modes -->
-                            <div class="analysis-modes">
-                                <button class="mode-btn active" data-mode="rounds">
-                                    <span class="mode-icon">📊</span>
-                                    <span class="mode-text">Round Analysis</span>
-                                    <span class="mode-desc">Round-by-round timeline view</span>
-                                </button>
-                                <button class="mode-btn" data-mode="detailed">
-                                    <span class="mode-icon">🎯</span>
-                                    <span class="mode-text">Detailed Analysis</span>
-                                    <span class="mode-desc">In-depth technical analysis</span>
-                                </button>
-                                <button class="mode-btn" data-mode="comparison">
-                                    <span class="mode-icon">⚖️</span>
-                                    <span class="mode-text">Player Comparison</span>
-                                    <span class="mode-desc">A vs B performance comparison</span>
-                                </button>
-                            </div>
+            <section id="analysis-tab" class="tab-content animate-fade-in page-transition">
+                <div class="max-w-7xl mx-auto space-y-6">
+                    <div class="glass-card rounded-2xl p-6 md:p-8 shadow-xl">
+                        <div class="text-center mb-8">
+                            <h2 class="text-3xl font-bold text-apple-blue mb-2 staggered-animation">📊 Game Analysis Dashboard</h2>
+                            <p class="text-gray-600">Deep insights into your match performance</p>
                         </div>
+                        
+                        <!-- Analysis Mode Selection -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                            <button class="mode-btn active apple-button enhanced-ripple interactive-glow bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-6 text-left hover:from-gray-50 hover:to-gray-100 transition-all duration-200 shadow-lg staggered-animation" data-mode="rounds">
+                                <div class="flex items-center space-x-3 mb-3">
+                                    <span class="text-3xl animated-icon">📊</span>
+                                    <span class="text-xl font-bold text-gray-800">Round Analysis</span>
+                                </div>
+                                <p class="text-gray-600 text-sm font-medium">Round-by-round timeline view</p>
+                                </button>
+                            <button class="mode-btn apple-button enhanced-ripple interactive-glow bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-6 text-left hover:from-gray-50 hover:to-gray-100 transition-all duration-200 shadow-lg staggered-animation" data-mode="detailed">
+                                <div class="flex items-center space-x-3 mb-3">
+                                    <span class="text-3xl animated-icon">🎯</span>
+                                    <span class="text-xl font-bold text-gray-800">Detailed Analysis</span>
+                                </div>
+                                <p class="text-gray-600 text-sm font-medium">In-depth technical analysis</p>
+                                </button>
+                            <button class="mode-btn apple-button enhanced-ripple interactive-glow bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-6 text-left hover:from-gray-50 hover:to-gray-100 transition-all duration-200 shadow-lg staggered-animation" data-mode="comparison">
+                                <div class="flex items-center space-x-3 mb-3">
+                                    <span class="text-3xl animated-icon">⚖️</span>
+                                    <span class="text-xl font-bold text-gray-800">Player Comparison</span>
+                                </div>
+                                <p class="text-gray-600 text-sm font-medium">A vs B performance comparison</p>
+                                </button>
                     </div>
                     
+                        <!-- Analysis Container -->
                     <div class="analysis-container">
                         <div id="pointBreakdown" class="point-breakdown">
-                            <div class="no-data">No match data available</div>
+                                <div class="no-data text-center py-16">
+                                    <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <span class="text-gray-400 text-3xl">📈</span>
+                                    </div>
+                                    <p class="text-gray-600 text-xl mb-2">No match data available</p>
+                                    <p class="text-gray-400 text-sm">Start a game to see analysis</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -306,44 +1502,77 @@
 
 
             <!-- Match Report -->
-            <section id="report-tab" class="tab-content">
-                <div class="container">
-                    <h2>Match Summary Report</h2>
-                    <div class="report-container">
-                        <div class="report-header">
-                            <h3>Match Overview</h3>
-                            <div class="export-controls">
-                                <button id="exportPDF" class="btn btn-export">Export PDF</button>
-                                <button id="exportExcel" class="btn btn-export">Export Excel</button>
+            <section id="report-tab" class="tab-content animate-fade-in page-transition">
+                <div class="max-w-7xl mx-auto space-y-6">
+                    <div class="glass-card rounded-2xl p-6 md:p-8 shadow-xl">
+                        <div class="text-center mb-8">
+                            <h2 class="text-3xl font-bold text-apple-blue mb-2 staggered-animation">📋 Match Summary Report</h2>
+                            <p class="text-gray-600">Comprehensive match analysis and insights</p>
+                        </div>
+                        
+                        <!-- Report Header -->
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
+                            <h3 class="text-xl font-bold text-gray-800">Match Overview</h3>
+                            <div class="flex gap-3">
+                                <button id="exportPDF" class="apple-button bg-apple-red text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 flex items-center space-x-2">
+                                    <span>📄</span>
+                                    <span>Export PDF</span>
+                                </button>
+                                <button id="exportExcel" class="apple-button bg-apple-green text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 flex items-center space-x-2">
+                                    <span>📊</span>
+                                    <span>Export Excel</span>
+                                </button>
                             </div>
                         </div>
 
-                        <div class="report-content">
-                            <div class="report-section">
-                                <h4>Final Score</h4>
-                                <div id="finalScore" class="final-score">
-                                    <div class="score-item">
-                                        <span class="player">Player A:</span>
-                                        <span class="score">0</span>
+                        <!-- Report Content -->
+                        <div class="space-y-6">
+                            <!-- Final Score Section -->
+                            <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+                                <h4 class="text-lg font-bold text-blue-800 mb-4 flex items-center">
+                                    <span class="mr-2">🏆</span>
+                                    Final Score
+                                </h4>
+                                <div id="finalScore" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="score-item bg-white rounded-lg p-4 shadow-sm">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-semibold text-gray-700">Player A:</span>
+                                            <span class="text-2xl font-bold text-blue-600">0</span>
                                     </div>
-                                    <div class="score-item">
-                                        <span class="player">Player B:</span>
-                                        <span class="score">0</span>
+                                    </div>
+                                    <div class="score-item bg-white rounded-lg p-4 shadow-sm">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-semibold text-gray-700">Player B:</span>
+                                            <span class="text-2xl font-bold text-red-600">0</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="report-section">
-                                <h4>Error Statistics</h4>
+                            <!-- Error Statistics Section -->
+                            <div class="error-statistics-section bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+                                <h4 class="text-lg font-bold text-green-800 mb-4 flex items-center">
+                                    <span class="mr-2">📈</span>
+                                    Error Statistics
+                                </h4>
                                 <div class="chart-container">
                                     <canvas id="errorChart"></canvas>
                                 </div>
                             </div>
 
-                            <div class="report-section">
-                                <h4>AI Improvement Suggestions</h4>
+                            <!-- AI Suggestions Section -->
+                            <div class="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
+                                <h4 class="text-lg font-bold text-purple-800 mb-4 flex items-center">
+                                    <span class="mr-2">🤖</span>
+                                    AI Improvement Suggestions
+                                </h4>
                                 <div id="aiSuggestions" class="ai-suggestions">
-                                    <div class="suggestion-item">Complete a match to see AI analysis suggestions</div>
+                                    <div class="suggestion-item bg-white rounded-lg p-4 shadow-sm text-center">
+                                        <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <span class="text-purple-600 text-xl">🎯</span>
+                                        </div>
+                                        <p class="text-gray-600">Complete a match to see AI analysis suggestions</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -352,12 +1581,121 @@
             </section>
         </main>
 
-        <footer class="footer">
-            <div class="container">
-                <p>&copy; 2024 Air_Hockey Assistant. Smart Air Hockey Training System.</p>
-                <p id="playerManagerVersion" class="version-info">PlayerManager: Loading...</p>
+        <!-- Footer -->
+        <footer class="glass-morphism mt-12 border-t border-white/20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="text-center space-y-4">
+                    <div class="flex items-center justify-center space-x-2">
+                        <div class="w-8 h-8 bg-apple-blue rounded-full flex items-center justify-center float-animation">
+                            <span class="text-white text-lg">🥏</span>
+                        </div>
+                        <span class="text-xl font-bold text-apple-blue staggered-animation">Air Hockey Assistant</span>
+                    </div>
+                    <p class="text-gray-600 staggered-animation">&copy; 2024 Air Hockey Assistant. Smart Air Hockey Training System.</p>
+                    <p id="playerManagerVersion" class="text-sm text-gray-500 staggered-animation">PlayerManager: Loading...</p>
+                    <div class="flex justify-center space-x-6 text-sm text-gray-500 staggered-animation">
+                        <span class="interactive-glow">Powered by Tailwind CSS</span>
+                        <span>•</span>
+                        <span class="interactive-glow">Apple Design Inspired</span>
+                        <span>•</span>
+                        <span class="interactive-glow">Glass Morphism</span>
+                    </div>
+                </div>
             </div>
         </footer>
+        </div>
+    
+
+    
+    <!-- Notification Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    
+    <!-- Floating Quick Control Panel -->
+    <div id="floatingPanel" class="floating-panel">
+        <div class="floating-menu">
+            <button class="floating-action-btn" data-action="start-game" title="Start Game">
+                <span>▶️</span>
+            </button>
+            <button class="floating-action-btn" data-action="pause-game" title="Pause Game">
+                <span>⏸️</span>
+            </button>
+            <button class="floating-action-btn" data-action="end-game" title="End Game">
+                <span>⏹️</span>
+            </button>
+            <button class="floating-action-btn" data-action="score-a" title="Player A Goal">
+                <span style="color: #3b82f6; font-weight: bold; font-size: 16px;">A+</span>
+            </button>
+            <button class="floating-action-btn" data-action="score-b" title="Player B Goal">
+                <span style="color: #ef4444; font-weight: bold; font-size: 16px;">B+</span>
+            </button>
+        </div>
+        <button class="floating-main-btn" id="floatingToggle">
+            <span>⚡</span>
+        </button>
+    </div>
+
+    <!-- Mobile Score Bar -->
+    <div id="mobileScoreBar" class="mobile-score-bar md:hidden cursor-pointer hover:bg-white" onclick="scrollToLiveScore()">
+        <div class="flex items-center justify-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span class="text-white text-xs font-bold">A</span>
+                </div>
+                <span id="mobileScoreA" class="text-blue-600 font-bold">0</span>
+            </div>
+            <div class="text-gray-400 text-sm">-</div>
+            <div class="flex items-center space-x-2">
+                <span id="mobileScoreB" class="text-red-500 font-bold">0</span>
+                <div class="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                    <span class="text-white text-xs font-bold">B</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 backdrop-filter backdrop-blur-sm z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-2xl p-8 flex flex-col items-center space-y-4">
+            <div class="w-12 h-12 border-4 border-apple-blue border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-gray-700 font-medium">Loading...</p>
+        </div>
+    </div>
+    
+    <!-- Mobile Menu Overlay -->
+    <div id="mobileMenuOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden">
+        <div class="fixed inset-y-0 left-0 max-w-xs w-full bg-white shadow-xl z-50 transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobileMenu">
+            <div class="flex items-center justify-between p-4 border-b">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-apple-blue rounded-full flex items-center justify-center">
+                        <span class="text-white text-lg">🥏</span>
+                    </div>
+                    <span class="text-lg font-bold text-apple-blue">Air Hockey</span>
+                </div>
+                <button id="closeMobileMenu" class="p-2 rounded-lg hover:bg-gray-100">
+                    <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav class="p-4 space-y-2">
+                <button class="nav-btn w-full text-left p-3 rounded-lg hover:bg-gray-100 flex items-center space-x-3 text-apple-blue font-medium" data-tab="game">
+                    <span>🎮</span>
+                    <span>Game Control</span>
+                </button>
+                <button class="nav-btn w-full text-left p-3 rounded-lg hover:bg-gray-100 flex items-center space-x-3 text-gray-600 font-medium" data-tab="history">
+                    <span>📚</span>
+                    <span>Game History</span>
+                </button>
+                <button class="nav-btn w-full text-left p-3 rounded-lg hover:bg-gray-100 flex items-center space-x-3 text-gray-600 font-medium" data-tab="analysis">
+                    <span>📊</span>
+                    <span>Game Analysis</span>
+                </button>
+                <button class="nav-btn w-full text-left p-3 rounded-lg hover:bg-gray-100 flex items-center space-x-3 text-gray-600 font-medium" data-tab="report">
+                    <span>📋</span>
+                    <span>Match Report</span>
+                </button>
+            </nav>
+        </div>
     </div>
 
     <script src="js/config.js"></script>
@@ -368,8 +1706,724 @@
     <script src="js/gameControl.js"></script>
     <script src="js/gameHistory.js"></script>
     <script src="js/analysis.js"></script>
-
     <script src="js/report.js"></script>
     <script src="js/export.js"></script>
+    
+    <!-- Advanced UI Interactions Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mobile Menu Functionality
+            const mobileMenuBtn = document.querySelector('.md\\:hidden button');
+            const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
+            const mobileMenu = document.getElementById('mobileMenu');
+            const closeMobileMenu = document.getElementById('closeMobileMenu');
+            
+            function openMobileMenu() {
+                mobileMenuOverlay.classList.remove('hidden');
+                setTimeout(() => {
+                    mobileMenu.classList.remove('-translate-x-full');
+                }, 10);
+            }
+            
+            function closeMobileMenuHandler() {
+                mobileMenu.classList.add('-translate-x-full');
+                setTimeout(() => {
+                    mobileMenuOverlay.classList.add('hidden');
+                }, 300);
+            }
+            
+            mobileMenuBtn.addEventListener('click', openMobileMenu);
+            closeMobileMenu.addEventListener('click', closeMobileMenuHandler);
+            mobileMenuOverlay.addEventListener('click', function(e) {
+                if (e.target === mobileMenuOverlay) {
+                    closeMobileMenuHandler();
+                }
+            });
+            
+            // Close mobile menu when nav item is clicked
+            document.querySelectorAll('#mobileMenu .nav-btn').forEach(btn => {
+                btn.addEventListener('click', closeMobileMenuHandler);
+            });
+            
+            // Progress Bar Animation
+            function updateSetupProgress() {
+                const playerA = document.getElementById('playerASelect').value;
+                const playerB = document.getElementById('playerBSelect').value;
+                const progress = document.getElementById('setupProgress');
+                
+                let percentage = 0;
+                if (playerA && playerB) {
+                    percentage = 100;
+                } else if (playerA || playerB) {
+                    percentage = 50;
+                }
+                
+                progress.style.width = percentage + '%';
+            }
+            
+            // Monitor player selection changes
+            document.getElementById('playerASelect').addEventListener('change', updateSetupProgress);
+            document.getElementById('playerBSelect').addEventListener('change', updateSetupProgress);
+        });
+        
+
+        
+                 // Clear all toast messages
+         function clearAllToasts() {
+             const container = document.getElementById('toastContainer');
+             const toasts = container.querySelectorAll('.toast');
+             toasts.forEach(toast => {
+                 toast.classList.remove('show');
+                 setTimeout(() => {
+                     if (toast.parentNode) {
+                         container.removeChild(toast);
+                     }
+                 }, 300);
+             });
+         }
+         
+
+        
+        // Toast Notification System - Enhanced to prevent duplicates
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toastContainer');
+            
+            // Check if a message with the same content already exists
+            const existingToasts = container.querySelectorAll('.toast');
+            for (let existingToast of existingToasts) {
+                if (existingToast.textContent === message) {
+                    return; // Don't show duplicate message
+                }
+            }
+            
+            // Clear existing messages of the same type to prevent stacking
+            const existingMessagesOfType = container.querySelectorAll(`.toast.${type}`);
+            existingMessagesOfType.forEach(toast => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        container.removeChild(toast);
+                    }
+                }, 300);
+            });
+            
+            // Create new toast
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            container.appendChild(toast);
+            
+            // Show toast with animation
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            // Hide and remove toast
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        container.removeChild(toast);
+                    }
+                }, 300);
+            }, duration);
+        }
+        
+        // Loading Overlay Functions
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
+        
+        // Enhanced Score Update with Animation
+        function updateScore(player, score) {
+            const scoreElement = document.getElementById(`score${player}`);
+            const oldScore = parseInt(scoreElement.textContent);
+            
+            if (score > oldScore) {
+                // Score increased - add celebration effect
+                scoreElement.classList.add('animate-pulse');
+                scoreElement.style.transform = 'scale(1.2)';
+                scoreElement.style.color = player === 'A' ? '#22c55e' : '#ef4444';
+                
+                // Show celebration toast
+                showToast(`Player ${player} scores!`, 'success');
+                
+                setTimeout(() => {
+                    scoreElement.classList.remove('animate-pulse');
+                    scoreElement.style.transform = 'scale(1)';
+                    scoreElement.style.color = player === 'A' ? '#2563eb' : '#dc2626';
+                }, 1000);
+            }
+            
+            scoreElement.textContent = score;
+        }
+        
+        // Enhanced WebSocket Status Updates
+        function updateWebSocketStatus(status) {
+            const statusElement = document.getElementById('wsStatus');
+            statusElement.className = `status-indicator ${status} inline-flex items-center px-3 py-1 rounded-full text-sm font-medium`;
+            
+            switch(status) {
+                case 'online':
+                    statusElement.className += ' bg-green-100 text-green-800';
+                    statusElement.innerHTML = '<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>Connected';
+                    showToast('WebSocket connected successfully', 'success');
+                    break;
+                case 'offline':
+                    statusElement.className += ' bg-red-100 text-red-800';
+                    statusElement.innerHTML = '<span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>Disconnected';
+                    showToast('WebSocket disconnected', 'error');
+                    break;
+                case 'connecting':
+                    statusElement.className += ' bg-yellow-100 text-yellow-800';
+                    statusElement.innerHTML = '<span class="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>Connecting';
+                    showToast('Connecting to WebSocket...', 'warning');
+                    break;
+            }
+        }
+        
+        // Close modals when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal-overlay')) {
+                e.target.classList.remove('show');
+            }
+        });
+        
+        // Welcome message on page load
+        setTimeout(() => {
+            showToast('Welcome to Air Hockey Assistant!', 'success');
+        }, 1000);
+
+                 // Add dynamic effects to page elements
+         document.addEventListener('DOMContentLoaded', function() {
+             // Initialize button states on page load
+             updateMainGoalButtonsState();
+             updateFloatingButtonsState();
+             updateQuickActionButtonsState();
+             updateConfirmationStatusUI();
+             
+                          // Initialize header scores
+             initializeHeaderScores();
+             
+             // Set up periodic score sync to ensure header stays updated
+             setInterval(syncAllScores, 5000); // Sync every 5 seconds
+             
+             // Add hover effect to cards
+            const cards = document.querySelectorAll('.glass-card');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-5px)';
+                    this.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.1)';
+                });
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                    this.style.boxShadow = '';
+                });
+            });
+
+            // Add ripple effect to buttons
+            const buttons = document.querySelectorAll('.enhanced-ripple');
+            buttons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    const rect = this.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    const ripple = document.createElement('span');
+                    ripple.style.left = x + 'px';
+                    ripple.style.top = y + 'px';
+                    ripple.className = 'ripple';
+                    
+                    this.appendChild(ripple);
+                    
+                    setTimeout(() => {
+                        ripple.remove();
+                    }, 600);
+                });
+            });
+
+            // Add floating animation to icons
+            const icons = document.querySelectorAll('.animated-icon');
+            icons.forEach(icon => {
+                icon.addEventListener('mouseenter', function() {
+                    this.style.transform = 'scale(1.2) rotate(10deg)';
+                });
+                icon.addEventListener('mouseleave', function() {
+                    this.style.transform = 'scale(1) rotate(0deg)';
+                });
+            });
+
+            // Add loading shimmer effect
+            const loadingElements = document.querySelectorAll('.loading-shimmer');
+            loadingElements.forEach(element => {
+                element.style.background = 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)';
+                element.style.backgroundSize = '200px 100%';
+                element.style.animation = 'shimmer 2s infinite';
+            });
+
+                         // Add staggered animation to elements
+             const staggeredElements = document.querySelectorAll('.staggered-animation');
+             staggeredElements.forEach((element, index) => {
+                 element.style.animationDelay = (index * 0.1) + 's';
+             });
+
+             // Initialize floating panel and score sync
+             initFloatingPanel();
+             initScoreSync();
+             initPlayerConfirmation();
+             
+             // 初始化时更新按钮状态
+             updateFloatingButtonsState();
+             updateQuickActionButtonsState();
+             updateConfirmationStatusUI();
+         });
+
+         // Floating Panel Management
+         function initFloatingPanel() {
+             const floatingPanel = document.getElementById('floatingPanel');
+             const toggleBtn = document.getElementById('floatingToggle');
+             
+             toggleBtn.addEventListener('click', function(e) {
+                 e.stopPropagation();
+                 floatingPanel.classList.toggle('open');
+                 const isOpen = floatingPanel.classList.contains('open');
+                 toggleBtn.innerHTML = isOpen ? '<span>❌</span>' : '<span>⚡</span>';
+             });
+
+             // Handle floating action buttons
+             document.querySelectorAll('.floating-action-btn').forEach(btn => {
+                 btn.addEventListener('click', function(e) {
+                     e.stopPropagation();
+                     const action = this.dataset.action;
+                     handleFloatingAction(action);
+                 });
+             });
+
+             // 点击页面其他地方关闭浮动面板
+             document.addEventListener('click', function(e) {
+                 if (!floatingPanel.contains(e.target) && floatingPanel.classList.contains('open')) {
+                     floatingPanel.classList.remove('open');
+                     toggleBtn.innerHTML = '<span>⚡</span>';
+                 }
+             });
+
+             // 阻止浮动面板内部点击事件冒泡
+             floatingPanel.addEventListener('click', function(e) {
+                 e.stopPropagation();
+             });
+         }
+
+         // Handle floating panel actions
+         function handleFloatingAction(action) {
+             // Check if players are confirmed
+             if ((action === 'score-a' || action === 'score-b' || action === 'start-game') && !arePlayersConfirmed()) {
+                 showToast('Please confirm players first!', 'error');
+                 return;
+             }
+
+             switch(action) {
+                 case 'start-game':
+                     document.getElementById('startGame')?.click();
+                     break;
+                 case 'pause-game':
+                     document.getElementById('pauseGame')?.click();
+                     break;
+                 case 'end-game':
+                     document.getElementById('endGame')?.click();
+                     break;
+                 case 'score-a':
+                     // Send real goal event via WebSocket
+                     if (window.wsManager) {
+                         window.wsManager.simulateGoal('playerA');
+                     } else {
+                         showToast('WebSocket not available', 'error');
+                     }
+                     break;
+                 case 'score-b':
+                     // Send real goal event via WebSocket
+                     if (window.wsManager) {
+                         window.wsManager.simulateGoal('playerB');
+                     } else {
+                         showToast('WebSocket not available', 'error');
+                     }
+                     break;
+             }
+             
+             // 不再自动关闭浮动面板，保持打开状态以便连续操作
+         }
+
+         // Score synchronization across all displays
+         function initScoreSync() {
+             // Show mobile score bar on scroll
+             let lastScrollTop = 0;
+             window.addEventListener('scroll', function() {
+                 const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+                 const mobileScoreBar = document.getElementById('mobileScoreBar');
+                 
+                 if (currentScroll > 100) {
+                     mobileScoreBar.classList.add('show');
+                 } else {
+                     mobileScoreBar.classList.remove('show');
+                 }
+                 
+                 lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
+             });
+         }
+
+         // Global state for player confirmation
+         let playersConfirmed = false;
+
+         // Check if players are confirmed
+         function arePlayersConfirmed() {
+             return playersConfirmed;
+         }
+
+         // Set players confirmation status
+         function setPlayersConfirmed(confirmed) {
+             playersConfirmed = confirmed;
+             updateFloatingButtonsState();
+             updateQuickActionButtonsState();
+             updateMainGoalButtonsState();
+             updateConfirmationStatusUI();
+         }
+
+         // Update main goal buttons state
+         function updateMainGoalButtonsState() {
+             const goalButtons = document.querySelectorAll('#simulateGoalA, #simulateGoalB');
+             goalButtons.forEach(btn => {
+                 if (!playersConfirmed) {
+                     btn.style.opacity = '0.5';
+                     btn.style.cursor = 'not-allowed';
+                     btn.disabled = true;
+                     btn.title = 'Please confirm players first';
+                 } else {
+                     btn.style.opacity = '1';
+                     btn.style.cursor = 'pointer';
+                     btn.disabled = false;
+                     btn.title = btn.id === 'simulateGoalA' ? 'Player A Goal' : 'Player B Goal';
+                 }
+             });
+             
+             // Update start game button
+             const startGameBtn = document.getElementById('startGame');
+             if (startGameBtn) {
+                 if (!playersConfirmed) {
+                     startGameBtn.disabled = true;
+                     startGameBtn.style.opacity = '0.5';
+                     startGameBtn.style.cursor = 'not-allowed';
+                     startGameBtn.title = 'Please confirm players first';
+                 } else {
+                     startGameBtn.disabled = false;
+                     startGameBtn.style.opacity = '1';
+                     startGameBtn.style.cursor = 'pointer';
+                     startGameBtn.title = 'Start a new air hockey match';
+                 }
+             }
+         }
+
+         // Update confirmation status UI
+         function updateConfirmationStatusUI() {
+             const statusDiv = document.getElementById('confirmationStatus');
+             if (statusDiv) {
+                 if (playersConfirmed) {
+                     statusDiv.innerHTML = `
+                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                             <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                             Players Confirmed ✓
+                         </span>
+                     `;
+                 } else {
+                     statusDiv.innerHTML = `
+                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                             <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                             Players Not Confirmed
+                         </span>
+                     `;
+                 }
+             }
+         }
+
+         // Update floating buttons state based on confirmation
+         function updateFloatingButtonsState() {
+             const scoreButtons = document.querySelectorAll('[data-action="score-a"], [data-action="score-b"], [data-action="start-game"]');
+             scoreButtons.forEach(btn => {
+                 if (!playersConfirmed) {
+                     btn.style.opacity = '0.5';
+                     btn.style.cursor = 'not-allowed';
+                     btn.title = 'Please confirm players first';
+                 } else {
+                     btn.style.opacity = '1';
+                     btn.style.cursor = 'pointer';
+                     btn.title = btn.dataset.action === 'score-a' ? 'Player A Goal' : 
+                               btn.dataset.action === 'score-b' ? 'Player B Goal' : 'Start Game';
+                 }
+             });
+         }
+
+         // Update quick action buttons state
+         function updateQuickActionButtonsState() {
+             const quickButtons = document.querySelectorAll('.quick-action-btn');
+             quickButtons.forEach(btn => {
+                 const onclick = btn.getAttribute('onclick');
+                 if (onclick && (onclick.includes('quickActionWithCheck') && 
+                                (onclick.includes('scoreA') || onclick.includes('scoreB') || onclick.includes('start')))) {
+                     if (!playersConfirmed) {
+                         btn.style.opacity = '0.5';
+                         btn.style.cursor = 'not-allowed';
+                         btn.disabled = true;
+                     } else {
+                         btn.style.opacity = '1';
+                         btn.style.cursor = 'pointer';
+                         btn.disabled = false;
+                     }
+                 }
+             });
+         }
+
+
+
+         // Update scores across all displays (called from WebSocket updates)
+         function updateScore(player, score) {
+             console.log('updateScore called with player:', player, 'score:', score);
+             
+             if (player === 'A') {
+                 const scoreA = document.getElementById('scoreA');
+                 const headerScoreA = document.getElementById('headerScoreA');
+                 const mobileScoreA = document.getElementById('mobileScoreA');
+                 
+                 if (scoreA) scoreA.textContent = score;
+                 if (headerScoreA) {
+                     headerScoreA.textContent = score;
+                     console.log('Updated headerScoreA via updateScore to:', score);
+                 }
+                 if (mobileScoreA) mobileScoreA.textContent = score;
+             } else if (player === 'B') {
+                 const scoreB = document.getElementById('scoreB');
+                 const headerScoreB = document.getElementById('headerScoreB');
+                 const mobileScoreB = document.getElementById('mobileScoreB');
+                 
+                 if (scoreB) scoreB.textContent = score;
+                 if (headerScoreB) {
+                     headerScoreB.textContent = score;
+                     console.log('Updated headerScoreB via updateScore to:', score);
+                 }
+                 if (mobileScoreB) mobileScoreB.textContent = score;
+             }
+         }
+         
+         // Update scores from WebSocket data format {playerA: x, playerB: y}
+         function updateScoresFromWebSocket(scoreData) {
+             console.log('updateScoresFromWebSocket called with:', scoreData);
+             
+             if (scoreData.playerA !== undefined) {
+                 updateScore('A', scoreData.playerA);
+             }
+             if (scoreData.playerB !== undefined) {
+                 updateScore('B', scoreData.playerB);
+             }
+         }
+         
+         // Initialize header scores on page load
+         function initializeHeaderScores() {
+             console.log('Initializing header scores...');
+             
+             // Get current scores from the game state or default to 0
+             let scoreA = 0, scoreB = 0;
+             
+             // Try to get scores from various sources
+             if (window.smartCourtApp && window.smartCourtApp.gameState) {
+                 scoreA = window.smartCourtApp.gameState.scores.playerA || 0;
+                 scoreB = window.smartCourtApp.gameState.scores.playerB || 0;
+             } else {
+                 // Try to get from main score display
+                 const mainScoreA = document.getElementById('scoreA');
+                 const mainScoreB = document.getElementById('scoreB');
+                 if (mainScoreA) scoreA = parseInt(mainScoreA.textContent) || 0;
+                 if (mainScoreB) scoreB = parseInt(mainScoreB.textContent) || 0;
+             }
+             
+             // Update header scores
+             updateScore('A', scoreA);
+             updateScore('B', scoreB);
+             
+             console.log('Header scores initialized to:', { A: scoreA, B: scoreB });
+         }
+         
+         // Manually sync all score displays
+         function syncAllScores() {
+             console.log('Manually syncing all scores...');
+             
+             // Get the most current scores
+             let scoreA = 0, scoreB = 0;
+             
+             if (window.smartCourtApp && window.smartCourtApp.gameState) {
+                 scoreA = window.smartCourtApp.gameState.scores.playerA || 0;
+                 scoreB = window.smartCourtApp.gameState.scores.playerB || 0;
+             }
+             
+             // Force update all displays
+             updateScore('A', scoreA);
+             updateScore('B', scoreB);
+             
+             console.log('All scores synced to:', { A: scoreA, B: scoreB });
+         }
+         
+
+         
+         // Get current score for a player
+         function getCurrentScore(player) {
+             if (window.smartCourtApp && window.smartCourtApp.gameState) {
+                 return player === 'A' ? 
+                     window.smartCourtApp.gameState.scores.playerA : 
+                     window.smartCourtApp.gameState.scores.playerB;
+             }
+             
+             const element = document.getElementById(player === 'A' ? 'scoreA' : 'scoreB');
+             return element ? parseInt(element.textContent) || 0 : 0;
+         }
+         
+
+         
+
+
+         // Send goal via WebSocket (for manual scoring)
+         function sendGoal(player) {
+             // Check confirmation status
+             if (!arePlayersConfirmed()) {
+                 showToast('Please confirm players first!', 'error');
+                 return;
+             }
+
+             // Send goal event via WebSocket
+             if (window.wsManager) {
+                 const team = player === 'A' ? 'playerA' : 'playerB';
+                 window.wsManager.simulateGoal(team);
+             } else {
+                 showToast('WebSocket not available', 'error');
+             }
+         }
+
+         // Quick access to main tab
+         function quickNavigate(tabId) {
+             // Switch to the specified tab
+             document.querySelectorAll('.tab-content').forEach(content => {
+                 content.classList.remove('active');
+             });
+             document.querySelectorAll('.nav-btn').forEach(btn => {
+                 btn.classList.remove('active');
+             });
+             
+             document.getElementById(tabId + '-tab').classList.add('active');
+             document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+         }
+
+         // Initialize player confirmation system
+         function initPlayerConfirmation() {
+             // Listen for confirm players button
+             const confirmButton = document.getElementById('confirmPlayers');
+             if (confirmButton) {
+                 // Remove any existing event listeners to prevent duplicates
+                 confirmButton.replaceWith(confirmButton.cloneNode(true));
+                 const newConfirmButton = document.getElementById('confirmPlayers');
+                 
+                 // Add debounced event listener to prevent rapid clicks
+                 let isProcessing = false;
+                 newConfirmButton.addEventListener('click', function() {
+                     if (isProcessing) return; // Prevent multiple rapid clicks
+                     isProcessing = true;
+                     
+                     // Add player selection validation logic here
+                     const playerASelect = document.getElementById('playerASelect');
+                     const playerBSelect = document.getElementById('playerBSelect');
+                     
+                     // Check if players are selected
+                     if (playerASelect && playerBSelect) {
+                         const playerA = playerASelect.value || document.getElementById('playerACustom')?.value;
+                         const playerB = playerBSelect.value || document.getElementById('playerBCustom')?.value;
+                         
+                         if (playerA && playerB && playerA.trim() !== '' && playerB.trim() !== '') {
+                             setPlayersConfirmed(true);
+                             showToast('Players confirmed successfully! Game can now start.', 'success');
+                         } else {
+                             setPlayersConfirmed(false);
+                             showToast('Please select or enter player names!', 'error');
+                         }
+                     }
+                     
+                     // Reset processing flag after a short delay
+                     setTimeout(() => {
+                         isProcessing = false;
+                     }, 1000);
+                 });
+             }
+
+             // Listen for refresh players button (reset confirmation status)
+             const refreshButton = document.getElementById('refreshPlayers');
+             if (refreshButton) {
+                 // Remove any existing event listeners to prevent duplicates
+                 refreshButton.replaceWith(refreshButton.cloneNode(true));
+                 const newRefreshButton = document.getElementById('refreshPlayers');
+                 
+                 // Add debounced event listener to prevent rapid clicks
+                 let isRefreshProcessing = false;
+                 newRefreshButton.addEventListener('click', function() {
+                     if (isRefreshProcessing) return; // Prevent multiple rapid clicks
+                     isRefreshProcessing = true;
+                     
+                     setPlayersConfirmed(false);
+                     showToast('Player list refreshed, please reconfirm players.', 'warning');
+                     
+                     // Reset processing flag after a short delay
+                     setTimeout(() => {
+                         isRefreshProcessing = false;
+                     }, 1000);
+                 });
+             }
+
+             // Listen for player selection changes
+             const playerSelects = document.querySelectorAll('#playerASelect, #playerBSelect');
+             playerSelects.forEach(select => {
+                 select.addEventListener('change', function() {
+                     // Reset confirmation status when player selection changes
+                     setPlayersConfirmed(false);
+                 });
+             });
+
+             // Listen for custom player input changes
+             const customInputs = document.querySelectorAll('#playerACustom, #playerBCustom');
+             customInputs.forEach(input => {
+                 input.addEventListener('input', function() {
+                     // Reset confirmation status when custom input changes
+                     setPlayersConfirmed(false);
+                 });
+             });
+         }
+
+         // Scroll to Live Score section
+         function scrollToLiveScore() {
+             // Switch to game tab first
+             quickNavigate('game');
+             
+             // Scroll to Live Score section after a brief delay
+             setTimeout(() => {
+                 // Find the Live Score section by looking for the scoreA element
+                 const scoreElement = document.getElementById('scoreA');
+                 if (scoreElement) {
+                     const liveScoreSection = scoreElement.closest('.glass-card');
+                     if (liveScoreSection) {
+                         liveScoreSection.scrollIntoView({ 
+                             behavior: 'smooth', 
+                             block: 'center' 
+                         });
+                     }
+                 }
+             }, 100);
+         }
+    </script>
 </body>
 </html> 
