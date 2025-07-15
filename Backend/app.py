@@ -297,6 +297,18 @@ def call_delete_all_games():
         "status": "success"
     })
 
+@app.route('/games/reset', methods=['GET'])
+def reset_game():
+    global current_score
+    global current_round
+    global current_game
+
+    current_score = {'A': 0, 'B': 0}
+    current_round = 0
+    current_game = 0
+    socketio.emit('score_update', current_score)
+    mqtt.publish('game/status', "ended".encode(), retain=True)
+
 @app.route('/player/create', methods=['POST'])
 def create_player():
     data = request.get_json()
