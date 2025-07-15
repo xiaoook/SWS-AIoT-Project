@@ -318,6 +318,7 @@ def reset_game():
     current_game = 0
     socketio.emit('score_update', current_score)
     mqtt.publish('game/status', "ended".encode(), retain=True)
+    logger.info(f'current game is reset')
 
 @app.route('/player/create', methods=['POST'])
 def create_player():
