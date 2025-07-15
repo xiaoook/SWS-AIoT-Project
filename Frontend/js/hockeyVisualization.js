@@ -117,8 +117,10 @@ class HockeyVisualization {
             
             // Log boundary information for debugging
             console.log(`📏 Real dimensions: ${this.realDimensions.tableLength}cm × ${this.realDimensions.tableWidth}cm`);
-            console.log(`🎯 Physical boundaries: X(0.05 - ${this.realDimensions.tableLength - 0.05}cm), Y(0.05 - ${this.realDimensions.tableWidth - 0.05}cm)`);
+            console.log(`🎯 Physical boundaries: X(0 - ${this.realDimensions.tableLength}cm), Y(0 - ${this.realDimensions.tableWidth}cm)`);
             console.log(`⚽ Puck radius: ${this.physics.puckRadius}cm, Pusher radius: ${this.physics.pusherRadius}cm`);
+            console.log(`🔄 Boundary system: NO BUFFER - exact real dimensions for perfect alignment`);
+            console.log(`🎯 Coordinate system: Origin at RED BORDER inner edge (not outer container)`);
             
             // Initialize DOM elements
             this.initializeElements();
@@ -140,6 +142,8 @@ class HockeyVisualization {
             
             this.isInitialized = true;
             console.log('✅ Hockey visualization initialized successfully');
+            console.log('🎯 Physical boundaries match visual boundaries exactly');
+            console.log('🔴 Origin: Red border inner edge (43×26cm game area)');
             
             return true;
         } catch (error) {
@@ -238,11 +242,11 @@ class HockeyVisualization {
     realToDisplayCoordinates(realX, realY) {
         const dimensions = this.getTableDimensions();
         
-        // Calculate scale factors
+        // Calculate scale factors based on the area inside the red border
         const scaleX = dimensions.width / this.realDimensions.tableLength;
         const scaleY = dimensions.height / this.realDimensions.tableWidth;
         
-        // Convert coordinates
+        // Convert coordinates - accounting for red border offset
         const displayX = realX * scaleX;
         const displayY = realY * scaleY;
         
@@ -256,11 +260,11 @@ class HockeyVisualization {
     displayToRealCoordinates(displayX, displayY) {
         const dimensions = this.getTableDimensions();
         
-        // Calculate scale factors
+        // Calculate scale factors based on the area inside the red border
         const scaleX = dimensions.width / this.realDimensions.tableLength;
         const scaleY = dimensions.height / this.realDimensions.tableWidth;
         
-        // Convert coordinates
+        // Convert coordinates - accounting for red border offset
         const realX = displayX / scaleX;
         const realY = displayY / scaleY;
         
@@ -270,7 +274,7 @@ class HockeyVisualization {
         };
     }
 
-    // Get current table dimensions - maintaining real aspect ratio
+    // Get current table dimensions - based on red border area (actual game area)
     getTableDimensions() {
         if (!this.tableSurface) return { width: 430, height: 260 };
         
@@ -279,8 +283,13 @@ class HockeyVisualization {
         
         const rect = tableSurfaceElement.getBoundingClientRect();
         
-        // Ensure we maintain exact aspect ratio
-        const width = rect.width;
+        // Account for red border thickness (2px on each side)
+        const borderThickness = 2;
+        const actualWidth = rect.width - (borderThickness * 2);
+        const actualHeight = rect.height - (borderThickness * 2);
+        
+        // Ensure we maintain exact aspect ratio based on actual game area
+        const width = actualWidth;
         const height = width / this.aspectRatio;
         
         return {
@@ -437,10 +446,9 @@ class HockeyVisualization {
         const puckPos = this.currentPositions.puck;
         const puckRadius = this.physics.puckRadius;
         
-        // Define boundary limits consistent with collision detection
-        const borderThickness = 0.3; // Consistent with boundary detection
-        const minX = borderThickness;
-        const maxX = this.realDimensions.tableLength - borderThickness;
+        // Use exact real dimensions without any buffer - consistent with boundary detection
+        const minX = 0;
+        const maxX = this.realDimensions.tableLength;
         
         // Check left goal
         if (puckPos.x - puckRadius <= minX) {
@@ -519,12 +527,11 @@ class HockeyVisualization {
         const vel = this.velocities[objectName];
         let bounced = false;
         
-        // Define actual boundary limits (increased buffer for better visual alignment)
-        const borderThickness = 0.3; // Increased buffer for better alignment with visual boundaries
-        const minX = borderThickness;
-        const maxX = this.realDimensions.tableLength - borderThickness;
-        const minY = borderThickness;
-        const maxY = this.realDimensions.tableWidth - borderThickness;
+        // Use exact real dimensions without any buffer - this ensures perfect alignment
+        const minX = 0;
+        const maxX = this.realDimensions.tableLength;
+        const minY = 0;
+        const maxY = this.realDimensions.tableWidth;
         
         // Special handling for puck near goals
         if (objectName === 'puck') {
@@ -535,7 +542,7 @@ class HockeyVisualization {
                     // Puck is in goal - don't bounce, let goal detection handle it
                     return;
                 } else {
-                    // Bounce off wall with enhanced coefficient
+                    // Bounce off wall - place puck exactly at boundary
                     pos.x = minX + radius;
                     vel.x = Math.abs(vel.x) * this.physics.wallBounce;
                     bounced = true;
@@ -549,7 +556,7 @@ class HockeyVisualization {
                     // Puck is in goal - don't bounce, let goal detection handle it
                     return;
                 } else {
-                    // Bounce off wall with enhanced coefficient
+                    // Bounce off wall - place puck exactly at boundary
                     pos.x = maxX - radius;
                     vel.x = -Math.abs(vel.x) * this.physics.wallBounce;
                     bounced = true;
@@ -572,24 +579,51 @@ class HockeyVisualization {
             }
         }
         
-        // Check top boundary (all objects) - Enhanced positioning
+        // Check top boundary (all objects) - exact boundary alignment
         if (pos.y - radius <= minY) {
             pos.y = minY + radius;
             vel.y = Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
             bounced = true;
         }
         
-        // Check bottom boundary (all objects) - Enhanced positioning
+        // Check bottom boundary (all objects) - enhanced detection with stricter checking
         if (pos.y + radius >= maxY) {
+            // Force position to be exactly at the boundary to prevent any sinking
             pos.y = maxY - radius;
             vel.y = -Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
             bounced = true;
+            
+            // Additional safety check - if object is still somehow beyond boundary, force it back
+            if (pos.y + radius > maxY) {
+                pos.y = maxY - radius - 0.01; // Add tiny buffer to ensure it's inside
+                console.warn(`⚠️ Force corrected ${objectName} position at bottom boundary: y=${pos.y.toFixed(3)}`);
+            }
+        }
+        
+        // Additional safety check for bottom boundary - early detection
+        if (pos.y + radius > maxY - 0.05) {
+            pos.y = maxY - radius;
+            if (vel.y > 0) { // Only reverse if moving towards boundary
+                vel.y = -Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
+                bounced = true;
+            }
         }
         
         // Add boundary collision effect
         if (bounced) {
             this.addBoundaryCollisionEffect(objectName);
-            console.log(`🏒 Boundary collision: ${objectName} at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}) - Boundary: ${minX.toFixed(2)}-${maxX.toFixed(2)}, ${minY.toFixed(2)}-${maxY.toFixed(2)}`);
+            
+            // Enhanced logging for boundary collisions, especially bottom boundary
+            const boundaryType = pos.y + radius >= maxY ? 'BOTTOM' : 
+                                pos.y - radius <= minY ? 'TOP' : 
+                                pos.x - radius <= minX ? 'LEFT' : 'RIGHT';
+            
+            console.log(`🏒 ${boundaryType} boundary collision: ${objectName} at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}) - Table bounds: (0,0) to (${maxX},${maxY})`);
+            
+            // Special logging for bottom boundary issues
+            if (boundaryType === 'BOTTOM') {
+                console.log(`🔍 Bottom boundary details: pos.y=${pos.y.toFixed(3)}, radius=${radius.toFixed(3)}, maxY=${maxY}, pos.y+radius=${(pos.y + radius).toFixed(3)}`);
+            }
         }
     }
 
@@ -1003,13 +1037,16 @@ class HockeyVisualization {
             if (this.isPaused) return;
             
             const rect = this.tableSurface.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            const tableSurfaceRect = this.tableSurface.querySelector('.table-surface').getBoundingClientRect();
+            
+            // Calculate mouse position relative to the actual game area (inside red border)
+            const mouseX = e.clientX - tableSurfaceRect.left;
+            const mouseY = e.clientY - tableSurfaceRect.top;
             
             // Check if click is on pusher A
             const pusherARect = this.pusherA.getBoundingClientRect();
-            const pusherAX = pusherARect.left - rect.left + pusherARect.width / 2;
-            const pusherAY = pusherARect.top - rect.top + pusherARect.height / 2;
+            const pusherAX = pusherARect.left - tableSurfaceRect.left + pusherARect.width / 2;
+            const pusherAY = pusherARect.top - tableSurfaceRect.top + pusherARect.height / 2;
             
             if (Math.sqrt((mouseX - pusherAX) ** 2 + (mouseY - pusherAY) ** 2) < 30) {
                 isDragging = true;
@@ -1019,8 +1056,8 @@ class HockeyVisualization {
             
             // Check if click is on pusher B
             const pusherBRect = this.pusherB.getBoundingClientRect();
-            const pusherBX = pusherBRect.left - rect.left + pusherBRect.width / 2;
-            const pusherBY = pusherBRect.top - rect.top + pusherBRect.height / 2;
+            const pusherBX = pusherBRect.left - tableSurfaceRect.left + pusherBRect.width / 2;
+            const pusherBY = pusherBRect.top - tableSurfaceRect.top + pusherBRect.height / 2;
             
             if (Math.sqrt((mouseX - pusherBX) ** 2 + (mouseY - pusherBY) ** 2) < 30) {
                 isDragging = true;
@@ -1033,13 +1070,21 @@ class HockeyVisualization {
         document.addEventListener('mousemove', (e) => {
             if (this.isPaused) return;
             
-            const rect = this.tableSurface.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            const tableSurfaceRect = this.tableSurface.querySelector('.table-surface').getBoundingClientRect();
             
-            // Check if mouse is over the table
-            if (mouseX >= 0 && mouseY >= 0 && mouseX <= rect.width && mouseY <= rect.height) {
-                // Convert to real coordinates
+            // Calculate mouse position relative to the actual game area (inside red border)
+            // Account for red border thickness (2px) - origin is now at red border's inner edge
+            const borderThickness = 2;
+            const mouseX = e.clientX - tableSurfaceRect.left - borderThickness;
+            const mouseY = e.clientY - tableSurfaceRect.top - borderThickness;
+            
+            // Get actual game area dimensions (inside red border)
+            const gameAreaWidth = tableSurfaceRect.width - (borderThickness * 2);
+            const gameAreaHeight = tableSurfaceRect.height - (borderThickness * 2);
+            
+            // Check if mouse is over the game area (inside red border)
+            if (mouseX >= 0 && mouseY >= 0 && mouseX <= gameAreaWidth && mouseY <= gameAreaHeight) {
+                // Convert to real coordinates using corrected coordinates
                 const realPos = this.displayToRealCoordinates(mouseX, mouseY);
                 
                 // Always show mouse coordinates when over table
@@ -1058,7 +1103,7 @@ class HockeyVisualization {
             dragTarget = null;
         });
         
-        console.log('🖱️ Mouse controls set up');
+        console.log('🖱️ Mouse controls set up - Origin at red border inner edge');
     }
 
     // Setup WebSocket connection
