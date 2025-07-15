@@ -1,4 +1,4 @@
-// Real-time Hockey Game Visualization Module
+// Real-time Hockey Game Visualization Module with Real Scale & Collision Detection
 class HockeyVisualization {
     constructor() {
         this.isInitialized = false;
@@ -7,10 +7,41 @@ class HockeyVisualization {
         this.showCoordinates = false;
         this.isWebSocketConnected = false;
         
-        // MQTT coordinate system (from Backend/test_mqtt.py)
-        this.mqttCoordinates = {
-            width: 800,   // MQTT x range: 0-800
-            height: 400   // MQTT y range: 0-400
+        // Real world dimensions (in cm)
+        this.realDimensions = {
+            tableLength: 43,    // cm (x-axis)
+            tableWidth: 26,     // cm (y-axis)
+            puckDiameter: 4,    // cm
+            pusherDiameter: 5,  // cm
+            goalLength: 9       // cm - goal opening length
+        };
+        
+        // Calculate aspect ratio
+        this.aspectRatio = this.realDimensions.tableLength / this.realDimensions.tableWidth; // 43:26 ≈ 1.65:1
+        
+        // Coordinate system: left-top corner as origin (0,0)
+        // x-axis: horizontal (length direction)
+        // y-axis: vertical (width direction)
+        this.coordinateSystem = {
+            origin: { x: 0, y: 0 },
+            maxX: this.realDimensions.tableLength,
+            maxY: this.realDimensions.tableWidth
+        };
+        
+        // Goal positions (centered vertically)
+        this.goals = {
+            left: {
+                x: 0,
+                y: (this.realDimensions.tableWidth - this.realDimensions.goalLength) / 2,
+                width: 1,  // Goal depth
+                height: this.realDimensions.goalLength
+            },
+            right: {
+                x: this.realDimensions.tableLength - 1,
+                y: (this.realDimensions.tableWidth - this.realDimensions.goalLength) / 2,
+                width: 1,  // Goal depth
+                height: this.realDimensions.goalLength
+            }
         };
         
         // Element references
@@ -19,12 +50,43 @@ class HockeyVisualization {
         this.pusherB = null;
         this.puck = null;
         this.positionIndicator = null;
+        this.goalLeft = null;
+        this.goalRight = null;
         
-        // Position data (will be updated after initialization)
+        // Position data (in real world coordinates - cm)
         this.currentPositions = {
-            pusherA: { x: 100, y: 200 },
-            pusherB: { x: 700, y: 200 },
-            puck: { x: 400, y: 200 }
+            pusherA: { x: 8, y: 13 },    // Left side, center
+            pusherB: { x: 35, y: 13 },   // Right side, center
+            puck: { x: 21.5, y: 13 }     // Center of table
+        };
+        
+        // Velocity data (cm/s)
+        this.velocities = {
+            pusherA: { x: 0, y: 0 },
+            pusherB: { x: 0, y: 0 },
+            puck: { x: 0, y: 0 }
+        };
+        
+        // Physics properties - Enhanced for realistic ice hockey
+        this.physics = {
+            puckRadius: this.realDimensions.puckDiameter / 2,      // 2cm
+            pusherRadius: this.realDimensions.pusherDiameter / 2,  // 2.5cm
+            friction: 0.995,          // High friction for ice surface
+            bounceDamping: 0.9,       // Less energy loss on collision
+            minVelocity: 0.05,        // Lower minimum velocity threshold
+            maxVelocity: 80,          // Higher maximum velocity for faster gameplay
+            wallBounce: 0.85,         // Wall bounce coefficient
+            puckPusherBounce: 0.95,   // Puck-pusher collision coefficient
+            pusherPusherBounce: 0.7,  // Pusher-pusher collision coefficient
+            speedMultiplier: 1.5,     // Global speed multiplier
+            impulseStrength: 15       // Stronger impulse for manual control
+        };
+        
+        // Game state
+        this.gameState = {
+            score: { left: 0, right: 0 },
+            lastGoal: null,
+            goalCooldown: false
         };
         
         // Position history (for trails)
@@ -39,23 +101,46 @@ class HockeyVisualization {
         this.lastUpdateTime = Date.now();
         this.updateRate = 0;
         
-        // Puck speed calculation
-        this.lastPuckPosition = { x: 400, y: 200 };
-        this.lastPuckTime = Date.now();
-        this.puckSpeed = 0;
+        // Physics loop
+        this.lastPhysicsTime = Date.now();
+        this.physicsRunning = false;
         
-        console.log('🏒 HockeyVisualization initialized with MQTT coordinate system:', this.mqttCoordinates);
+        console.log('🏒 HockeyVisualization initialized with real-world scale:', this.realDimensions);
+        console.log('📏 Aspect ratio:', this.aspectRatio.toFixed(2) + ':1');
+        console.log('🥅 Goal size:', this.realDimensions.goalLength + 'cm');
     }
 
     // Initialize visualization system
-    init() {
+    async initialize() {
         try {
+            console.log('🚀 Initializing hockey visualization...');
+            
+            // Log boundary information for debugging
+            console.log(`📏 Real dimensions: ${this.realDimensions.tableLength}cm × ${this.realDimensions.tableWidth}cm`);
+            console.log(`🎯 Physical boundaries: X(0.05 - ${this.realDimensions.tableLength - 0.05}cm), Y(0.05 - ${this.realDimensions.tableWidth - 0.05}cm)`);
+            console.log(`⚽ Puck radius: ${this.physics.puckRadius}cm, Pusher radius: ${this.physics.pusherRadius}cm`);
+            
+            // Initialize DOM elements
             this.initializeElements();
+            
+            // Setup event listeners
             this.setupEventListeners();
+            
+            // Setup WebSocket connection
             this.setupWebSocketConnection();
+            
+            // Set initial positions
+            this.setInitialPositions();
+            
+            // Start physics simulation
+            this.startPhysicsLoop();
+            
+            // Start update loop
             this.startUpdateLoop();
+            
             this.isInitialized = true;
-            console.log('✅ Hockey visualization started successfully');
+            console.log('✅ Hockey visualization initialized successfully');
+            
             return true;
         } catch (error) {
             console.error('❌ Failed to initialize hockey visualization:', error);
@@ -69,22 +154,785 @@ class HockeyVisualization {
         this.pusherA = document.getElementById('pusherA');
         this.pusherB = document.getElementById('pusherB');
         this.puck = document.getElementById('puck');
-        // Note: positionIndicator is no longer used to avoid obstruction
+        this.goalLeft = document.querySelector('.goal-a');
+        this.goalRight = document.querySelector('.goal-b');
         
         if (!this.tableSurface || !this.pusherA || !this.pusherB || !this.puck) {
             throw new Error('Required DOM elements not found');
         }
         
-        // Initialize mouse coordinates section as hidden
+        // Initialize coordinate display elements
         const mouseSection = document.getElementById('mouseCoordinatesSection');
+        const positionInfo = document.getElementById('positionInfo');
+        
+        // Set initial display state based on showCoordinates (for mouse coordinates)
         if (mouseSection) {
-            mouseSection.style.display = 'none';
+            mouseSection.style.display = this.showCoordinates ? 'block' : 'none';
         }
         
-        // Set initial positions based on table dimensions
-        this.setInitialPositions();
-        this.updateVisualPositions();
+        // Set initial display state based on showTrails (for pusher/puck coordinates)
+        if (positionInfo) {
+            positionInfo.style.display = this.showTrails ? 'flex' : 'none';
+        }
+        
+        // Add physics enabled class to enable physics-specific CSS
+        this.tableSurface.classList.add('physics-enabled');
+        
+        // Update element sizes based on real dimensions
+        this.updateElementSizes();
+        
+        // Update goal sizes
+        this.updateGoalSizes();
+        
         console.log('🎯 DOM elements initialized');
+        console.log('📍 Coordinate system: Left-top corner as origin (0,0), X: horizontal, Y: vertical');
+        console.log('🎭 Show Trails (pusher/puck coords):', this.showTrails ? 'enabled' : 'disabled');
+        console.log('📍 Show Coordinates (mouse coords):', this.showCoordinates ? 'enabled' : 'disabled');
+    }
+
+    // Update element sizes based on real dimensions
+    updateElementSizes() {
+        const dimensions = this.getTableDimensions();
+        const scaleX = dimensions.width / this.realDimensions.tableLength;
+        const scaleY = dimensions.height / this.realDimensions.tableWidth;
+        
+        // Use consistent scale (smaller of the two to maintain aspect ratio)
+        const scale = Math.min(scaleX, scaleY);
+        
+        // Update puck size
+        const puckSize = this.realDimensions.puckDiameter * scale;
+        this.puck.style.width = puckSize + 'px';
+        this.puck.style.height = puckSize + 'px';
+        
+        // Update pusher sizes
+        const pusherSize = this.realDimensions.pusherDiameter * scale;
+        this.pusherA.style.width = pusherSize + 'px';
+        this.pusherA.style.height = pusherSize + 'px';
+        this.pusherB.style.width = pusherSize + 'px';
+        this.pusherB.style.height = pusherSize + 'px';
+        
+        console.log('📏 Element sizes updated - Scale:', scale.toFixed(3));
+        console.log('📏 Puck size:', puckSize + 'px', 'Pusher size:', pusherSize + 'px');
+    }
+
+    // Update goal sizes based on real dimensions
+    updateGoalSizes() {
+        const dimensions = this.getTableDimensions();
+        const scaleY = dimensions.height / this.realDimensions.tableWidth;
+        
+        // Update goal heights
+        const goalHeight = this.realDimensions.goalLength * scaleY;
+        
+        if (this.goalLeft) {
+            this.goalLeft.style.height = goalHeight + 'px';
+        }
+        
+        if (this.goalRight) {
+            this.goalRight.style.height = goalHeight + 'px';
+        }
+        
+        console.log('🥅 Goal sizes updated - Height:', goalHeight + 'px');
+    }
+
+    // Convert real-world coordinates to display coordinates
+    realToDisplayCoordinates(realX, realY) {
+        const dimensions = this.getTableDimensions();
+        
+        // Calculate scale factors
+        const scaleX = dimensions.width / this.realDimensions.tableLength;
+        const scaleY = dimensions.height / this.realDimensions.tableWidth;
+        
+        // Convert coordinates
+        const displayX = realX * scaleX;
+        const displayY = realY * scaleY;
+        
+        return {
+            x: displayX,
+            y: displayY
+        };
+    }
+
+    // Convert display coordinates to real-world coordinates
+    displayToRealCoordinates(displayX, displayY) {
+        const dimensions = this.getTableDimensions();
+        
+        // Calculate scale factors
+        const scaleX = dimensions.width / this.realDimensions.tableLength;
+        const scaleY = dimensions.height / this.realDimensions.tableWidth;
+        
+        // Convert coordinates
+        const realX = displayX / scaleX;
+        const realY = displayY / scaleY;
+        
+        return {
+            x: realX,
+            y: realY
+        };
+    }
+
+    // Get current table dimensions - maintaining real aspect ratio
+    getTableDimensions() {
+        if (!this.tableSurface) return { width: 430, height: 260 };
+        
+        const tableSurfaceElement = this.tableSurface.querySelector('.table-surface');
+        if (!tableSurfaceElement) return { width: 430, height: 260 };
+        
+        const rect = tableSurfaceElement.getBoundingClientRect();
+        
+        // Ensure we maintain exact aspect ratio
+        const width = rect.width;
+        const height = width / this.aspectRatio;
+        
+        return {
+            width: width,
+            height: height
+        };
+    }
+
+    // Physics-based collision detection
+    checkCollisions() {
+        // Check puck-pusher collisions
+        this.checkPuckPusherCollision('pusherA');
+        this.checkPuckPusherCollision('pusherB');
+        
+        // Check boundary collisions (including goals)
+        this.checkBoundaryCollisions();
+        
+        // Check pusher-pusher collision
+        this.checkPusherPusherCollision();
+        
+        // Check goal scoring
+        this.checkGoalScoring();
+    }
+
+    // Check collision between puck and pusher
+    checkPuckPusherCollision(pusherName) {
+        const puckPos = this.currentPositions.puck;
+        const pusherPos = this.currentPositions[pusherName];
+        
+        // Calculate distance between centers
+        const dx = puckPos.x - pusherPos.x;
+        const dy = puckPos.y - pusherPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if collision occurred
+        const minDistance = this.physics.puckRadius + this.physics.pusherRadius;
+        
+        if (distance < minDistance && distance > 0) {
+            // Collision detected - resolve collision
+            this.resolvePuckPusherCollision(pusherName, dx, dy, distance);
+        }
+    }
+
+    // Resolve collision between puck and pusher - Enhanced for realistic ice hockey
+    resolvePuckPusherCollision(pusherName, dx, dy, distance) {
+        const puckPos = this.currentPositions.puck;
+        const pusherPos = this.currentPositions[pusherName];
+        const pusherVel = this.velocities[pusherName];
+        
+        // Normalize collision vector
+        const nx = dx / distance;
+        const ny = dy / distance;
+        
+        // Separate objects to prevent overlap
+        const overlap = (this.physics.puckRadius + this.physics.pusherRadius) - distance;
+        const separationX = nx * overlap * 0.6;
+        const separationY = ny * overlap * 0.6;
+        
+        // Move puck away from pusher
+        puckPos.x += separationX;
+        puckPos.y += separationY;
+        
+        // Move pusher away from puck (less movement)
+        pusherPos.x -= separationX * 0.1;
+        pusherPos.y -= separationY * 0.1;
+        
+        // Calculate relative velocity
+        const puckVel = this.velocities.puck;
+        const relativeVelX = puckVel.x - pusherVel.x;
+        const relativeVelY = puckVel.y - pusherVel.y;
+        
+        // Calculate relative velocity in collision normal direction
+        const relativeVelNormal = relativeVelX * nx + relativeVelY * ny;
+        
+        // Do not resolve if velocities are separating
+        if (relativeVelNormal > 0) return;
+        
+        // Calculate collision impulse with enhanced bounce coefficient
+        const impulse = -relativeVelNormal * this.physics.puckPusherBounce;
+        
+        // Apply impulse to puck (pusher is much heavier, so gets less effect)
+        puckVel.x += impulse * nx * 0.95;
+        puckVel.y += impulse * ny * 0.95;
+        
+        // Add pusher velocity to puck (pusher "hits" puck) - Enhanced transfer
+        const pusherSpeed = Math.sqrt(pusherVel.x * pusherVel.x + pusherVel.y * pusherVel.y);
+        const transferFactor = Math.min(0.8, 0.3 + pusherSpeed * 0.02);
+        
+        puckVel.x += pusherVel.x * transferFactor;
+        puckVel.y += pusherVel.y * transferFactor;
+        
+        // Limit velocity
+        this.limitVelocity('puck');
+        
+        // Add collision effect
+        this.addCollisionEffect('puck');
+        this.addCollisionEffect(pusherName);
+        
+        console.log(`💥 Collision: ${pusherName} hit puck (impulse: ${impulse.toFixed(2)})`);
+    }
+
+    // Check pusher-pusher collision
+    checkPusherPusherCollision() {
+        const pusherAPos = this.currentPositions.pusherA;
+        const pusherBPos = this.currentPositions.pusherB;
+        
+        // Calculate distance between centers
+        const dx = pusherAPos.x - pusherBPos.x;
+        const dy = pusherAPos.y - pusherBPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if collision occurred
+        const minDistance = this.physics.pusherRadius * 2;
+        
+        if (distance < minDistance && distance > 0) {
+            // Collision detected - separate pushers with enhanced physics
+            const nx = dx / distance;
+            const ny = dy / distance;
+            
+            const overlap = minDistance - distance;
+            const separationX = nx * overlap * 0.6;
+            const separationY = ny * overlap * 0.6;
+            
+            pusherAPos.x += separationX;
+            pusherAPos.y += separationY;
+            pusherBPos.x -= separationX;
+            pusherBPos.y -= separationY;
+            
+            // Apply bounce effect to velocities
+            const velA = this.velocities.pusherA;
+            const velB = this.velocities.pusherB;
+            
+            const relativeVelX = velA.x - velB.x;
+            const relativeVelY = velA.y - velB.y;
+            const relativeVelNormal = relativeVelX * nx + relativeVelY * ny;
+            
+            if (relativeVelNormal < 0) {
+                const impulse = -relativeVelNormal * this.physics.pusherPusherBounce;
+                
+                velA.x += impulse * nx * 0.5;
+                velA.y += impulse * ny * 0.5;
+                velB.x -= impulse * nx * 0.5;
+                velB.y -= impulse * ny * 0.5;
+            }
+            
+            console.log('💥 Pusher collision detected with enhanced physics');
+        }
+    }
+
+    // Check if puck scored in goals
+    checkGoalScoring() {
+        if (this.gameState.goalCooldown) return;
+        
+        const puckPos = this.currentPositions.puck;
+        const puckRadius = this.physics.puckRadius;
+        
+        // Define boundary limits consistent with collision detection
+        const borderThickness = 0.3; // Consistent with boundary detection
+        const minX = borderThickness;
+        const maxX = this.realDimensions.tableLength - borderThickness;
+        
+        // Check left goal
+        if (puckPos.x - puckRadius <= minX) {
+            if (puckPos.y >= this.goals.left.y && puckPos.y <= this.goals.left.y + this.goals.left.height) {
+                this.onGoalScored('right'); // Right player scored
+                console.log(`🥅 LEFT GOAL! Puck at (${puckPos.x.toFixed(2)}, ${puckPos.y.toFixed(2)})`);
+                return;
+            }
+        }
+        
+        // Check right goal
+        if (puckPos.x + puckRadius >= maxX) {
+            if (puckPos.y >= this.goals.right.y && puckPos.y <= this.goals.right.y + this.goals.right.height) {
+                this.onGoalScored('left'); // Left player scored
+                console.log(`🥅 RIGHT GOAL! Puck at (${puckPos.x.toFixed(2)}, ${puckPos.y.toFixed(2)})`);
+                return;
+            }
+        }
+    }
+
+    // Handle goal scoring
+    onGoalScored(scoringSide) {
+        this.gameState.score[scoringSide]++;
+        this.gameState.lastGoal = {
+            side: scoringSide,
+            time: Date.now()
+        };
+        
+        // Goal cooldown to prevent multiple goals
+        this.gameState.goalCooldown = true;
+        setTimeout(() => {
+            this.gameState.goalCooldown = false;
+        }, 2000);
+        
+        // Reset puck to center
+        this.currentPositions.puck = { x: 21.5, y: 13 };
+        this.velocities.puck = { x: 0, y: 0 };
+        
+        // Add goal effect
+        this.addGoalEffect(scoringSide);
+        
+        console.log(`🥅 GOAL! ${scoringSide} scored! Score: ${this.gameState.score.left} - ${this.gameState.score.right}`);
+    }
+
+    // Add goal effect - 在对方那一侧显示闪烁
+    addGoalEffect(scoringSide) {
+        // 进球时在对方那一侧显示高亮
+        const goalElement = scoringSide === 'left' ? this.goalRight : this.goalLeft;
+        if (goalElement) {
+            goalElement.classList.add('goal-scored');
+            setTimeout(() => {
+                goalElement.classList.remove('goal-scored');
+            }, 1200);
+        }
+        
+        // Add puck celebration effect
+        this.puck.classList.add('goal-celebration');
+        setTimeout(() => {
+            this.puck.classList.remove('goal-celebration');
+        }, 1000);
+    }
+
+    // Check boundary collisions
+    checkBoundaryCollisions() {
+        // Check puck boundaries
+        this.checkObjectBoundaries('puck', this.physics.puckRadius);
+        
+        // Check pusher boundaries
+        this.checkObjectBoundaries('pusherA', this.physics.pusherRadius);
+        this.checkObjectBoundaries('pusherB', this.physics.pusherRadius);
+    }
+
+    // Check object boundaries (updated with goal detection and real edge collision)
+    checkObjectBoundaries(objectName, radius) {
+        const pos = this.currentPositions[objectName];
+        const vel = this.velocities[objectName];
+        let bounced = false;
+        
+        // Define actual boundary limits (increased buffer for better visual alignment)
+        const borderThickness = 0.3; // Increased buffer for better alignment with visual boundaries
+        const minX = borderThickness;
+        const maxX = this.realDimensions.tableLength - borderThickness;
+        const minY = borderThickness;
+        const maxY = this.realDimensions.tableWidth - borderThickness;
+        
+        // Special handling for puck near goals
+        if (objectName === 'puck') {
+            // Check left boundary with goal
+            if (pos.x - radius <= minX) {
+                // Check if in goal area
+                if (pos.y >= this.goals.left.y && pos.y <= this.goals.left.y + this.goals.left.height) {
+                    // Puck is in goal - don't bounce, let goal detection handle it
+                    return;
+                } else {
+                    // Bounce off wall with enhanced coefficient
+                    pos.x = minX + radius;
+                    vel.x = Math.abs(vel.x) * this.physics.wallBounce;
+                    bounced = true;
+                }
+            }
+            
+            // Check right boundary with goal
+            if (pos.x + radius >= maxX) {
+                // Check if in goal area
+                if (pos.y >= this.goals.right.y && pos.y <= this.goals.right.y + this.goals.right.height) {
+                    // Puck is in goal - don't bounce, let goal detection handle it
+                    return;
+                } else {
+                    // Bounce off wall with enhanced coefficient
+                    pos.x = maxX - radius;
+                    vel.x = -Math.abs(vel.x) * this.physics.wallBounce;
+                    bounced = true;
+                }
+            }
+        } else {
+            // Normal boundary checking for pushers
+            // Check left boundary
+            if (pos.x - radius <= minX) {
+                pos.x = minX + radius;
+                vel.x = Math.abs(vel.x) * this.physics.pusherPusherBounce;
+                bounced = true;
+            }
+            
+            // Check right boundary
+            if (pos.x + radius >= maxX) {
+                pos.x = maxX - radius;
+                vel.x = -Math.abs(vel.x) * this.physics.pusherPusherBounce;
+                bounced = true;
+            }
+        }
+        
+        // Check top boundary (all objects) - Enhanced positioning
+        if (pos.y - radius <= minY) {
+            pos.y = minY + radius;
+            vel.y = Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
+            bounced = true;
+        }
+        
+        // Check bottom boundary (all objects) - Enhanced positioning
+        if (pos.y + radius >= maxY) {
+            pos.y = maxY - radius;
+            vel.y = -Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
+            bounced = true;
+        }
+        
+        // Add boundary collision effect
+        if (bounced) {
+            this.addBoundaryCollisionEffect(objectName);
+            console.log(`🏒 Boundary collision: ${objectName} at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}) - Boundary: ${minX.toFixed(2)}-${maxX.toFixed(2)}, ${minY.toFixed(2)}-${maxY.toFixed(2)}`);
+        }
+    }
+
+    // Add collision effect
+    addCollisionEffect(objectName) {
+        const element = this[objectName];
+        if (element) {
+            element.classList.add('collision');
+            setTimeout(() => {
+                element.classList.remove('collision');
+            }, 300);
+        }
+    }
+
+    // Add boundary collision effect
+    addBoundaryCollisionEffect(objectName) {
+        const element = this[objectName];
+        if (element) {
+            element.classList.add('boundary-collision');
+            setTimeout(() => {
+                element.classList.remove('boundary-collision');
+            }, 200);
+        }
+    }
+
+    // Apply physics simulation - Enhanced for realistic ice hockey
+    updatePhysics(deltaTime) {
+        // Apply speed multiplier for faster gameplay
+        const effectiveDeltaTime = deltaTime * this.physics.speedMultiplier;
+        
+        // Update positions based on velocities
+        Object.keys(this.currentPositions).forEach(objectName => {
+            const pos = this.currentPositions[objectName];
+            const vel = this.velocities[objectName];
+            
+            // Update position with enhanced delta time
+            pos.x += vel.x * effectiveDeltaTime;
+            pos.y += vel.y * effectiveDeltaTime;
+            
+            // Apply friction (different for puck and pushers)
+            if (objectName === 'puck') {
+                // High friction for ice surface
+                vel.x *= this.physics.friction;
+                vel.y *= this.physics.friction;
+                
+                // Stop very slow movement
+                if (Math.abs(vel.x) < this.physics.minVelocity) vel.x = 0;
+                if (Math.abs(vel.y) < this.physics.minVelocity) vel.y = 0;
+            } else {
+                // Pushers have more friction when not being controlled
+                vel.x *= 0.9;
+                vel.y *= 0.9;
+                
+                // Stop pusher movement faster
+                if (Math.abs(vel.x) < 0.1) vel.x = 0;
+                if (Math.abs(vel.y) < 0.1) vel.y = 0;
+            }
+        });
+        
+        // Check collisions
+        this.checkCollisions();
+    }
+
+    // Limit velocity to maximum
+    limitVelocity(objectName) {
+        const vel = this.velocities[objectName];
+        const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
+        
+        if (speed > this.physics.maxVelocity) {
+            const factor = this.physics.maxVelocity / speed;
+            vel.x *= factor;
+            vel.y *= factor;
+        }
+    }
+
+    // Start physics loop
+    startPhysicsLoop() {
+        this.physicsRunning = true;
+        this.lastPhysicsTime = Date.now();
+        
+        const physicsLoop = () => {
+            if (!this.physicsRunning || this.isPaused) {
+                if (this.physicsRunning) {
+                    requestAnimationFrame(physicsLoop);
+                }
+                return;
+            }
+            
+            const currentTime = Date.now();
+            const deltaTime = (currentTime - this.lastPhysicsTime) / 1000; // Convert to seconds
+            this.lastPhysicsTime = currentTime;
+            
+            // Update physics
+            this.updatePhysics(deltaTime);
+        
+        // Update visual positions
+        this.updateVisualPositions();
+        
+            requestAnimationFrame(physicsLoop);
+        };
+        
+        requestAnimationFrame(physicsLoop);
+        console.log('⚡ Physics loop started');
+    }
+
+    // Stop physics loop
+    stopPhysicsLoop() {
+        this.physicsRunning = false;
+        console.log('⏸️ Physics loop stopped');
+    }
+
+    // Set initial positions based on real dimensions
+    setInitialPositions() {
+        // Set positions in real-world coordinates (cm)
+        this.currentPositions = {
+            pusherA: { x: 8, y: 13 },      // Left side, center
+            pusherB: { x: 35, y: 13 },     // Right side, center
+            puck: { x: 21.5, y: 13 }       // Center of table
+        };
+        
+        // Reset velocities
+        this.velocities = {
+            pusherA: { x: 0, y: 0 },
+            pusherB: { x: 0, y: 0 },
+            puck: { x: 0, y: 0 }
+        };
+        
+        // Reset game state
+        this.gameState.score = { left: 0, right: 0 };
+        this.gameState.lastGoal = null;
+        this.gameState.goalCooldown = false;
+        
+        console.log('🎯 Initial positions set in real-world coordinates');
+    }
+
+    // Update visual positions
+    updateVisualPositions() {
+        if (!this.isInitialized) return;
+        
+        Object.keys(this.currentPositions).forEach(objectName => {
+            const realPos = this.currentPositions[objectName];
+            const displayPos = this.realToDisplayCoordinates(realPos.x, realPos.y);
+            
+            const element = this[objectName];
+            if (element) {
+                // Center the element on the position
+                const elementWidth = element.offsetWidth;
+                const elementHeight = element.offsetHeight;
+                
+                element.style.left = (displayPos.x - elementWidth / 2) + 'px';
+                element.style.top = (displayPos.y - elementHeight / 2) + 'px';
+            }
+            
+            // Update position display
+            this.updatePositionDisplay(objectName, realPos.x, realPos.y);
+        });
+    }
+
+    // Handle position update from WebSocket/MQTT
+    handlePositionUpdate(data) {
+        if (!this.isInitialized || this.isPaused) return;
+        
+        // Convert MQTT data to real-world coordinates
+        // Assuming MQTT sends data in the format: { pusher1: {x, y}, pusher2: {x, y}, puck: {x, y} }
+        
+        if (data.pusher1) {
+            // Check if pusher1 data is valid before processing
+            if (this.isValidPositionData(data.pusher1)) {
+                const realPos = this.mqttToRealCoordinates(data.pusher1.x, data.pusher1.y);
+                
+                // Double-check that conversion was successful
+                if (realPos) {
+                    this.currentPositions.pusherA = realPos;
+                    
+                    // Calculate velocity based on position change
+                    this.updateVelocity('pusherA', realPos);
+                    
+                    console.log(`📍 Pusher A updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                } else {
+                    console.log(`⚠️ Failed to convert pusher1 coordinates, keeping current position: (${this.currentPositions.pusherA.x.toFixed(2)}, ${this.currentPositions.pusherA.y.toFixed(2)})`);
+                }
+            } else {
+                console.log(`⚠️ Invalid pusher1 data received, keeping current position: (${this.currentPositions.pusherA.x.toFixed(2)}, ${this.currentPositions.pusherA.y.toFixed(2)})`);
+            }
+        }
+        
+        if (data.pusher2) {
+            // Check if pusher2 data is valid before processing
+            if (this.isValidPositionData(data.pusher2)) {
+                const realPos = this.mqttToRealCoordinates(data.pusher2.x, data.pusher2.y);
+                
+                // Double-check that conversion was successful
+                if (realPos) {
+                    this.currentPositions.pusherB = realPos;
+                    this.updateVelocity('pusherB', realPos);
+                    
+                    console.log(`📍 Pusher B updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                } else {
+                    console.log(`⚠️ Failed to convert pusher2 coordinates, keeping current position: (${this.currentPositions.pusherB.x.toFixed(2)}, ${this.currentPositions.pusherB.y.toFixed(2)})`);
+                }
+            } else {
+                console.log(`⚠️ Invalid pusher2 data received, keeping current position: (${this.currentPositions.pusherB.x.toFixed(2)}, ${this.currentPositions.pusherB.y.toFixed(2)})`);
+            }
+        }
+        
+        if (data.puck) {
+            // Check if puck data is valid before processing
+            if (this.isValidPositionData(data.puck)) {
+                const realPos = this.mqttToRealCoordinates(data.puck.x, data.puck.y);
+                
+                // Double-check that conversion was successful
+                if (realPos) {
+                    this.currentPositions.puck = realPos;
+                    this.updateVelocity('puck', realPos);
+                    
+                    console.log(`📍 Puck updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                } else {
+                    console.log(`⚠️ Failed to convert puck coordinates, keeping current position: (${this.currentPositions.puck.x.toFixed(2)}, ${this.currentPositions.puck.y.toFixed(2)})`);
+                }
+            } else {
+                console.log(`⚠️ Invalid puck data received, keeping current position: (${this.currentPositions.puck.x.toFixed(2)}, ${this.currentPositions.puck.y.toFixed(2)})`);
+            }
+        }
+        
+        // Update performance metrics
+        this.updatePerformanceMetrics();
+    }
+
+    // Check if position data is valid (not null, undefined, or NaN)
+    isValidPositionData(positionData) {
+        if (!positionData || typeof positionData !== 'object') {
+            return false;
+        }
+        
+        const { x, y } = positionData;
+        
+        // Check if x and y are valid numbers
+        if (x === null || x === undefined || isNaN(x) || typeof x !== 'number') {
+            return false;
+        }
+        
+        if (y === null || y === undefined || isNaN(y) || typeof y !== 'number') {
+            return false;
+        }
+        
+        // Check if values are within reasonable bounds (0-800 for x, 0-400 for y in MQTT coordinates)
+        if (x < 0 || x > 800 || y < 0 || y > 400) {
+            console.warn(`⚠️ Position data out of bounds: x=${x}, y=${y}`);
+            return false;
+        }
+        
+        return true;
+    }
+
+    // Convert MQTT coordinates to real-world coordinates
+    mqttToRealCoordinates(mqttX, mqttY) {
+        // Ensure input values are valid numbers
+        if (typeof mqttX !== 'number' || typeof mqttY !== 'number' || isNaN(mqttX) || isNaN(mqttY)) {
+            console.error('Invalid MQTT coordinates:', { mqttX, mqttY });
+            return null;
+        }
+        
+        // Clamp values to expected MQTT range to prevent out-of-bounds positions
+        const clampedX = Math.max(0, Math.min(800, mqttX));
+        const clampedY = Math.max(0, Math.min(400, mqttY));
+        
+        // Log if values were clamped
+        if (clampedX !== mqttX || clampedY !== mqttY) {
+            console.warn(`⚠️ MQTT coordinates clamped: (${mqttX}, ${mqttY}) → (${clampedX}, ${clampedY})`);
+        }
+        
+        // Convert to real-world coordinates
+        // Assuming MQTT coordinate system is 0-800 for length, 0-400 for width
+        const realX = (clampedX / 800) * this.realDimensions.tableLength;
+        const realY = (clampedY / 400) * this.realDimensions.tableWidth;
+        
+        // Ensure the resulting coordinates are within table bounds
+        const boundedX = Math.max(0, Math.min(this.realDimensions.tableLength, realX));
+        const boundedY = Math.max(0, Math.min(this.realDimensions.tableWidth, realY));
+        
+        return { x: boundedX, y: boundedY };
+    }
+
+    // Update velocity based on position change
+    updateVelocity(objectName, newPos) {
+        const currentTime = Date.now();
+        const lastPos = this.currentPositions[objectName];
+        
+        if (this.lastUpdateTime) {
+            const deltaTime = (currentTime - this.lastUpdateTime) / 1000;
+            
+            if (deltaTime > 0) {
+                const vel = this.velocities[objectName];
+                vel.x = (newPos.x - lastPos.x) / deltaTime;
+                vel.y = (newPos.y - lastPos.y) / deltaTime;
+                
+                // Limit velocity
+                this.limitVelocity(objectName);
+            }
+        }
+    }
+
+    // Update performance metrics
+    updatePerformanceMetrics() {
+        this.updateCount++;
+        const currentTime = Date.now();
+        
+        if (currentTime - this.lastUpdateTime >= 1000) {
+            this.updateRate = this.updateCount;
+            this.updateCount = 0;
+            this.lastUpdateTime = currentTime;
+            
+            // Update rate display
+            this.updateRateDisplay();
+        }
+    }
+
+    // Update position info display
+    updatePositionDisplay(object, x, y) {
+        const posElement = document.getElementById(`${object}Pos`);
+        const velElement = document.getElementById(`${object}Vel`);
+        
+        // Display real-world coordinates (左上角为原点，横向为x，竖向为y)
+        if (posElement) {
+            posElement.textContent = `X: ${x.toFixed(2)}cm, Y: ${y.toFixed(2)}cm`;
+        }
+        
+        // Display velocity
+        if (velElement) {
+            const vel = this.velocities[object];
+            if (vel) {
+                const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
+                velElement.textContent = `V: ${speed.toFixed(1)} cm/s`;
+            }
+        }
+    }
+
+    // Update rate display
+    updateRateDisplay() {
+        const rateElement = document.getElementById('updateRate');
+        if (rateElement) {
+            rateElement.textContent = `${this.updateRate} Hz`;
+        }
     }
 
     // Setup event listeners
@@ -97,7 +945,15 @@ class HockeyVisualization {
         if (showTrailsCheckbox) {
             showTrailsCheckbox.addEventListener('change', (e) => {
                 this.showTrails = e.target.checked;
-                console.log('🎭 Trails display:', this.showTrails ? 'enabled' : 'disabled');
+                
+                // Show/hide pusher and puck position info panel
+                const positionInfo = document.getElementById('positionInfo');
+                
+                if (positionInfo) {
+                    positionInfo.style.display = this.showTrails ? 'flex' : 'none';
+                }
+                
+                console.log('🎭 Trails display and pusher/puck coordinates:', this.showTrails ? 'enabled' : 'disabled');
             });
         }
         
@@ -105,12 +961,14 @@ class HockeyVisualization {
             showCoordinatesCheckbox.addEventListener('change', (e) => {
                 this.showCoordinates = e.target.checked;
                 
-                // Hide mouse coordinates section when coordinates are disabled
-                if (!this.showCoordinates) {
-                    this.clearMouseCoordinatesDisplay();
+                // Show/hide mouse coordinates section
+                const mouseSection = document.getElementById('mouseCoordinatesSection');
+                
+                if (mouseSection) {
+                    mouseSection.style.display = this.showCoordinates ? 'block' : 'none';
                 }
                 
-                console.log('📍 Coordinates display:', this.showCoordinates ? 'enabled' : 'disabled');
+                console.log('📍 Mouse coordinates display:', this.showCoordinates ? 'enabled' : 'disabled');
             });
         }
         
@@ -121,44 +979,89 @@ class HockeyVisualization {
             });
         }
         
-        // Mouse hover to show coordinates in info panel
-        if (this.tableSurface) {
-            this.tableSurface.addEventListener('mousemove', (e) => {
-                if (this.showCoordinates) {
-                    const rect = this.tableSurface.querySelector('.table-surface').getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    this.updateMouseCoordinatesDisplay(x, y);
-                }
-            });
-            
-            this.tableSurface.addEventListener('mouseleave', () => {
-                if (this.showCoordinates) {
-                    this.clearMouseCoordinatesDisplay();
-                }
-            });
-        }
-        
-        // Window resize handler - maintain coordinate system proportions
+        // Window resize handling
         window.addEventListener('resize', () => {
-            setTimeout(() => {
-                // Update visual positions to maintain proportions after resize
-                this.updateVisualPositions();
-                
-                // Update position displays with new dimensions
-                Object.keys(this.currentPositions).forEach(object => {
-                    const pos = this.currentPositions[object];
-                    this.updatePositionDisplay(object, pos.x, pos.y);
-                });
-                
-                console.log('🔄 Window resized - coordinate system updated');
-            }, 100);
+            // Update element sizes when window resizes
+            this.updateElementSizes();
+            this.updateGoalSizes();
+            this.updateVisualPositions();
         });
+        
+        // Add mouse controls
+        this.setupMouseControls();
         
         console.log('👂 Event listeners set up');
     }
 
-    // Setup WebSocket connection to receive MQTT data
+    // Setup mouse controls for pusher A
+    setupMouseControls() {
+        let isDragging = false;
+        let dragTarget = null;
+        
+        // Mouse down on pusher
+        document.addEventListener('mousedown', (e) => {
+            if (this.isPaused) return;
+            
+            const rect = this.tableSurface.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Check if click is on pusher A
+            const pusherARect = this.pusherA.getBoundingClientRect();
+            const pusherAX = pusherARect.left - rect.left + pusherARect.width / 2;
+            const pusherAY = pusherARect.top - rect.top + pusherARect.height / 2;
+            
+            if (Math.sqrt((mouseX - pusherAX) ** 2 + (mouseY - pusherAY) ** 2) < 30) {
+                isDragging = true;
+                dragTarget = 'pusherA';
+                return;
+            }
+            
+            // Check if click is on pusher B
+            const pusherBRect = this.pusherB.getBoundingClientRect();
+            const pusherBX = pusherBRect.left - rect.left + pusherBRect.width / 2;
+            const pusherBY = pusherBRect.top - rect.top + pusherBRect.height / 2;
+            
+            if (Math.sqrt((mouseX - pusherBX) ** 2 + (mouseY - pusherBY) ** 2) < 30) {
+                isDragging = true;
+                dragTarget = 'pusherB';
+                return;
+            }
+        });
+        
+        // Mouse move - show coordinates whenever mouse is over the table
+        document.addEventListener('mousemove', (e) => {
+            if (this.isPaused) return;
+            
+            const rect = this.tableSurface.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Check if mouse is over the table
+            if (mouseX >= 0 && mouseY >= 0 && mouseX <= rect.width && mouseY <= rect.height) {
+                // Convert to real coordinates
+                const realPos = this.displayToRealCoordinates(mouseX, mouseY);
+                
+                // Always show mouse coordinates when over table
+                this.updateMousePosition(realPos.x, realPos.y, mouseX, mouseY);
+                
+                // Update pusher position only when dragging
+                if (isDragging && dragTarget) {
+                    this.currentPositions[dragTarget] = realPos;
+                }
+            }
+        });
+        
+        // Mouse up
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            dragTarget = null;
+        });
+        
+        console.log('🖱️ Mouse controls set up');
+    }
+
+    // Setup WebSocket connection
     setupWebSocketConnection() {
         // Use existing WebSocket manager
         if (window.websocketManager) {
@@ -170,337 +1073,15 @@ class HockeyVisualization {
             // Listen for connection status changes
             window.websocketManager.on('connect', () => {
                 this.updateConnectionStatus(true);
-                this.onWebSocketConnected();
             });
             
             window.websocketManager.on('disconnect', () => {
                 this.updateConnectionStatus(false);
-                this.onWebSocketDisconnected();
             });
-            
-            // Check if WebSocket is already connected
-            if (window.websocketManager.isConnected) {
-                this.onWebSocketConnected();
-            } else {
-                // Wait for real WebSocket connection - no fallback mode
-                console.log('⏳ Waiting for WebSocket connection...');
-                this.showWaitingForConnection();
-            }
             
             console.log('🔌 WebSocket connection listeners set up');
         } else {
-            console.warn('⚠️ WebSocket manager not available - waiting for connection');
-            this.showWaitingForConnection();
-        }
-    }
-
-    // Handle WebSocket connection established
-    onWebSocketConnected() {
-        this.isWebSocketConnected = true;
-        this.stopDemoMode();
-        console.log('✅ WebSocket connected - Using real MQTT data');
-        
-        // Show connection status
-        const statusElement = document.getElementById('mqttStatus');
-        if (statusElement) {
-            statusElement.textContent = 'Connected - Real Data';
-            statusElement.className = 'status-value connected';
-        }
-    }
-
-    // Handle WebSocket disconnection
-    onWebSocketDisconnected() {
-        this.isWebSocketConnected = false;
-        console.log('❌ WebSocket disconnected - Waiting for reconnection');
-        
-        // Show waiting status - no fallback mode
-        this.showWaitingForConnection();
-    }
-
-    // Show waiting for connection status
-    showWaitingForConnection() {
-        const statusElement = document.getElementById('mqttStatus');
-        if (statusElement) {
-            statusElement.textContent = 'Waiting for Connection';
-            statusElement.className = 'status-value disconnected';
-        }
-        
-        // Reset update rate display
-        const rateElement = document.getElementById('updateRate');
-        if (rateElement) {
-            rateElement.textContent = '0 Hz';
-        }
-        
-        console.log('⏳ Waiting for WebSocket connection...');
-    }
-
-    // Legacy method - no longer used (no demo mode)
-    stopDemoMode() {
-        // No demo mode to stop - only real data mode
-        console.log('ℹ️ No demo mode to stop - using real data only');
-    }
-
-    // Handle position update data - ONLY from backend WebSocket
-    handlePositionUpdate(data) {
-        // Only process data when WebSocket is connected and not paused
-        if (this.isPaused || !this.isWebSocketConnected) return;
-        
-        try {
-            // Parse and convert position data from backend MQTT (pusher1/pusher2 format)
-            if (data.pusher1) {
-                // Convert MQTT coordinates to display coordinates
-                const convertedPos = this.convertMqttToDisplayCoordinates(data.pusher1.x, data.pusher1.y);
-                this.updatePosition('pusherA', convertedPos.x, convertedPos.y);
-            }
-            
-            if (data.pusher2) {
-                // Convert MQTT coordinates to display coordinates
-                const convertedPos = this.convertMqttToDisplayCoordinates(data.pusher2.x, data.pusher2.y);
-                this.updatePosition('pusherB', convertedPos.x, convertedPos.y);
-            }
-            
-            if (data.puck) {
-                // Convert MQTT coordinates to display coordinates
-                const convertedPos = this.convertMqttToDisplayCoordinates(data.puck.x, data.puck.y);
-                this.updatePuckPosition(convertedPos.x, convertedPos.y);
-            }
-            
-            // Update frequency statistics
-            this.updateCount++;
-            const now = Date.now();
-            if (now - this.lastUpdateTime >= 1000) {
-                this.updateRate = this.updateCount;
-                this.updateCount = 0;
-                this.lastUpdateTime = now;
-                this.updateRateDisplay();
-            }
-            
-        } catch (error) {
-            console.error('❌ Error processing position update:', error);
-        }
-    }
-
-    // Get current table dimensions - maintaining 2:1 aspect ratio
-    getTableDimensions() {
-        if (!this.tableSurface) return { width: 800, height: 400 };
-        
-        const tableSurfaceElement = this.tableSurface.querySelector('.table-surface');
-        if (!tableSurfaceElement) return { width: 800, height: 400 };
-        
-        const rect = tableSurfaceElement.getBoundingClientRect();
-        
-        // Ensure we maintain exact 2:1 ratio even if CSS has minor differences
-        const width = rect.width;
-        const height = width / 2; // Force 2:1 ratio
-        
-        console.log(`🏒 Table dimensions: ${width}x${height} (ratio: ${(width/height).toFixed(2)}:1)`);
-        
-        return {
-            width: width,
-            height: height
-        };
-    }
-    
-    // Convert MQTT coordinates to frontend display coordinates
-    // MQTT: (0,0) to (800,400) → Display: (0,0) to (width, height)
-    // Maintains proportional positioning across all screen sizes
-    // 修复: 修正了xy轴映射
-    convertMqttToDisplayCoordinates(mqttX, mqttY) {
-        const displayDimensions = this.getTableDimensions();
-        
-        // Calculate scale factors - both should be equal due to 2:1 aspect ratio
-        const scaleX = displayDimensions.width / this.mqttCoordinates.width;
-        const scaleY = displayDimensions.height / this.mqttCoordinates.height;
-        
-        // Verify scale factors are equal (indicating proper aspect ratio maintenance)
-        if (Math.abs(scaleX - scaleY) > 0.01) {
-            console.warn(`⚠️ Scale factor mismatch: X=${scaleX.toFixed(3)}, Y=${scaleY.toFixed(3)}`);
-        }
-        
-        // Convert coordinates - 修复xy轴映射问题
-        // MQTT坐标系统: x轴表示长度方向，y轴表示宽度方向
-        // 显示坐标系统: x轴表示宽度方向，y轴表示长度方向
-        const displayX = mqttY * scaleX;  // MQTT的y轴映射到显示的x轴
-        const displayY = mqttX * scaleY;  // MQTT的x轴映射到显示的y轴
-        
-        // Ensure coordinates are within display bounds
-        const boundedX = Math.max(0, Math.min(displayDimensions.width, displayX));
-        const boundedY = Math.max(0, Math.min(displayDimensions.height, displayY));
-        
-        return {
-            x: boundedX,
-            y: boundedY
-        };
-    }
-
-    // Set initial positions based on table dimensions
-    setInitialPositions() {
-        const dimensions = this.getTableDimensions();
-        const centerY = dimensions.height / 2;
-        
-        // Verify aspect ratio is correct
-        const aspectRatio = dimensions.width / dimensions.height;
-        if (Math.abs(aspectRatio - 2.0) > 0.1) {
-            console.warn(`⚠️ Aspect ratio deviation detected: ${aspectRatio.toFixed(2)}:1 (expected 2:1)`);
-        }
-        
-        // Set initial positions in display coordinates
-        this.currentPositions = {
-            pusherA: { x: dimensions.width * 0.2, y: centerY },
-            pusherB: { x: dimensions.width * 0.8, y: centerY },
-            puck: { x: dimensions.width * 0.5, y: centerY }
-        };
-        
-        // Update last puck position for speed calculation
-        this.lastPuckPosition = { x: dimensions.width * 0.5, y: centerY };
-        
-        console.log('🎯 Initial positions set for display dimensions:', dimensions);
-        console.log('🏒 Coordinate system verification:');
-        console.log(`   MQTT: ${this.mqttCoordinates.width}x${this.mqttCoordinates.height} (${this.mqttCoordinates.width/this.mqttCoordinates.height}:1)`);
-        console.log(`   Display: ${dimensions.width.toFixed(0)}x${dimensions.height.toFixed(0)} (${aspectRatio.toFixed(2)}:1)`);
-    }
-
-    // Update object position (coordinates already converted from MQTT to display)
-    updatePosition(object, x, y) {
-        // Update current position (coordinates are already in display coordinate system)
-        this.currentPositions[object] = { x, y };
-        
-        // Add to history (for trails)
-        if (this.showTrails) {
-            this.positionHistory[object].push({ x, y, timestamp: Date.now() });
-            
-            // Limit history length
-            if (this.positionHistory[object].length > 50) {
-                this.positionHistory[object].shift();
-            }
-        }
-        
-        // Update visual positions
-        this.updateVisualPositions();
-        
-        // Update position info display (show both display and MQTT coordinates)
-        this.updatePositionDisplay(object, x, y);
-    }
-
-    // Update puck position (including speed calculation)
-    updatePuckPosition(x, y) {
-        const now = Date.now();
-        const deltaTime = (now - this.lastPuckTime) / 1000; // Convert to seconds
-        
-        if (deltaTime > 0) {
-            const deltaX = x - this.lastPuckPosition.x;
-            const deltaY = y - this.lastPuckPosition.y;
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            this.puckSpeed = distance / deltaTime; // pixels/second
-        }
-        
-        this.lastPuckPosition = { x, y };
-        this.lastPuckTime = now;
-        
-        // Update position
-        this.updatePosition('puck', x, y);
-        
-        // Update speed display
-        this.updateSpeedDisplay();
-        
-        // Add movement effect
-        if (this.puckSpeed > 50) { // Speed threshold
-            this.puck.classList.add('moving');
-            setTimeout(() => {
-                if (this.puck) {
-                    this.puck.classList.remove('moving');
-                }
-            }, 500);
-        }
-    }
-
-    // Update visual positions
-    updateVisualPositions() {
-        if (!this.isInitialized) return;
-        
-        // Update pusher A position
-        if (this.pusherA) {
-            const pos = this.currentPositions.pusherA;
-            this.pusherA.style.left = `${pos.x - 20}px`; // Subtract radius
-            this.pusherA.style.top = `${pos.y - 20}px`;
-        }
-        
-        // Update pusher B position
-        if (this.pusherB) {
-            const pos = this.currentPositions.pusherB;
-            this.pusherB.style.left = `${pos.x - 20}px`;
-            this.pusherB.style.top = `${pos.y - 20}px`;
-        }
-        
-        // Update puck position
-        if (this.puck) {
-            const pos = this.currentPositions.puck;
-            this.puck.style.left = `${pos.x - 12.5}px`; // Subtract radius
-            this.puck.style.top = `${pos.y - 12.5}px`;
-        }
-    }
-
-    // Update mouse coordinates display in info panel
-    updateMouseCoordinatesDisplay(x, y) {
-        if (!this.showCoordinates) return;
-        
-        // Calculate MQTT coordinates from display coordinates
-        // 修复: 修正反向坐标转换以匹配正向转换
-        const dimensions = this.getTableDimensions();
-        const mqttX = (y / dimensions.height) * this.mqttCoordinates.width;  // 显示y轴映射到MQTT x轴
-        const mqttY = (x / dimensions.width) * this.mqttCoordinates.height;  // 显示x轴映射到MQTT y轴
-        
-        // Update mouse coordinates in info panel
-        const mouseXElement = document.getElementById('mouseX');
-        const mouseYElement = document.getElementById('mouseY');
-        
-        if (mouseXElement) mouseXElement.textContent = `${Math.round(mqttX)} (${Math.round(x)}px)`;
-        if (mouseYElement) mouseYElement.textContent = `${Math.round(mqttY)} (${Math.round(y)}px)`;
-        
-        // Show mouse coordinates section
-        const mouseSection = document.getElementById('mouseCoordinatesSection');
-        if (mouseSection) {
-            mouseSection.style.display = 'block';
-        }
-    }
-    
-    // Clear mouse coordinates display
-    clearMouseCoordinatesDisplay() {
-        const mouseSection = document.getElementById('mouseCoordinatesSection');
-        if (mouseSection) {
-            mouseSection.style.display = 'none';
-        }
-    }
-
-    // Update position info display
-    updatePositionDisplay(object, x, y) {
-        const xElement = document.getElementById(`${object}X`);
-        const yElement = document.getElementById(`${object}Y`);
-        
-        // Calculate MQTT coordinates from display coordinates for reference
-        // 修复: 修正反向坐标转换以匹配正向转换
-        const dimensions = this.getTableDimensions();
-        const mqttX = (y / dimensions.height) * this.mqttCoordinates.width;  // 显示y轴映射到MQTT x轴
-        const mqttY = (x / dimensions.width) * this.mqttCoordinates.height;  // 显示x轴映射到MQTT y轴
-        
-        // Display both coordinate systems
-        if (xElement) xElement.textContent = `${Math.round(mqttX)} (${Math.round(x)}px)`;
-        if (yElement) yElement.textContent = `${Math.round(mqttY)} (${Math.round(y)}px)`;
-    }
-
-    // Update speed display
-    updateSpeedDisplay() {
-        const speedElement = document.getElementById('puckSpeed');
-        if (speedElement) {
-            speedElement.textContent = `${Math.round(this.puckSpeed)} px/s`;
-        }
-    }
-
-    // Update rate display
-    updateRateDisplay() {
-        const rateElement = document.getElementById('updateRate');
-        if (rateElement) {
-            rateElement.textContent = `${this.updateRate} Hz`;
+            console.warn('⚠️ WebSocket manager not available');
         }
     }
 
@@ -508,19 +1089,19 @@ class HockeyVisualization {
     updateConnectionStatus(isConnected) {
         const statusElement = document.getElementById('mqttStatus');
         if (statusElement) {
-            statusElement.textContent = isConnected ? 'Connected' : 'Disconnected';
+            statusElement.textContent = isConnected ? 'Connected - Real Data' : 'Disconnected';
             statusElement.className = `status-value ${isConnected ? 'connected' : 'disconnected'}`;
         }
         
-        console.log(`🔗 MQTT connection status: ${isConnected ? 'connected' : 'disconnected'}`);
+        console.log(`🔗 Connection status: ${isConnected ? 'connected' : 'disconnected'}`);
     }
 
     // Start update loop
     startUpdateLoop() {
         const update = () => {
             if (this.isInitialized && !this.isPaused) {
-                // Clean up expired history records
-                this.cleanupPositionHistory();
+                // Update display elements
+                this.updateVisualPositions();
             }
             requestAnimationFrame(update);
         };
@@ -529,69 +1110,31 @@ class HockeyVisualization {
         console.log('🔄 Update loop started');
     }
 
-    // Cleanup position history
-    cleanupPositionHistory() {
-        const now = Date.now();
-        const maxAge = 5000; // 5 seconds
-        
-        ['pusherA', 'pusherB', 'puck'].forEach(object => {
-            this.positionHistory[object] = this.positionHistory[object].filter(
-                pos => now - pos.timestamp < maxAge
-            );
-        });
-    }
-
-    // No demo mode - only real data from backend
-
-    // Reset visualization
-    reset() {
-        this.currentPositions = {
-            pusherA: { x: 100, y: 200 },
-            pusherB: { x: 700, y: 200 },
-            puck: { x: 400, y: 200 }
-        };
-        
-        this.positionHistory = {
-            pusherA: [],
-            pusherB: [],
-            puck: []
-        };
-        
-        this.puckSpeed = 0;
-        this.updateVisualPositions();
-        this.updateSpeedDisplay();
-        
-        console.log('🔄 Hockey visualization reset');
-    }
-
-    // Destroy visualization
+    // Clean up
     destroy() {
+        this.stopPhysicsLoop();
         this.isInitialized = false;
-        console.log('🗑️ Hockey visualization destroyed');
+        console.log('🧹 HockeyVisualization destroyed');
+    }
+
+    // Update mouse position display
+    updateMousePosition(realX, realY, displayX, displayY) {
+        const mouseSection = document.getElementById('mouseCoordinatesSection');
+        const mousePosElement = document.getElementById('mousePos');
+        const mouseDisplayElement = document.getElementById('mouseDisplay');
+        
+        if (mousePosElement) {
+            mousePosElement.textContent = `X: ${realX.toFixed(2)}cm, Y: ${realY.toFixed(2)}cm`;
+        }
+        
+        if (mouseDisplayElement) {
+            mouseDisplayElement.textContent = `Display: (${displayX.toFixed(0)}px, ${displayY.toFixed(0)}px)`;
+        }
     }
 }
 
-// Global instance
-let hockeyVisualization = null;
-
         // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // Wait a bit to ensure other components are loaded
-    setTimeout(() => {
-        hockeyVisualization = new HockeyVisualization();
-        if (hockeyVisualization.init()) {
-            console.log('🏒 Hockey visualization system ready');
-            
-            // Expose to global scope for other modules to use
-            window.hockeyVisualization = hockeyVisualization;
-            
-            // Only real data from backend - no simulation
-            console.log('🔌 Ready to receive real data from backend...');
-        }
-    }, 1000);
-});
-
-// Export module
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = HockeyVisualization;
-} 
+    window.hockeyVisualization = new HockeyVisualization();
+    window.hockeyVisualization.initialize();
+}); 

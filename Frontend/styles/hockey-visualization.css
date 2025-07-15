@@ -284,7 +284,7 @@
     width: 100%;
 }
 
-/* 冰球桌主体 - 保持2:1长宽比（匹配MQTT 800:400坐标系统） */
+/* 冰球桌主体 - 真实比例 43:26 ≈ 1.65:1 */
 .hockey-table {
     position: relative;
     background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%);
@@ -292,7 +292,7 @@
     box-shadow: 
         inset 0 0 30px rgba(0, 0, 0, 0.03),
         var(--shadow-md);
-    padding: var(--spacing-md);
+    padding: 30px 25px; /* 增加垂直padding以避免边界陷入 */
     border: 2px solid var(--separator-opaque);
     width: 100%;
     max-width: 1000px; /* 最大宽度限制 */
@@ -303,133 +303,369 @@
     align-items: center;
 }
 
-/* 现代浏览器：使用aspect-ratio保持2:1比例 */
-@supports (aspect-ratio: 2 / 1) {
+/* 现代浏览器：使用真实冰球桌比例 43:26 */
+@supports (aspect-ratio: 43 / 26) {
     .hockey-table {
-        aspect-ratio: 2 / 1; /* 固定2:1长宽比，匹配真实冰球场地比例 */
+        aspect-ratio: 43 / 26; /* 真实冰球桌比例 */
     }
 }
 
 /* 旧浏览器备用方案：使用padding-bottom技巧 */
-@supports not (aspect-ratio: 2 / 1) {
+@supports not (aspect-ratio: 43 / 26) {
     .hockey-table {
         height: 0;
-        padding-bottom: 50%; /* 50% = 1/2，创建2:1比例 */
-        padding-top: 15px;
-        padding-left: 15px;
-        padding-right: 15px;
+        padding-bottom: calc(26 / 43 * 100%); /* 26/43 ≈ 60.47% */
+        padding-top: 30px;
+        padding-left: 25px;
+        padding-right: 25px;
     }
     
     .hockey-table .table-surface {
         position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
+        top: 30px;
+        left: 25px;
+        right: 25px;
+        bottom: 30px;
     }
 }
 
-/* 桌子下方的控制区域 */
-.table-controls-area {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    width: 100%;
-    flex-shrink: 0;
-}
-
-/* 桌面表面 */
-.table-surface {
+/* 桌面表面 - 模拟真实白色球桌 */
+.hockey-table .table-surface {
     position: relative;
     width: 100%;
     height: 100%;
-    max-width: none;
-    max-height: none;
-    background: linear-gradient(45deg, #ecf0f1 25%, transparent 25%),
-                linear-gradient(-45deg, #ecf0f1 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #ecf0f1 75%),
-                linear-gradient(-45deg, transparent 75%, #ecf0f1 75%);
-    background-size: 20px 20px;
-    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-    border-radius: 15px;
-    border: 4px solid #2c3e50;
+    background: linear-gradient(135deg, 
+        #ffffff 0%, 
+        #f8fafc 25%, 
+        #f1f5f9 50%, 
+        #e2e8f0 75%, 
+        #f8fafc 100%
+    );
+    border-radius: var(--radius-lg);
+    border: 4px solid #6b7280; /* 增加边框厚度 */
+    box-shadow: 
+        inset 0 0 40px rgba(0, 0, 0, 0.03),
+        inset 0 0 20px rgba(0, 0, 0, 0.02),
+        0 0 20px rgba(0, 0, 0, 0.1);
     overflow: hidden;
-    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.1);
+    
+    /* 创建白色表面的细微纹理 */
+    background-image: 
+        /* 轻微的表面反射 */
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.3) 0%, transparent 30%),
+        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.2) 0%, transparent 30%),
+        /* 细微的纹理效果 */
+        linear-gradient(45deg, rgba(0, 0, 0, 0.01) 0%, transparent 50%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
 }
 
-/* 桌面边界 */
+/* 真实球桌边界 - 红色边框 */
 .table-border {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    border: 6px solid #e74c3c;
-    border-radius: 12px;
+    border: 3px solid #dc2626;
+    border-radius: 8px;
     pointer-events: none;
+    box-shadow: 
+        0 0 10px rgba(220, 38, 38, 0.2),
+        inset 0 0 5px rgba(220, 38, 38, 0.1);
 }
 
-/* 中心线 */
+/* 真实球桌中心线 */
 .center-line {
     position: absolute;
     left: 50%;
-    top: 10%;
-    bottom: 10%;
-    width: 3px;
-    background: #3498db;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dc2626;
     transform: translateX(-50%);
-    border-radius: 2px;
+    border-radius: 1px;
+    z-index: 5;
 }
 
-/* 球门样式 */
+/* 中间两边的红色平分线 - 与中心线一样长，位置更靠近 */
+.mid-divider-left {
+    position: absolute;
+    left: 35%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dc2626;
+    transform: translateX(-50%);
+    border-radius: 1px;
+    z-index: 5;
+}
+
+.mid-divider-right {
+    position: absolute;
+    left: 65%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dc2626;
+    transform: translateX(-50%);
+    border-radius: 1px;
+    z-index: 5;
+}
+
+/* 外侧两边的红色平分线 - 8%位置 */
+.outer-divider-left {
+    position: absolute;
+    left: 8%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dc2626;
+    transform: translateX(-50%);
+    border-radius: 1px;
+    z-index: 5;
+}
+
+.outer-divider-right {
+    position: absolute;
+    left: 92%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dc2626;
+    transform: translateX(-50%);
+    border-radius: 1px;
+    z-index: 5;
+}
+
+
+
+/* 中心圆圈 - 双环结构，再大一点点点 */
+.center-circle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+}
+
+.center-circle-outer {
+    position: absolute;
+    width: 160px;
+    height: 160px;
+    border: 2px solid #dc2626;
+    border-radius: 50%;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.center-circle-inner {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border: 2px solid #dc2626;
+    border-radius: 50%;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* 角落圆圈 - 再大一点点点，位置在平分线中间 */
+.corner-circle {
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    border: 2px solid #dc2626;
+    border-radius: 50%;
+    z-index: 4;
+}
+
+.corner-tl {
+    top: 15%;
+    left: 21.5%;
+    transform: translate(-50%, -50%);
+}
+
+.corner-tr {
+    top: 15%;
+    right: 21.5%;
+    transform: translate(50%, -50%);
+}
+
+.corner-bl {
+    bottom: 15%;
+    left: 21.5%;
+    transform: translate(-50%, 50%);
+}
+
+.corner-br {
+    bottom: 15%;
+    right: 21.5%;
+    transform: translate(50%, 50%);
+}
+
+
+
+/* 定位点 - 加深颜色并略微增大 */
+.positioning-dots {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        radial-gradient(circle at 0px 0px, #111827 1.5px, transparent 1.5px);
+    background-size: 30px 30px;
+    background-position: 15px 15px;
+    opacity: 0.4;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* 圆圈中心点 */
+.circle-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #dc2626;
+    border-radius: 50%;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+}
+
+/* 中心点（特殊样式） */
+.center-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #dc2626;
+    border-radius: 50%;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    box-shadow: 0 0 4px rgba(220, 38, 38, 0.5);
+}
+
+
+
+/* 真实的9cm球门样式 - 简洁设计 */
 .goal {
     position: absolute;
     top: 50%;
-    width: 8px;
-    height: 120px;
+    width: 4px;
     transform: translateY(-50%);
+    z-index: 15;
+    opacity: 1;
 }
 
 .goal-a {
-    left: -4px;
+    left: -2px;
 }
 
 .goal-b {
-    right: -4px;
+    right: -2px;
 }
 
 .goal-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
     width: 100%;
-    height: 100%;
-    background: #e74c3c;
-    border-radius: 4px;
-    box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+    background: #dc2626;
+    border-radius: 2px;
 }
 
 .goal-area {
     position: absolute;
-    width: 60px;
-    height: 140px;
+    width: 40px;
     top: 50%;
     transform: translateY(-50%);
-    border: 2px solid #e74c3c;
-    border-radius: 8px;
-    background: rgba(231, 76, 60, 0.1);
+    border: 1px solid #dc2626;
+    border-radius: 4px;
+    background: rgba(220, 38, 38, 0.03);
+    opacity: 0.8;
 }
 
 .goal-a .goal-area {
-    left: 8px;
+    left: 4px;
+    border-left: none;
 }
 
 .goal-b .goal-area {
-    right: 8px;
+    right: 4px;
+    border-right: none;
 }
 
-/* 推杆样式 */
+/* 椭圆形球门把手设计 */
+.goal-handle {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 25px;
+    height: 60px;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+    border: 2px solid #000;
+    border-radius: 50%;
+    box-shadow: 
+        0 0 8px rgba(0, 0, 0, 0.6),
+        inset 0 0 6px rgba(255, 255, 255, 0.1),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+    z-index: 16;
+}
+
+.goal-a .goal-handle {
+    left: -15px;
+}
+
+.goal-b .goal-handle {
+    right: -15px;
+}
+
+/* 球门把手内部细节 */
+.goal-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 15px;
+    height: 40px;
+    background: linear-gradient(45deg, #333 0%, #555 50%, #333 100%);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+/* 球门把手高光效果 */
+.goal-handle::after {
+    content: '';
+    position: absolute;
+    top: 20%;
+    left: 20%;
+    width: 8px;
+    height: 20px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, transparent 50%);
+    border-radius: 50%;
+    filter: blur(1px);
+}
+
+/* 球门柱顶部和底部效果 - 简化 */
+.goal::before,
+.goal::after {
+    display: none;
+}
+
+/* 球门网格效果 - 简洁设计 */
+.goal-net {
+    display: none;
+}
+
+/* 移除固定尺寸的推杆样式 - 现在通过JS动态设置 */
 .pusher {
     position: absolute;
-    width: 40px;
-    height: 40px;
+    /* width和height将通过JS设置 */
     border-radius: 50%;
     transition: all 0.1s ease-out;
     cursor: pointer;
@@ -456,19 +692,18 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 12px;
-    height: 12px;
+    width: 30%;
+    height: 30%;
     background: #34495e;
     border-radius: 50%;
     transform: translate(-50%, -50%);
     box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
-/* 冰球样式 */
+/* 移除固定尺寸的冰球样式 - 现在通过JS动态设置 */
 .puck {
     position: absolute;
-    width: 25px;
-    height: 25px;
+    /* width和height将通过JS设置 */
     background: radial-gradient(circle at 30% 30%, #2c3e50, #1a252f);
     border: 2px solid #1a252f;
     border-radius: 50%;
@@ -484,8 +719,8 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 8px;
-    height: 8px;
+    width: 35%;
+    height: 35%;
     background: #95a5a6;
     border-radius: 50%;
     transform: translate(-50%, -50%);
@@ -498,19 +733,71 @@
     height: 100%;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(52, 152, 219, 0.3) 0%, transparent 70%);
-    animation: trail-pulse 0.5s ease-out infinite;
     opacity: 0;
+    transition: opacity 0.2s ease-out;
 }
 
-@keyframes trail-pulse {
-    0% {
-        opacity: 0.8;
-        transform: scale(1);
+/* 碰撞效果 */
+.pusher.collision {
+    animation: collisionPulse 0.3s ease-out;
+}
+
+.puck.collision {
+    animation: collisionPulse 0.3s ease-out;
+}
+
+@keyframes collisionPulse {
+    0% { 
+        transform: scale(1); 
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
     }
-    100% {
-        opacity: 0;
-        transform: scale(2.5);
+    50% { 
+        transform: scale(1.1); 
+        box-shadow: 0 0 25px rgba(255, 255, 255, 1);
     }
+    100% { 
+        transform: scale(1); 
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+    }
+}
+
+/* 物理仿真相关样式 */
+.physics-enabled .pusher {
+    transition: none; /* 物理仿真时禁用CSS过渡 */
+}
+
+.physics-enabled .puck {
+    transition: none; /* 物理仿真时禁用CSS过渡 */
+}
+
+/* 速度指示器 */
+.speed-indicator {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+}
+
+.puck.moving .speed-indicator {
+    opacity: 1;
+}
+
+/* 边界反弹效果 */
+.boundary-collision {
+    animation: bounceFlash 0.2s ease-out;
+}
+
+@keyframes bounceFlash {
+    0% { filter: brightness(1); }
+    50% { filter: brightness(1.5); }
+    100% { filter: brightness(1); }
 }
 
 /* 鼠标坐标显示 - 在信息面板中 */
@@ -852,5 +1139,252 @@
     
     .info-section {
         min-width: 100%;
+    }
+} 
+
+
+
+/* 球门效果 */
+.goal {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    border: 2px solid #991b1b;
+    border-radius: var(--radius-sm);
+    box-shadow: 
+        0 0 10px rgba(220, 38, 38, 0.5),
+        inset 0 0 5px rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+/* 球门得分效果增强 */
+.goal-scored {
+    animation: goalScored 1.2s ease-out;
+}
+
+.goal-scored .goal-line {
+    animation: goalLineFlash 1.2s ease-out;
+}
+
+.goal-scored .goal-area {
+    animation: goalAreaFlash 1.2s ease-out;
+}
+
+.goal-scored .goal-handle {
+    animation: goalHandleFlash 1.2s ease-out;
+}
+
+@keyframes goalScored {
+    0% { 
+        transform: translateY(-50%) scale(1);
+        filter: brightness(1);
+    }
+    25% { 
+        transform: translateY(-50%) scale(1.1);
+        filter: brightness(1.5) hue-rotate(120deg);
+    }
+    50% { 
+        transform: translateY(-50%) scale(1.05);
+        filter: brightness(1.3) hue-rotate(60deg);
+    }
+    75% { 
+        transform: translateY(-50%) scale(1.08);
+        filter: brightness(1.4) hue-rotate(240deg);
+    }
+    100% { 
+        transform: translateY(-50%) scale(1);
+        filter: brightness(1);
+    }
+}
+
+@keyframes goalLineFlash {
+    0% { 
+        background: #dc2626;
+    }
+    50% { 
+        background: #22c55e;
+        box-shadow: 0 0 15px rgba(34, 197, 94, 0.8);
+    }
+    100% { 
+        background: #dc2626;
+    }
+}
+
+@keyframes goalAreaFlash {
+    0% { 
+        border-color: #dc2626;
+        background: rgba(220, 38, 38, 0.03);
+    }
+    50% { 
+        border-color: #22c55e;
+        background: rgba(34, 197, 94, 0.1);
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+    }
+    100% { 
+        border-color: #dc2626;
+        background: rgba(220, 38, 38, 0.03);
+    }
+}
+
+@keyframes goalHandleFlash {
+    0% { 
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+        border-color: #000;
+        box-shadow: 
+            0 0 8px rgba(0, 0, 0, 0.6),
+            inset 0 0 6px rgba(255, 255, 255, 0.1),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+    }
+    50% { 
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%);
+        border-color: #15803d;
+        box-shadow: 
+            0 0 20px rgba(34, 197, 94, 0.8),
+            inset 0 0 10px rgba(255, 255, 255, 0.3),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+        transform: translateY(-50%) scale(1.1);
+    }
+    100% { 
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+        border-color: #000;
+        box-shadow: 
+            0 0 8px rgba(0, 0, 0, 0.6),
+            inset 0 0 6px rgba(255, 255, 255, 0.1),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* 冰球进球庆祝效果 */
+.puck.goal-celebration {
+    animation: goalCelebration 1s ease-out;
+}
+
+@keyframes goalCelebration {
+    0% { 
+        transform: scale(1);
+        box-shadow: 0 0 20px rgba(44, 62, 80, 0.8);
+    }
+    25% { 
+        transform: scale(1.3);
+        box-shadow: 0 0 40px rgba(34, 197, 94, 1);
+    }
+    50% { 
+        transform: scale(1.1);
+        box-shadow: 0 0 30px rgba(251, 191, 36, 1);
+    }
+    75% { 
+        transform: scale(1.2);
+        box-shadow: 0 0 35px rgba(168, 85, 247, 1);
+    }
+    100% { 
+        transform: scale(1);
+        box-shadow: 0 0 20px rgba(44, 62, 80, 0.8);
+    }
+}
+
+/* 球门区域高亮 - 已移除 */
+
+/* 球门线 - 已移除 */
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .score-display {
+        padding: var(--spacing-sm);
+        margin-bottom: var(--spacing-sm);
+    }
+    
+    .score-value {
+        font-size: 2rem;
+        min-width: 50px;
+        padding: var(--spacing-xs);
+    }
+    
+    .score-separator {
+        font-size: 1rem;
+        margin: 0 var(--spacing-md);
+    }
+    
+    .score-label {
+        font-size: 0.8rem;
+    }
+    
+    /* 小屏幕球门把手调整 */
+    .goal-handle {
+        width: 20px;
+        height: 45px;
+    }
+    
+    .goal-a .goal-handle {
+        left: -12px;
+    }
+    
+    .goal-b .goal-handle {
+        right: -12px;
+    }
+    
+    .goal-handle::before {
+        width: 12px;
+        height: 30px;
+    }
+    
+    .goal-handle::after {
+        width: 6px;
+        height: 15px;
+    }
+    
+    /* 小屏幕红色圆圈调整 */
+    .center-circle-outer {
+        width: 135px;
+        height: 135px;
+    }
+    
+    .center-circle-inner {
+        width: 65px;
+        height: 65px;
+    }
+    
+    .corner-circle {
+        width: 105px;
+        height: 105px;
+    }
+}
+
+@media (max-width: 576px) {
+    /* 超小屏幕球门把手调整 */
+    .goal-handle {
+        width: 18px;
+        height: 40px;
+    }
+    
+    .goal-a .goal-handle {
+        left: -10px;
+    }
+    
+    .goal-b .goal-handle {
+        right: -10px;
+    }
+    
+    .goal-handle::before {
+        width: 10px;
+        height: 25px;
+    }
+    
+    .goal-handle::after {
+        width: 5px;
+        height: 12px;
+    }
+    
+    /* 超小屏幕红色圆圈调整 */
+    .center-circle-outer {
+        width: 120px;
+        height: 120px;
+    }
+    
+    .center-circle-inner {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .corner-circle {
+        width: 95px;
+        height: 95px;
     }
 } 
