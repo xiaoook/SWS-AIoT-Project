@@ -80,14 +80,21 @@ class GameControlManager {
     togglePause() {
         if (window.smartCourtApp) {
             const gameState = window.smartCourtApp.gameState;
+            console.log('🔄 Toggle pause - Current status:', gameState.status);
             
             if (gameState.status === 'playing') {
+                console.log('⏸️ Pausing game...');
                 window.smartCourtApp.pauseGame();
                 this.buttons.pause.textContent = 'Resume Game';
             } else if (gameState.status === 'paused') {
+                console.log('▶️ Resuming game...');
                 window.smartCourtApp.resumeGame();
                 this.buttons.pause.textContent = 'Pause Game';
+            } else {
+                console.log('⚠️ Cannot pause/resume - Invalid game status:', gameState.status);
             }
+        } else {
+            console.log('❌ smartCourtApp not found');
         }
         
         this.updateButtonStates();
@@ -108,10 +115,14 @@ class GameControlManager {
     }
     
     updateButtonStates() {
-        if (!window.smartCourtApp) return;
+        if (!window.smartCourtApp) {
+            console.log('❌ updateButtonStates: smartCourtApp not found');
+            return;
+        }
         
         const gameState = window.smartCourtApp.gameState;
         const status = gameState.status;
+        console.log('🔄 Updating button states - Current status:', status);
         
         // Update button states
         switch (status) {

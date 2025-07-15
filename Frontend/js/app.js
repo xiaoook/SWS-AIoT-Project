@@ -61,17 +61,11 @@ class SmartCourtApp {
         });
         
         // Game control buttons
-        document.getElementById('startGame')?.addEventListener('click', () => {
-            this.startGame();
-        });
+        // Start game button is handled by gameControl.js
         
-        document.getElementById('pauseGame')?.addEventListener('click', () => {
-            this.pauseGame();
-        });
+        // Pause game button is handled by gameControl.js
         
-        document.getElementById('endGame')?.addEventListener('click', () => {
-            this.endGame();
-        });
+        // End game button is handled by gameControl.js
         
         // Global keyboard events
         document.addEventListener('keydown', (e) => {
@@ -167,12 +161,15 @@ class SmartCourtApp {
         return true;
     }
     
-    saveCurrentGameToHistory() {
+    saveCurrentGameToHistory(finalDuration = null) {
         if (!this.currentGameId) {
             // Create new game ID
             this.gameCounter++;
             this.currentGameId = `GAME-${String(this.gameCounter).padStart(3, '0')}`;
         }
+        
+        // Use provided duration or current elapsed time
+        const duration = finalDuration !== null ? finalDuration : this.gameState.elapsedTime;
         
         // Find existing game or create new one
         let gameIndex = this.gamesHistory.findIndex(g => g.gameId === this.currentGameId);
@@ -181,7 +178,7 @@ class SmartCourtApp {
             gameType: this.gameState.status === 'ended' ? 'Completed Match' : 'Live Match',
             startTime: this.gameState.startTime,
             endTime: this.gameState.endTime,
-            duration: this.gameState.elapsedTime,
+            duration: duration,
             finalScores: { ...this.gameState.scores },
             winner: this.gameState.status === 'ended' ? 
                    (this.gameState.scores.playerA >= 7 ? 'playerA' : 
@@ -445,6 +442,15 @@ class SmartCourtApp {
         this.gameState.status = 'ended';
         this.gameState.endTime = new Date();
         this.stopTimer();
+        
+        // Save duration before resetting timer display
+        const durationInSeconds = this.gameState.elapsedTime; // Keep as seconds for accuracy
+        console.log(`📊 Game ending - Duration: ${durationInSeconds} seconds (${this.formatDuration(durationInSeconds)})`);
+        
+        // Reset timer display to 0 after game ends
+        this.gameState.elapsedTime = 0;
+        this.updateTimer();
+        
         this.updateGameStatus();
         
         const winner = this.gameState.scores.playerA >= 7 ? 'A' : 
@@ -457,7 +463,6 @@ class SmartCourtApp {
         
         // Calculate game statistics for database
         const totalRounds = this.gameState.rounds.length;
-        const durationInSeconds = this.gameState.elapsedTime; // Keep as seconds for accuracy
         
         // Get player information
         const playerInfo = this.getCurrentPlayerInfo();
@@ -504,8 +509,8 @@ class SmartCourtApp {
             this.addLiveFeedItem(`📝 Game saved locally only (${totalRounds} rounds)`, 'info');
         }
         
-        // Save final game state to history
-        this.saveCurrentGameToHistory();
+        // Save final game state to history with correct duration
+        this.saveCurrentGameToHistory(durationInSeconds);
         
         // Generate final report
         if (window.reportManager) {
@@ -1180,6 +1185,12 @@ class SmartCourtApp {
             return;
         }
         
+        // 检查游戏状态
+        if (this.gameState.status !== 'playing') {
+            this.showMessage('Please start the game first', 'error');
+            return;
+        }
+        
         if (window.wsManager) {
             await window.wsManager.simulateGoal('playerA');
         } else {
@@ -1191,6 +1202,12 @@ class SmartCourtApp {
         // 检查确认状态
         if (!window.arePlayersConfirmed || !window.arePlayersConfirmed()) {
             this.showMessage('Please confirm players first!', 'error');
+            return;
+        }
+        
+        // 检查游戏状态
+        if (this.gameState.status !== 'playing') {
+            this.showMessage('Please start the game first', 'error');
             return;
         }
         

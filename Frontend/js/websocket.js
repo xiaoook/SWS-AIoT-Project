@@ -412,6 +412,13 @@ class WebSocketManager {
             return;
         }
         
+        // Check game status
+        if (window.smartCourtApp && window.smartCourtApp.gameState.status !== 'playing') {
+            this.showMessage('Please start the game first', 'error');
+            this.addLiveFeedItem('❌ Game not started - Cannot score', 'error');
+            return;
+        }
+        
         // Backend expects 'A' or 'B' instead of 'playerA' or 'playerB'
         const backendTeam = team === 'playerA' ? 'A' : 'B';
         
@@ -448,8 +455,22 @@ class WebSocketManager {
             }
         } catch (error) {
             console.error('❌ Failed to record goal:', error);
-            this.addLiveFeedItem(`❌ Failed to record goal: ${error.message}`, 'error');
-            this.showMessage(`Failed to record goal: ${error.message}`, 'error');
+            
+            // Provide more user-friendly error messages
+            let errorMessage = error.message;
+            
+            if (error.message.includes('HTTP 400')) {
+                errorMessage = 'Please start the game first';
+            } else if (error.message.includes('HTTP 404')) {
+                errorMessage = 'Backend service not available';
+            } else if (error.message.includes('HTTP 500')) {
+                errorMessage = 'Backend server error';
+            } else if (error.message.includes('Failed to fetch')) {
+                errorMessage = 'Network connection error';
+            }
+            
+            this.addLiveFeedItem(`❌ Failed to record goal: ${errorMessage}`, 'error');
+            this.showMessage(`Failed to record goal: ${errorMessage}`, 'error');
         }
     }
     

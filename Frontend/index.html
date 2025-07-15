@@ -1009,7 +1009,7 @@
                     <!-- Navigation -->
                     <nav class="hidden md:flex space-x-2">
                         <div class="tooltip">
-                            <button class="nav-btn apple-button ripple-effect enhanced-ripple interactive-glow px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 text-apple-blue bg-white/50 hover:bg-apple-blue hover:text-white border border-white/30" data-tab="game">
+                            <button class="nav-btn apple-button ripple-effect px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 text-gray-600 hover:bg-apple-blue hover:text-white border border-white/30" data-tab="game">
                                 <span class="flex items-center space-x-2">
                                     <span class="animated-icon">🎮</span>
                                     <span>Game Control</span>
@@ -1708,7 +1708,7 @@
                 </button>
             </div>
             <nav class="p-4 space-y-2">
-                <button class="nav-btn w-full text-left p-3 rounded-lg hover:bg-gray-100 flex items-center space-x-3 text-apple-blue font-medium" data-tab="game">
+                <button class="nav-btn w-full text-left p-3 rounded-lg hover:bg-gray-100 flex items-center space-x-3 text-gray-600 font-medium" data-tab="game">
                     <span>🎮</span>
                     <span>Game Control</span>
                 </button>
@@ -2020,23 +2020,66 @@
              
              toggleBtn.addEventListener('click', function(e) {
                  e.stopPropagation();
+                 
+                 // 如果用户主动点击主按钮，清除快速操作标志
+                 isQuickActionInProgress = false;
+                 
                  floatingPanel.classList.toggle('open');
                  const isOpen = floatingPanel.classList.contains('open');
                  toggleBtn.innerHTML = isOpen ? '<span>❌</span>' : '<span>⚡</span>';
+                 
+                 // 提供用户反馈
+                 if (isOpen) {
+                     // 面板打开时的提示
+                     console.log('🚀 快速操作面板已打开');
+                 } else {
+                     // 面板关闭时的提示
+                     console.log('📦 快速操作面板已关闭');
+                 }
              });
 
              // Handle floating action buttons
              document.querySelectorAll('.floating-action-btn').forEach(btn => {
                  btn.addEventListener('click', function(e) {
                      e.stopPropagation();
+                     e.preventDefault();
                      const action = this.dataset.action;
-                     handleFloatingAction(action);
+                     
+                     // 立即设置标志，防止面板关闭
+                     isQuickActionInProgress = true;
+                     
+                     // 延迟执行动作，确保标志已设置
+                     setTimeout(() => {
+                         handleFloatingAction(action);
+                     }, 10);
                  });
              });
 
+             // 防止快速操作后立即关闭面板的标志
+             let isQuickActionInProgress = false;
+
              // 点击页面其他地方关闭浮动面板
              document.addEventListener('click', function(e) {
-                 if (!floatingPanel.contains(e.target) && floatingPanel.classList.contains('open')) {
+                 // 如果正在进行快速操作，不关闭面板
+                 if (isQuickActionInProgress) {
+                     return;
+                 }
+                 
+                 // 如果点击的是浮动面板相关的元素，不关闭面板
+                 if (floatingPanel.contains(e.target) || 
+                     e.target.closest('.floating-action-btn') || 
+                     e.target.closest('.floating-main-btn')) {
+                     return;
+                 }
+                 
+                 // 如果点击的是游戏控制按钮，不关闭面板（因为可能是快速操作触发的）
+                 if (e.target.closest('#startGame') || 
+                     e.target.closest('#pauseGame') || 
+                     e.target.closest('#endGame')) {
+                     return;
+                 }
+                 
+                 if (floatingPanel.classList.contains('open')) {
                      floatingPanel.classList.remove('open');
                      toggleBtn.innerHTML = '<span>⚡</span>';
                  }
@@ -2050,9 +2093,15 @@
 
          // Handle floating panel actions
          function handleFloatingAction(action) {
+             // 标志已在按钮点击时设置，这里不需要重复设置
+             
              // Check if players are confirmed
              if ((action === 'score-a' || action === 'score-b' || action === 'start-game') && !arePlayersConfirmed()) {
                  showToast('Please confirm players first!', 'error');
+                 // 重置标志
+                 setTimeout(() => {
+                     isQuickActionInProgress = false;
+                 }, 100);
                  return;
              }
 
@@ -2083,6 +2132,12 @@
                      }
                      break;
              }
+             
+             // 延迟重置标志，确保相关操作完成后再允许关闭面板
+             setTimeout(() => {
+                 isQuickActionInProgress = false;
+                 console.log('✅ 快速操作完成，面板可以正常关闭');
+             }, 500);
              
              // 不再自动关闭浮动面板，保持打开状态以便连续操作
          }
