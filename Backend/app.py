@@ -260,7 +260,7 @@ def change_game_status():
     mqtt.publish('game/status', status.encode(), retain=True)
 
     # initialize game after ending
-    if status == 'end':
+    if status == 'ended':
         current_game = 0
         current_score = {'A': 0, 'B': 0}
         current_round = 0
