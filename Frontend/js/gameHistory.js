@@ -103,19 +103,22 @@ class GameHistoryManager {
                     
                     // 转换数据库格式到前端格式
                     const games = data.games.map((game) => {
+                        const duration = game.duration || 0;
+                        console.log(`📊 Loading game ${game.gid} - Raw duration: ${game.duration}, Processed: ${duration}`);
+                        
                         return {
                             gameId: `GAME-${String(game.gid).padStart(3, '0')}`,
-                            gameType: game.duration > 0 ? 'Completed Match' : 'Live Match',
+                            gameType: duration > 0 ? 'Completed Match' : 'Live Match',
                             startTime: new Date(game.date + ' ' + game.time),
-                            endTime: game.duration > 0 ? new Date(new Date(game.date + ' ' + game.time).getTime() + game.duration * 1000) : null,
-                            duration: game.duration || 0,
+                            endTime: duration > 0 ? new Date(new Date(game.date + ' ' + game.time).getTime() + duration * 1000) : null,
+                            duration: duration,
                             finalScores: { 
                                 playerA: game.pointA || 0, 
                                 playerB: game.pointB || 0 
                             },
                             winner: game.pointA > game.pointB ? 'playerA' : 
                                    game.pointB > game.pointA ? 'playerB' : null,
-                            status: game.duration > 0 ? 'ended' : 'playing',
+                            status: duration > 0 ? 'ended' : 'playing',
                             rounds: game.rounds || [], // 如果有轮次数据
                             databaseGameId: game.gid,
                             playerNames: {
@@ -194,11 +197,27 @@ class GameHistoryManager {
             
             // 从数据库获取真实的游戏记录，而不是前端虚拟数据
             const games = await this.loadGamesFromDatabase();
-            this.loadedGames = games; // Store loaded games for later use
-            this.updateStats(games);
-            this.displayGames(games);
             
-            console.log(`✅ Game history refreshed: ${games.length} games loaded`);
+            // 如果数据库中没有游戏记录，尝试显示本地游戏历史
+            if (games.length === 0 && this.app.gamesHistory && this.app.gamesHistory.length > 0) {
+                console.log('📝 No games in database, showing local games history');
+                const localGames = this.app.gamesHistory.map(game => ({
+                    ...game,
+                    playerNames: {
+                        playerA: game.playerNames?.playerA || 'Player A',
+                        playerB: game.playerNames?.playerB || 'Player B'
+                    }
+                }));
+                this.loadedGames = localGames;
+                this.updateStats(localGames);
+                this.displayGames(localGames);
+                console.log(`✅ Local game history displayed: ${localGames.length} games loaded`);
+            } else {
+                this.loadedGames = games; // Store loaded games for later use
+                this.updateStats(games);
+                this.displayGames(games);
+                console.log(`✅ Game history refreshed: ${games.length} games loaded`);
+            }
             
         } catch (error) {
             console.error('❌ Failed to refresh game history:', error);
@@ -601,7 +620,9 @@ class GameHistoryManager {
     }
     
     formatDuration(seconds) {
-        if (!seconds || seconds === 0) return '0:00';
+        if (!seconds || seconds === 0) {
+            return '0:00';
+        }
         
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
