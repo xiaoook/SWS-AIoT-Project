@@ -1293,16 +1293,54 @@
                                     <!-- Center Line -->
                                     <div class="center-line"></div>
                                     
+                                    <!-- Mid Divider Lines -->
+                                    <div class="mid-divider-left"></div>
+                                    <div class="mid-divider-right"></div>
+                                    
+                                    <!-- Outer Divider Lines -->
+                                    <div class="outer-divider-left"></div>
+                                    <div class="outer-divider-right"></div>
+                                    
+                                    <!-- Center Circle (Double Ring) -->
+                                    <div class="center-circle">
+                                        <div class="center-circle-outer"></div>
+                                        <div class="center-circle-inner"></div>
+                                        <div class="center-dot"></div>
+                                    </div>
+                                    
+                                    <!-- Corner Circles -->
+                                    <div class="corner-circle corner-tl">
+                                        <div class="circle-dot"></div>
+                                    </div>
+                                    <div class="corner-circle corner-tr">
+                                        <div class="circle-dot"></div>
+                                    </div>
+                                    <div class="corner-circle corner-bl">
+                                        <div class="circle-dot"></div>
+                                    </div>
+                                    <div class="corner-circle corner-br">
+                                        <div class="circle-dot"></div>
+                                    </div>
+                                    
+                                    <!-- Positioning Dots -->
+                                    <div class="positioning-dots"></div>
+                                    
                                     <!-- Goal A (Left Side) -->
                                     <div class="goal goal-a">
                                         <div class="goal-line"></div>
-                                        <div class="goal-area"></div>
+                                        <div class="goal-area">
+                                            <div class="goal-net"></div>
+                                        </div>
+                                        <div class="goal-handle"></div>
                                     </div>
                                     
                                     <!-- Goal B (Right Side) -->
                                     <div class="goal goal-b">
                                         <div class="goal-line"></div>
-                                        <div class="goal-area"></div>
+                                        <div class="goal-area">
+                                            <div class="goal-net"></div>
+                                        </div>
+                                        <div class="goal-handle"></div>
                                     </div>
                                     
                                                                 <!-- Pusher A -->
@@ -1356,35 +1394,36 @@
                             </div>
                             
                             <!-- Position Information Display Below Controls -->
-                            <div class="position-info">
+                            <div class="position-info" id="positionInfo">
                                 <div class="info-section">
                                     <h4>Pusher A</h4>
                                     <div class="position-data">
-                                        <span>X: <span id="pusherAX">--</span></span>
-                                        <span>Y: <span id="pusherAY">--</span></span>
+                                        <span id="pusherAPos">X: 0.00, Y: 0.00</span>
+                                        <span id="pusherAVel">V: 0.00 cm/s</span>
                                     </div>
                                 </div>
                                 <div class="info-section">
                                     <h4>Puck</h4>
                                     <div class="position-data">
-                                        <span>X: <span id="puckX">--</span></span>
-                                        <span>Y: <span id="puckY">--</span></span>
-                                        <span>Speed: <span id="puckSpeed">--</span></span>
+                                        <span id="puckPos">X: 0.00, Y: 0.00</span>
+                                        <span id="puckVel">V: 0.00 cm/s</span>
                                     </div>
                                 </div>
                                 <div class="info-section">
                                     <h4>Pusher B</h4>
                                     <div class="position-data">
-                                        <span>X: <span id="pusherBX">--</span></span>
-                                        <span>Y: <span id="pusherBY">--</span></span>
+                                        <span id="pusherBPos">X: 0.00, Y: 0.00</span>
+                                        <span id="pusherBVel">V: 0.00 cm/s</span>
                                     </div>
                                 </div>
-                                <div class="info-section" id="mouseCoordinatesSection" style="display: none;">
-                                    <h4>Mouse Position</h4>
-                                    <div class="position-data">
-                                        <span>X: <span id="mouseX">--</span></span>
-                                        <span>Y: <span id="mouseY">--</span></span>
-                                    </div>
+                            </div>
+                            
+                            <!-- Mouse coordinates display (hidden by default) -->
+                            <div id="mouseCoordinatesSection" style="display: none;">
+                                <h4>🖱️ Mouse Coordinates</h4>
+                                <div class="position-data">
+                                    <span id="mousePos">X: 0.00cm, Y: 0.00cm</span>
+                                    <span id="mouseDisplay">Display: (0px, 0px)</span>
                                 </div>
                             </div>
                         </div>
