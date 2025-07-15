@@ -28,8 +28,12 @@ class SmartCourtApp {
         this.setupTabNavigation();
         this.initializeComponents();
         
-        // 确保页面刷新后得分重置为0
-        await this.forceResetScores();
+        // 初始化游戏状态
+        this.gameState.scores = { playerA: 0, playerB: 0 };
+        this.gameState.status = 'idle';
+        this.gameState.rounds = [];
+        this.gameState.currentRound = 0;
+        this.gameState.elapsedTime = 0;
         
         this.initializeWebSocket();
         this.showMessage('System initialized, ready to start the game!', 'success');
@@ -329,6 +333,13 @@ class SmartCourtApp {
         // Check if players are confirmed
         if (!window.arePlayersConfirmed || !window.arePlayersConfirmed()) {
             this.showMessage('Please confirm players before starting the game', 'error');
+            return;
+        }
+        
+        // Get current player IDs
+        const playerIds = window.playerManager ? window.playerManager.getCurrentPlayerIds() : null;
+        if (!playerIds || !playerIds.playerA || !playerIds.playerB) {
+            this.showMessage('Please select players before starting the game', 'error');
             return;
         }
         
@@ -730,6 +741,33 @@ class SmartCourtApp {
         console.log('Scoreboard updated:', { playerA: scoreA, playerB: scoreB });
     }
     
+    // Update score from backend response
+    updateScoreFromBackend(backendScore) {
+        // Backend returns score as { A: number, B: number }
+        // Convert to our frontend format
+        this.gameState.scores.playerA = backendScore.A || 0;
+        this.gameState.scores.playerB = backendScore.B || 0;
+        
+        // Update display
+        this.updateScoreboard();
+        
+        // Update game state
+        this.gameState.currentRound = (backendScore.A || 0) + (backendScore.B || 0);
+        
+        // Add round to history
+        const round = {
+            roundNumber: this.gameState.currentRound,
+            scores: { ...this.gameState.scores },
+            timestamp: new Date().toISOString()
+        };
+        this.gameState.rounds.push(round);
+        
+        // Update game status display
+        this.updateGameStatus();
+        
+        console.log('Score updated from backend:', { A: backendScore.A, B: backendScore.B });
+    }
+    
     addLiveFeedItem(message, type = 'info') {
         const feedContainer = document.getElementById('liveFeed');
         if (!feedContainer) return;
@@ -868,13 +906,8 @@ class SmartCourtApp {
             window.updateScore('B', 0);
         }
         
-        // 重置后端得分状态（异步操作）
-        try {
-            await this.resetBackendScores();
-            console.log('Backend scores also reset');
-        } catch (error) {
-            console.error('Failed to reset backend scores:', error);
-        }
+        // 注意：不调用后端重置接口，因为后端没有实现此功能
+        console.log('Frontend scores reset completed (backend reset skipped)');
         
         console.log('All scores force reset to 0');
     }
@@ -891,7 +924,8 @@ class SmartCourtApp {
         }
     }
     
-    // 重置后端得分状态
+    // 重置后端得分状态 - 已禁用，因为后端没有实现此接口
+    /*
     async resetBackendScores() {
         try {
             const backendUrl = window.CONFIG?.BACKEND_URL || 'http://localhost:5000';
@@ -915,6 +949,7 @@ class SmartCourtApp {
             return false;
         }
     }
+    */
 
     resetGame() {
         this.stopTimer();
@@ -1138,7 +1173,7 @@ class SmartCourtApp {
     }
     
     // 模拟进球（用于测试）
-    simulateGoalA() {
+    async simulateGoalA() {
         // 检查确认状态
         if (!window.arePlayersConfirmed || !window.arePlayersConfirmed()) {
             this.showMessage('Please confirm players first!', 'error');
@@ -1146,13 +1181,13 @@ class SmartCourtApp {
         }
         
         if (window.wsManager) {
-            window.wsManager.simulateGoal('playerA');
+            await window.wsManager.simulateGoal('playerA');
         } else {
             this.showMessage('WebSocket manager not available', 'error');
         }
     }
     
-    simulateGoalB() {
+    async simulateGoalB() {
         // 检查确认状态
         if (!window.arePlayersConfirmed || !window.arePlayersConfirmed()) {
             this.showMessage('Please confirm players first!', 'error');
@@ -1160,7 +1195,7 @@ class SmartCourtApp {
         }
         
         if (window.wsManager) {
-            window.wsManager.simulateGoal('playerB');
+            await window.wsManager.simulateGoal('playerB');
         } else {
             this.showMessage('WebSocket manager not available', 'error');
         }
