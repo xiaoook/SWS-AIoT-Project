@@ -403,8 +403,8 @@ class WebSocketManager {
         }
     }
     
-    // Send goal to backend - Avoid CORS issues, use local score management
-    simulateGoal(team) {
+    // Send goal to backend using HTTP API
+    async simulateGoal(team) {
         // Check confirmation status (double protection)
         if (!window.arePlayersConfirmed || !window.arePlayersConfirmed()) {
             this.showMessage('Please confirm players first!', 'error');
@@ -415,21 +415,42 @@ class WebSocketManager {
         // Backend expects 'A' or 'B' instead of 'playerA' or 'playerB'
         const backendTeam = team === 'playerA' ? 'A' : 'B';
         
-        // Check WebSocket connection
-        if (!this.socket || !this.socket.connected) {
-            this.showMessage('WebSocket not connected. Cannot send goal event.', 'error');
-            this.addLiveFeedItem('❌ WebSocket disconnected - goal not recorded', 'error');
-            return;
-        }
-        
-        // Send goal event to backend via WebSocket
-        console.log(`Sending goal event to backend for team ${backendTeam}`);
-        this.socket.emit('goal', { team: backendTeam });
-        
         // Show sending message
         this.addLiveFeedItem(`⚡ Sending goal for Team ${backendTeam}...`, 'info');
         
-        // Note: No longer update score locally, wait for backend score_update event
+        try {
+            // Call backend HTTP API directly
+            const response = await fetch(`${window.CONFIG.API_URLS.GOAL}?team=${backendTeam}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success') {
+                    console.log(`✅ Goal recorded: Team ${backendTeam} scored, score: ${data.score.A} - ${data.score.B}`);
+                    this.addLiveFeedItem(`✅ Goal scored by Team ${backendTeam}! Score: ${data.score.A} - ${data.score.B}`, 'success');
+                    
+                    // Update local score display
+                    if (window.smartCourtApp && window.smartCourtApp.updateScoreFromBackend) {
+                        window.smartCourtApp.updateScoreFromBackend(data.score);
+                    }
+                    
+                    // Show success message
+                    this.showMessage(`Goal scored by Team ${backendTeam}! Score: ${data.score.A} - ${data.score.B}`, 'success');
+                } else {
+                    throw new Error(data.message || 'Failed to record goal');
+                }
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('❌ Failed to record goal:', error);
+            this.addLiveFeedItem(`❌ Failed to record goal: ${error.message}`, 'error');
+            this.showMessage(`Failed to record goal: ${error.message}`, 'error');
+        }
     }
     
     // Set callback function
