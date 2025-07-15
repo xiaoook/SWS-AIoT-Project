@@ -1,21 +1,279 @@
 /* 冰球可视化样式 */
 .game-visualization {
-    background: #f8f9fa;
-    border-radius: 15px;
-    padding: 15px;
-    margin: 20px 0;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    background: var(--bg-primary);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-lg);
+    margin: var(--spacing-lg) 0;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--separator-nonopaque);
     min-height: auto;
     display: flex;
     flex-direction: column;
+    transition: all var(--transition-normal);
 }
 
+.game-visualization:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+}
+
+/* 游戏视图标题样式 */
+.game-view-header {
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-xl);
+    background: #ffffff;
+    border-radius: var(--radius-xl);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e5e7eb;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.game-view-header:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    border-color: #d1d3db;
+}
+
+.game-view-header:hover .game-view-main-title {
+    color: #111827;
+    transform: translateY(-1px);
+}
+
+.game-view-header:hover .game-view-subtitle {
+    color: #4b5563;
+    opacity: 0.9;
+}
+
+.game-view-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(0, 0, 0, 0.02), transparent);
+    animation: shimmer 10s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+.game-view-title-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    position: relative;
+    z-index: 1;
+    animation: containerSlide 0.8s ease-out;
+}
+
+@keyframes containerSlide {
+    0% {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.game-view-icon {
+    background: #f9fafb;
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    border: 1px solid #e5e7eb;
+    transition: all var(--transition-normal);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    animation: iconFloat 5s ease-in-out infinite;
+}
+
+@keyframes iconFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+.game-view-icon:hover {
+    transform: translateY(-1px);
+    background: #f3f4f6;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.game-view-icon svg {
+    width: 32px;
+    height: 32px;
+    color: #374151;
+    transition: all var(--transition-normal);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.game-view-icon:hover svg {
+    color: #1f2937;
+    transform: scale(1.05);
+}
+
+.game-view-title {
+    flex: 1;
+}
+
+.game-view-main-title {
+    color: #1f2937;
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.02em;
+    transition: all var(--transition-normal);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    animation: titlePulse 3s ease-in-out infinite;
+}
+
+.game-view-subtitle {
+    color: #6b7280;
+    font-size: var(--text-sm);
+    margin-top: var(--spacing-xs);
+    font-weight: 500;
+    transition: all var(--transition-normal);
+    opacity: 0.8;
+    animation: subtitleFade 4s ease-in-out infinite;
+}
+
+@keyframes titlePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.9; }
+}
+
+@keyframes subtitleFade {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 0.6; }
+}
+
+.game-view-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    background: #f9fafb;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-full);
+    border: 1px solid #e5e7eb;
+    transition: all var(--transition-normal);
+    animation: statusFloat 6s ease-in-out infinite;
+}
+
+.game-view-header:hover .game-view-status {
+    transform: translateY(-1px);
+    background: #f3f4f6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.live-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+    animation: livePulse 2s infinite, liveBounce 4s ease-in-out infinite;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+}
+
+@keyframes livePulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+@keyframes liveBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-1px); }
+}
+
+@keyframes statusFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+}
+
+.status-text {
+    color: #374151;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    transition: all var(--transition-normal);
+    animation: textGlow 3s ease-in-out infinite;
+}
+
+@keyframes textGlow {
+    0%, 100% { 
+        color: #374151; 
+        text-shadow: 0 0 0 transparent;
+    }
+    50% { 
+        color: #1f2937; 
+        text-shadow: 0 0 4px rgba(239, 68, 68, 0.2);
+    }
+}
+
+
+
+/* 保持原有的兼容性 */
 .game-visualization h3 {
     color: #2c3e50;
     margin-bottom: 15px;
     font-size: 1.5rem;
     text-align: center;
     flex-shrink: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .game-view-header {
+        padding: var(--spacing-lg);
+        margin-bottom: var(--spacing-md);
+    }
+    
+    .game-view-title-container {
+        gap: var(--spacing-sm);
+    }
+    
+    .game-view-icon {
+        padding: var(--spacing-sm);
+    }
+    
+    .game-view-icon svg {
+        width: 24px;
+        height: 24px;
+    }
+    
+    .game-view-main-title {
+        font-size: var(--text-xl);
+    }
+    
+    .game-view-subtitle {
+        font-size: var(--text-xs);
+    }
+    
+    .game-view-status {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+    
+    .live-indicator {
+        width: 6px;
+        height: 6px;
+    }
+    
+    .status-text {
+        font-size: 10px;
+    }
 }
 
 /* 冰球桌容器 */
@@ -29,13 +287,13 @@
 /* 冰球桌主体 - 保持2:1长宽比（匹配MQTT 800:400坐标系统） */
 .hockey-table {
     position: relative;
-    background: linear-gradient(135deg, #e8f4f8 0%, #d1ecf1 100%);
-    border-radius: 20px;
+    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%);
+    border-radius: var(--radius-xl);
     box-shadow: 
-        inset 0 0 50px rgba(255, 255, 255, 0.5),
-        0 8px 30px rgba(0, 0, 0, 0.15);
-    padding: 15px;
-    border: 3px solid #34495e;
+        inset 0 0 30px rgba(0, 0, 0, 0.03),
+        var(--shadow-md);
+    padding: var(--spacing-md);
+    border: 2px solid var(--separator-opaque);
     width: 100%;
     max-width: 1000px; /* 最大宽度限制 */
     margin: 0 auto; /* 居中显示 */
