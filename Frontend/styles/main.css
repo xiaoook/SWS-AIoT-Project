@@ -260,8 +260,339 @@ body {
     }
     to { 
         opacity: 1; 
-        transform: translateY(0); 
+                transform: translateY(0);
     }
+}
+
+/* ==============================================
+   REALTIME GAME VIEW HEADER STYLES - 实时游戏视图标题样式
+   ============================================== */
+
+.realtime-header {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl) var(--spacing-2xl);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    transition: all var(--transition-normal);
+}
+
+.realtime-header:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border-color: #cbd5e1;
+}
+
+.realtime-header:hover .header-text .title {
+    color: #111827;
+    transform: translateY(-1px);
+}
+
+.realtime-header:hover .header-text .subtitle {
+    color: #4b5563;
+    opacity: 0.9;
+}
+
+.realtime-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.05), transparent);
+    animation: slideGlow 8s infinite;
+}
+
+@keyframes slideGlow {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    z-index: 1;
+    position: relative;
+    animation: slideInLeft 0.8s ease-out;
+}
+
+.live-icon {
+    width: 48px;
+    height: 48px;
+    background: #f1f5f9;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+    transition: all var(--transition-normal);
+    animation: iconBounce 4s ease-in-out infinite;
+}
+
+@keyframes slideInLeft {
+    0% {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes iconBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+}
+
+.live-icon:hover {
+    transform: translateY(-2px) scale(1.05);
+    background: #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pulse-dot {
+    width: 16px;
+    height: 16px;
+    background: var(--apple-green);
+    border-radius: 50%;
+    position: relative;
+    animation: pulseDot 2s infinite;
+    box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.6);
+    border: 1px solid #ffffff;
+    transition: all var(--transition-normal);
+}
+
+.pulse-dot:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.3);
+}
+
+.pulse-dot::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    right: -1px;
+    bottom: -1px;
+    background: var(--apple-green);
+    border-radius: 50%;
+    animation: pulseRing 2s infinite;
+}
+
+@keyframes pulseDot {
+    0%, 100% { 
+        transform: scale(1); 
+        box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.6);
+    }
+    50% { 
+        transform: scale(1.15); 
+        box-shadow: 0 0 0 6px rgba(52, 199, 89, 0.3);
+    }
+}
+
+@keyframes pulseRing {
+    0% {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+    100% {
+        transform: scale(2.5);
+        opacity: 0;
+    }
+}
+
+.header-text {
+    color: #1f2937;
+    animation: slideInUp 0.6s ease-out 0.2s both;
+}
+
+.header-text .title {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    animation: titleGlow 3s ease-in-out infinite;
+}
+
+.header-text .subtitle {
+    font-size: var(--text-sm);
+    opacity: 0.7;
+    font-weight: 500;
+    color: #6b7280;
+    margin-top: 2px;
+    animation: subtitleSlide 4s ease-in-out infinite;
+}
+
+@keyframes slideInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes titleGlow {
+    0%, 100% { 
+        color: #1f2937; 
+        transform: translateY(0);
+    }
+    50% { 
+        color: #111827; 
+        transform: translateY(-1px);
+    }
+}
+
+@keyframes subtitleSlide {
+    0%, 100% { 
+        opacity: 0.7; 
+        transform: translateX(0);
+    }
+    50% { 
+        opacity: 0.9; 
+        transform: translateX(2px);
+    }
+}
+
+@keyframes slideInRight {
+    0% {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.header-right {
+    z-index: 1;
+    position: relative;
+    animation: slideInRight 0.8s ease-out 0.4s both;
+}
+
+.status-badge {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all var(--transition-normal);
+    animation: badgeFloat 5s ease-in-out infinite;
+}
+
+.status-badge:hover {
+    background: #e2e8f0;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes badgeFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-1px); }
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background: #EF4444;
+    border-radius: 50%;
+    animation: statusPulse 1.5s infinite;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+}
+
+@keyframes statusPulse {
+    0%, 100% { 
+        opacity: 1; 
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    50% { 
+        opacity: 0.8; 
+        transform: scale(1.1);
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+    }
+}
+
+.status-label {
+    color: #374151;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    animation: labelPulse 2s ease-in-out infinite;
+}
+
+@keyframes labelPulse {
+    0%, 100% { 
+        color: #374151; 
+        opacity: 1;
+    }
+    50% { 
+        color: #1f2937; 
+        opacity: 0.9;
+    }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .realtime-header {
+        padding: var(--spacing-lg) var(--spacing-xl);
+        margin-bottom: var(--spacing-md);
+    }
+    
+    .header-left {
+        gap: var(--spacing-sm);
+    }
+    
+    .live-icon {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .pulse-dot {
+        width: 12px;
+        height: 12px;
+    }
+    
+    .header-text .title {
+        font-size: var(--text-xl);
+    }
+    
+    .header-text .subtitle {
+        font-size: var(--text-xs);
+    }
+    
+    .status-badge {
+        padding: 6px 12px;
+    }
+}
+
+/* 确保游戏可视化容器的样式 */
+.game-visualization {
+    background: #f8f9fa !important;
+    border-radius: 15px !important;
+    padding: 15px !important;
+    margin: 20px 0 !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+    min-height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 /* Button System */

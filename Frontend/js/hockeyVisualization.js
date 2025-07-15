@@ -304,6 +304,7 @@ class HockeyVisualization {
     // Convert MQTT coordinates to frontend display coordinates
     // MQTT: (0,0) to (800,400) → Display: (0,0) to (width, height)
     // Maintains proportional positioning across all screen sizes
+    // 修复: 修正了xy轴映射
     convertMqttToDisplayCoordinates(mqttX, mqttY) {
         const displayDimensions = this.getTableDimensions();
         
@@ -316,9 +317,11 @@ class HockeyVisualization {
             console.warn(`⚠️ Scale factor mismatch: X=${scaleX.toFixed(3)}, Y=${scaleY.toFixed(3)}`);
         }
         
-        // Convert coordinates
-        const displayX = mqttX * scaleX;
-        const displayY = mqttY * scaleY;
+        // Convert coordinates - 修复xy轴映射问题
+        // MQTT坐标系统: x轴表示长度方向，y轴表示宽度方向
+        // 显示坐标系统: x轴表示宽度方向，y轴表示长度方向
+        const displayX = mqttY * scaleX;  // MQTT的y轴映射到显示的x轴
+        const displayY = mqttX * scaleY;  // MQTT的x轴映射到显示的y轴
         
         // Ensure coordinates are within display bounds
         const boundedX = Math.max(0, Math.min(displayDimensions.width, displayX));
@@ -442,9 +445,10 @@ class HockeyVisualization {
         if (!this.showCoordinates) return;
         
         // Calculate MQTT coordinates from display coordinates
+        // 修复: 修正反向坐标转换以匹配正向转换
         const dimensions = this.getTableDimensions();
-        const mqttX = (x / dimensions.width) * this.mqttCoordinates.width;
-        const mqttY = (y / dimensions.height) * this.mqttCoordinates.height;
+        const mqttX = (y / dimensions.height) * this.mqttCoordinates.width;  // 显示y轴映射到MQTT x轴
+        const mqttY = (x / dimensions.width) * this.mqttCoordinates.height;  // 显示x轴映射到MQTT y轴
         
         // Update mouse coordinates in info panel
         const mouseXElement = document.getElementById('mouseX');
@@ -474,9 +478,10 @@ class HockeyVisualization {
         const yElement = document.getElementById(`${object}Y`);
         
         // Calculate MQTT coordinates from display coordinates for reference
+        // 修复: 修正反向坐标转换以匹配正向转换
         const dimensions = this.getTableDimensions();
-        const mqttX = (x / dimensions.width) * this.mqttCoordinates.width;
-        const mqttY = (y / dimensions.height) * this.mqttCoordinates.height;
+        const mqttX = (y / dimensions.height) * this.mqttCoordinates.width;  // 显示y轴映射到MQTT x轴
+        const mqttY = (x / dimensions.width) * this.mqttCoordinates.height;  // 显示x轴映射到MQTT y轴
         
         // Display both coordinate systems
         if (xElement) xElement.textContent = `${Math.round(mqttX)} (${Math.round(x)}px)`;
