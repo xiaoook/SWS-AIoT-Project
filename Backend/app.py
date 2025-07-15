@@ -58,7 +58,7 @@ def handle_connect_mqtt(client, userdata, flags, rc):
 def handle_mqtt_message(client, userdata, message):
     global latest_position
     payload = message.payload.decode()
-    logger.debug(f'Received position: {payload}')
+    # logger.debug(f'Received position: {payload}')
     latest_position = json.loads(payload)
     socketio.emit('position_update', latest_position)
 
@@ -181,6 +181,16 @@ def goal():
     if team in current_score:
         current_round += 1
         current_score[team] += 1
+
+        # MQTT for AI part
+        update = {
+            "winner": team,
+            "current_game": gid,
+            "current_round": current_round
+        }
+        mqtt.publish('game/goal', json.dumps(update).encode())
+
+        # publish for socket
         socketio.emit('score_update', current_score)
         logger.info(f'{team} scored, current score: {current_score[team]}')
         insert_rounds(gid, current_round, current_score) # insert the round into database
