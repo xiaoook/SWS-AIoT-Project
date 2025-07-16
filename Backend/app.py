@@ -56,14 +56,21 @@ latest_position = {}
 def handle_connect_mqtt(client, userdata, flags, rc):
     logger.info('Connected to MQTT Broker')
     mqtt.subscribe('game/positions')
+    mqtt.subscribe("game/predictions")
 
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
     global latest_position
-    payload = message.payload.decode()
-    logger.debug(f'Received position: {payload}')
-    latest_position = json.loads(payload)
-    socketio.emit('position_update', latest_position)
+    if message.topic == 'game/positions':
+        payload = message.payload.decode()
+        logger.debug(f'Received position: {payload}')
+        latest_position = json.loads(payload)
+        # socketio.emit('position_update', latest_position)
+    elif message.topic == 'game/predictions':
+        payload = message.payload.decode()
+        logger.debug(f'Received prediction: {payload}')
+        prediction = json.loads(payload)
+        socketio.emit('request_win_rate_prediction', prediction)
 
 # emit the current score when the new client connects
 @socketio.on('connect')
@@ -297,6 +304,7 @@ def delete_game():
         current_round = 0
         current_game = 0
         socketio.emit('score_update', current_score)
+        mqtt.publish('game/score', )
 
     delete_selected_game(gid)
     return jsonify({
@@ -321,6 +329,7 @@ def reset_game():
     current_game = 0
     socketio.emit('score_update', current_score)
     mqtt.publish('game/status', "ended".encode(), retain=True)
+    mqtt.publish('game/score', json.dumps(current_score).encode(), retain=True)
     logger.info(f'current game is reset')
 
 @app.route('/player/create', methods=['POST'])
