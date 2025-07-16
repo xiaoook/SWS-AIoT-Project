@@ -245,3 +245,40 @@ def delete_all_games():
     finally:
         if conn is not None:
             conn.close()
+
+def get_game_analysis(gid):
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM GameAnalysis WHERE gid = ?", (gid,))
+        result = cur.fetchone()
+        if result is None:
+            return None
+    except sqlite3.OperationalError as e:
+        logger.error(f"Error: {e}")
+        raise RuntimeError(f"Error: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
+
+    analysis = dict(result)
+    return analysis
+
+def insert_game_analysis(gid, error_type, analysis):
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO GameAnalysis (gid, type, analysis) 
+        VALUES (?, ?, ?)""", (gid, error_type, analysis))
+        conn.commit()
+        logger.info(f"Game {gid} inserted successfully")
+    except sqlite3.OperationalError as e:
+        logger.error(f"Error: {e}")
+        raise RuntimeError(f"Error: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
