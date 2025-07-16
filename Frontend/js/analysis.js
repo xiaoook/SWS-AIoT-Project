@@ -290,6 +290,9 @@ class AnalysisManager {
                     };
                     
                     console.log(`🎯 Game analysis data prepared for ${gameId} with ${formattedRounds.length} rounds`);
+                    
+                    // 获取后端分析数据
+                    await this.loadBackendAnalysis(databaseGameId);
                 } else {
                     console.warn('No rounds data received from backend, using local data');
                     this.currentGame = game;
@@ -311,6 +314,159 @@ class AnalysisManager {
         }
         
         this.displayGameAnalysis();
+    }
+    
+    // 从后端获取分析数据
+    async loadBackendAnalysis(databaseGameId) {
+        try {
+            console.log(`📊 Loading backend analysis for game ${databaseGameId}`);
+            
+            // 获取游戏分析数据
+            const analysisResponse = await fetch(`${CONFIG.API_URLS.ANALYSIS_GAME}?gid=${databaseGameId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (analysisResponse.ok) {
+                const analysisData = await analysisResponse.json();
+                if (analysisData.status === 'success' && analysisData.analysis) {
+                    console.log(`✅ Loaded backend analysis for game ${databaseGameId}`);
+                    this.integrateBackendAnalysis(analysisData.analysis);
+                } else if (analysisData.status === 'error') {
+                    // 显示后端错误信息
+                    this.showAnalysisError(analysisData.message);
+                    console.warn(`⚠️ Backend analysis error: ${analysisData.message}`);
+                } else {
+                    console.warn('No analysis data available from backend');
+                }
+            } else {
+                const errorData = await analysisResponse.json();
+                if (errorData.status === 'error') {
+                    this.showAnalysisError(errorData.message);
+                    console.error(`❌ Backend analysis request failed: ${errorData.message}`);
+                } else {
+                    console.error('Failed to load backend analysis');
+                }
+            }
+        } catch (error) {
+            console.error('Error loading backend analysis:', error);
+            this.showAnalysisError('Failed to connect to analysis service');
+        }
+    }
+    
+    // 整合后端分析数据到当前游戏
+    integrateBackendAnalysis(backendAnalysis) {
+        if (!this.currentGame) return;
+        
+        // 将后端分析数据整合到当前游戏对象中
+        this.currentGame.backendAnalysis = {
+            playerA: {
+                errorTypes: backendAnalysis.A_type || [],
+                analysis: backendAnalysis.A_analysis || {},
+                timestamp: new Date().toISOString()
+            },
+            playerB: {
+                errorTypes: backendAnalysis.B_type || [],
+                analysis: backendAnalysis.B_analysis || {},
+                timestamp: new Date().toISOString()
+            }
+        };
+        
+        console.log('✅ Backend analysis integrated into current game');
+    }
+    
+    // 显示分析错误信息
+    showAnalysisError(message) {
+        const container = document.getElementById('pointBreakdown');
+        if (!container) return;
+        
+        const errorHTML = `
+            <div class="analysis-error">
+                <div class="error-icon">❌</div>
+                <h3>Analysis Error</h3>
+                <p class="error-message">${message}</p>
+                <p class="error-suggestion">Please check your connection and try again, or contact support if the problem persists.</p>
+            </div>
+        `;
+        
+        // 如果已经有内容，在顶部添加错误信息
+        if (container.innerHTML.trim()) {
+            container.insertAdjacentHTML('afterbegin', errorHTML);
+        } else {
+            container.innerHTML = errorHTML;
+        }
+    }
+    
+    // 添加新的分析数据到后端
+    async addAnalysisToBackend(gameId, playerAErrorTypes, playerAAnalysis, playerBErrorTypes, playerBAnalysis) {
+        try {
+            console.log(`📊 Adding analysis to backend for game ${gameId}`);
+            
+            const response = await fetch(CONFIG.API_URLS.ANALYSIS_GAME_NEW, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gid: gameId,
+                    A_type: playerAErrorTypes,
+                    A_analysis: playerAAnalysis,
+                    B_type: playerBErrorTypes,
+                    B_analysis: playerBAnalysis
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.status === 'success') {
+                    console.log('✅ Analysis added to backend successfully');
+                    this.showAnalysisSuccess('Analysis data saved successfully');
+                    return true;
+                } else {
+                    this.showAnalysisError(result.message || 'Failed to save analysis data');
+                    return false;
+                }
+            } else {
+                const errorData = await response.json();
+                this.showAnalysisError(errorData.message || 'Failed to save analysis data');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error adding analysis to backend:', error);
+            this.showAnalysisError('Failed to connect to analysis service');
+            return false;
+        }
+    }
+    
+    // 显示分析成功信息
+    showAnalysisSuccess(message) {
+        const container = document.getElementById('pointBreakdown');
+        if (!container) return;
+        
+        const successHTML = `
+            <div class="analysis-success">
+                <div class="success-icon">✅</div>
+                <h3>Success</h3>
+                <p class="success-message">${message}</p>
+            </div>
+        `;
+        
+        // 临时显示成功消息
+        if (container.innerHTML.trim()) {
+            container.insertAdjacentHTML('afterbegin', successHTML);
+        } else {
+            container.innerHTML = successHTML;
+        }
+        
+        // 3秒后自动隐藏成功消息
+        setTimeout(() => {
+            const successElement = document.querySelector('.analysis-success');
+            if (successElement) {
+                successElement.remove();
+            }
+        }, 3000);
     }
     
     addRound(round) {
@@ -424,14 +580,83 @@ class AnalysisManager {
                             <strong>Started:</strong> ${startTime}
                         </div>
                         ${this.currentGame.endTime ? `
-                            <div class="meta-item">
-                                <strong>Ended:</strong> ${endTime}
-                            </div>
+                                                    <div class="meta-item">
+                            <strong>Ended:</strong> ${endTime}
+                        </div>
                         ` : ''}
+                    </div>
+                    
+                    ${this.createBackendAnalysisHeader()}
+                </div>
+            </div>
+        `;
+    }
+    
+    // 创建后端分析数据的头部显示
+    createBackendAnalysisHeader() {
+        if (!this.currentGame || !this.currentGame.backendAnalysis) {
+            return '';
+        }
+        
+        const backendAnalysis = this.currentGame.backendAnalysis;
+        const playerAName = this.getPlayerName(this.currentGame, 'playerA');
+        const playerBName = this.getPlayerName(this.currentGame, 'playerB');
+        
+        return `
+            <div class="backend-analysis-header">
+                <h4>🤖 AI 分析结果</h4>
+                <div class="analysis-overview">
+                    <div class="player-analysis-summary">
+                        <div class="player-summary player-a-summary">
+                            <div class="player-name">🔵 ${playerAName}</div>
+                            <div class="error-types">
+                                ${this.formatErrorTypes(backendAnalysis.playerA.errorTypes)}
+                            </div>
+                        </div>
+                        <div class="vs-divider">VS</div>
+                        <div class="player-summary player-b-summary">
+                            <div class="player-name">🔴 ${playerBName}</div>
+                            <div class="error-types">
+                                ${this.formatErrorTypes(backendAnalysis.playerB.errorTypes)}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="analysis-timestamp">
+                        <small>分析时间: ${new Date(backendAnalysis.playerA.timestamp).toLocaleString()}</small>
                     </div>
                 </div>
             </div>
         `;
+    }
+    
+    // 格式化错误类型显示
+    formatErrorTypes(errorTypes) {
+        if (!errorTypes || errorTypes.length === 0) {
+            return '<span class="no-errors">✅ 无主要错误</span>';
+        }
+        
+        return errorTypes.map(errorType => 
+            `<span class="error-type-badge">${errorType}</span>`
+        ).join('');
+    }
+    
+    // 获取后端分析数据中的错误类型
+    getBackendErrorTypes(playerName) {
+        if (!this.currentGame || !this.currentGame.backendAnalysis) {
+            return [];
+        }
+        
+        const backendAnalysis = this.currentGame.backendAnalysis;
+        const playerAName = this.getPlayerName(this.currentGame, 'playerA');
+        const playerBName = this.getPlayerName(this.currentGame, 'playerB');
+        
+        if (playerName === playerAName) {
+            return backendAnalysis.playerA.errorTypes || [];
+        } else if (playerName === playerBName) {
+            return backendAnalysis.playerB.errorTypes || [];
+        }
+        
+        return [];
     }
     
     getWinnerName() {
@@ -707,6 +932,9 @@ class AnalysisManager {
         const defenseScore = Math.max(1, 10 - this.calculateRoundScore(analysis));
         const preventionTips = this.generatePreventionTips(analysis);
         
+        // 获取后端分析数据中的错误类型
+        const backendErrorTypes = this.getBackendErrorTypes(loser);
+        
         return `
             <div class="ai-analysis loss-analysis">
                 <h5>💔 ${loser} Loss Analysis Report</h5>
@@ -729,6 +957,22 @@ class AnalysisManager {
                             </div>
                             <div class="section-content">
                                 ⚠️ ${this.translateErrorType(analysis.errorType)}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${backendErrorTypes.length > 0 ? `
+                        <div class="analysis-section section-backend">
+                            <div class="section-header">
+                                <span class="section-number">🤖</span>
+                                <strong class="section-title">AI 识别的错误类型</strong>
+                            </div>
+                            <div class="section-content">
+                                <div class="backend-error-types">
+                                    ${backendErrorTypes.map(errorType => 
+                                        `<span class="backend-error-badge">🎯 ${errorType}</span>`
+                                    ).join('')}
+                                </div>
                             </div>
                         </div>
                     ` : ''}
