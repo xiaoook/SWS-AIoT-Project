@@ -119,7 +119,6 @@ class GameHistoryManager {
                             winner: game.pointA > game.pointB ? 'playerA' : 
                                    game.pointB > game.pointA ? 'playerB' : null,
                             status: duration > 0 ? 'ended' : 'playing',
-                            rounds: game.rounds || [], // 如果有轮次数据
                             databaseGameId: game.gid,
                             playerNames: {
                                 playerA: game.playerAname || 'Player A',
@@ -289,8 +288,8 @@ class GameHistoryManager {
         const playerAName = game.playerNames ? game.playerNames.playerA : 'Player A';
         const playerBName = game.playerNames ? game.playerNames.playerB : 'Player B';
         
-        // 计算实际的轮次数
-        const actualRounds = Math.max(game.rounds.length, game.finalScores.playerA + game.finalScores.playerB);
+        // 计算总轮次数
+        const totalRounds = game.finalScores.playerA + game.finalScores.playerB;
         
         return `
             <div class="game-card ${game.status} ${isCurrent ? 'active' : ''}" data-game-id="${game.gameId}">
@@ -316,7 +315,7 @@ class GameHistoryManager {
                 <div class="game-stats">
                     <div class="stat-item">
                         <span class="stat-icon">🎯</span>
-                        <span class="stat-value">${actualRounds}</span>
+                        <span class="stat-value">${totalRounds}</span>
                         <span class="stat-label">Rounds</span>
                     </div>
                     <div class="stat-item">
@@ -333,6 +332,7 @@ class GameHistoryManager {
                 
                 <div class="game-actions">
                     <button class="game-action-btn" data-action="view">Details</button>
+                    ${isActive ? '<button class="game-action-btn primary" data-action="resume">Resume</button>' : ''}
                     <button class="game-action-btn danger" data-action="delete">Delete</button>
                 </div>
             </div>
@@ -346,6 +346,9 @@ class GameHistoryManager {
                 break;
             case 'view':
                 this.showGameDetails(gameId);
+                break;
+            case 'resume':
+                this.resumeGame(gameId);
                 break;
             case 'delete':
                 this.deleteGame(gameId);
@@ -372,6 +375,98 @@ class GameHistoryManager {
             this.refreshDisplay();
         } else {
             this.app.showMessage(`Failed to load game ${gameId}`, 'error');
+        }
+    }
+    
+    // Resume an unfinished game
+    async resumeGame(gameId) {
+        try {
+            // Find the game in loaded games
+            const game = this.loadedGames.find(g => g.gameId === gameId);
+            
+            if (!game) {
+                this.app.showMessage(`Game ${gameId} not found`, 'error');
+                return;
+            }
+            
+            // Check if the game is actually unfinished
+            if (game.status === 'ended') {
+                this.app.showMessage(`Game ${gameId} has already ended and cannot be resumed`, 'warning');
+                return;
+            }
+            
+            // Get the database game ID
+            const databaseGameId = game.databaseGameId;
+            if (!databaseGameId) {
+                this.app.showMessage(`Cannot resume game ${gameId} - no database ID found`, 'error');
+                return;
+            }
+            
+            // Find the resume button and update its state
+            const resumeButton = document.querySelector(`[data-game-id="${gameId}"] [data-action="resume"]`);
+            if (resumeButton) {
+                resumeButton.disabled = true;
+                resumeButton.textContent = 'Resuming...';
+            }
+            
+            console.log(`🔄 Resuming game ${gameId} (Database ID: ${databaseGameId})`);
+            
+            // Call the backend to select this game
+            const response = await fetch(`${CONFIG.API_URLS.GAMES_SELECT}?game=${databaseGameId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success' && data.game) {
+                    console.log(`✅ Game ${gameId} selected successfully on backend`);
+                    
+                    // Update the app's current game state
+                    this.app.currentGameId = gameId;
+                    this.app.gameState.status = 'playing';
+                    this.app.gameState.scores = {
+                        playerA: data.game.pointA || 0,
+                        playerB: data.game.pointB || 0
+                    };
+                    this.app.gameState.currentRound = (data.game.pointA || 0) + (data.game.pointB || 0);
+                    this.app.gameState.startTime = game.startTime;
+                    this.app.gameState.endTime = null;
+                    
+                    // Update UI
+                    this.app.updateGameStatus();
+                    this.app.updateScoreboard();
+                    
+                    // Switch to game control tab
+                    this.app.switchTab('game');
+                    
+                    // Show success message
+                    this.app.showMessage(`Game ${gameId} resumed successfully! Continue playing.`, 'success');
+                    
+                    // Refresh the display to show updated status
+                    setTimeout(() => {
+                        this.refreshDisplay();
+                    }, 1000);
+                    
+                } else {
+                    throw new Error(data.message || 'Failed to select game on backend');
+                }
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to resume game:', error);
+            this.app.showMessage(`Failed to resume game ${gameId}: ${error.message}`, 'error');
+            
+            // Re-enable the resume button on error
+            const resumeButton = document.querySelector(`[data-game-id="${gameId}"] [data-action="resume"]`);
+            if (resumeButton) {
+                resumeButton.disabled = false;
+                resumeButton.textContent = 'Resume';
+            }
         }
     }
     
@@ -455,59 +550,13 @@ class GameHistoryManager {
         this.modal.classList.add('show');
         
         try {
-            // 获取数据库中的游戏ID
-            const databaseGameId = game.databaseGameId;
-            if (!databaseGameId) {
-                console.warn('No database game ID found, using local data');
-                detailsContainer.innerHTML = this.createGameDetailsHTML(game);
-                return;
-            }
-            
-            console.log(`📊 Loading rounds for game details ${gameId} (Database ID: ${databaseGameId})`);
-            
-            // 从后端获取轮次数据
-            const roundsResponse = await fetch(CONFIG.getRoundsUrl(databaseGameId), {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-            
-            if (roundsResponse.ok) {
-                const roundsData = await roundsResponse.json();
-                if (roundsData.status === 'success' && roundsData.rounds) {
-                    console.log(`✅ Loaded ${roundsData.rounds.length} rounds for game details ${gameId}`);
-                    
-                    // 转换后端轮次数据格式到前端格式
-                    const formattedRounds = roundsData.rounds.map((round, index) => ({
-                        id: round.roundInGame,
-                        timestamp: new Date().toISOString(), // 使用当前时间作为默认值
-                        winner: round.pointA > round.pointB ? 'playerA' : 'playerB', // 判断谁得分了
-                        playerAScore: round.pointA,
-                        playerBScore: round.pointB,
-                        databaseRound: round // 保存原始数据
-                    }));
-                    
-                    // 更新游戏的轮次数据
-                    const gameWithRounds = {
-                        ...game,
-                        rounds: formattedRounds
-                    };
-                    
-                    detailsContainer.innerHTML = this.createGameDetailsHTML(gameWithRounds);
-                    console.log(`🎯 Game details displayed for ${gameId} with ${formattedRounds.length} rounds`);
-                } else {
-                    console.warn('No rounds data received from backend, using local data');
-                    detailsContainer.innerHTML = this.createGameDetailsHTML(game);
-                }
-            } else {
-                console.error('Failed to load rounds from backend, using local data');
-                detailsContainer.innerHTML = this.createGameDetailsHTML(game);
-            }
+            // 直接显示游戏详情，不需要加载轮次数据
+            detailsContainer.innerHTML = this.createGameDetailsHTML(game);
+            console.log(`🎯 Game details displayed for ${gameId}`);
             
         } catch (error) {
             console.error('Error loading game details:', error);
-            detailsContainer.innerHTML = this.createGameDetailsHTML(game); // 回退到本地数据
+            detailsContainer.innerHTML = this.createGameDetailsHTML(game);
         }
     }
     
@@ -520,8 +569,8 @@ class GameHistoryManager {
         const playerAName = game.playerNames ? game.playerNames.playerA : 'Player A';
         const playerBName = game.playerNames ? game.playerNames.playerB : 'Player B';
         
-        // 计算实际的轮次数
-        const actualRounds = Math.max(game.rounds.length, game.finalScores.playerA + game.finalScores.playerB);
+        // 计算总轮次数
+        const totalRounds = game.finalScores.playerA + game.finalScores.playerB;
         
         return `
             <div class="game-details-container">
@@ -536,7 +585,7 @@ class GameHistoryManager {
                             <strong>Status:</strong> ${game.status.toUpperCase()}
                         </div>
                         <div class="meta-item">
-                            <strong>Total Rounds:</strong> ${actualRounds}
+                            <strong>Total Rounds:</strong> ${totalRounds}
                         </div>
                         <div class="meta-item">
                             <strong>Duration:</strong> ${duration}
@@ -585,39 +634,6 @@ class GameHistoryManager {
                             <span class="winner-text">${game.winner === 'playerA' ? playerAName : playerBName} Wins!</span>
                         </div>
                     </div>` : ''}
-                </div>
-                
-                <!-- Round History Card -->
-                <div class="rounds-history-card">
-                    <h3>📊 Round History</h3>
-                    <div class="rounds-summary">
-                        <span class="rounds-count">${game.rounds.length} recorded rounds</span>
-                    </div>
-                    <div class="rounds-container">
-                        ${game.rounds.length > 0 ? 
-                            game.rounds.map((round, index) => `
-                            <div class="round-timeline-item">
-                                <div class="round-marker">
-                                    <span class="round-index">${index + 1}</span>
-                                </div>
-                                <div class="round-content">
-                                    <div class="round-header">
-                                        <span class="round-title">Round ${round.id}</span>
-                                        <span class="round-score">${round.playerAScore} - ${round.playerBScore}</span>
-                                    </div>
-                                    <div class="round-details">
-                                        <span class="round-winner">${round.winner === 'playerA' ? playerAName : playerBName} scored</span>
-                                        <span class="round-time">${new Date(round.timestamp).toLocaleTimeString()}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            `).join('') 
-                            : `<div class="no-rounds">
-                                <div class="no-rounds-icon">📝</div>
-                                <div class="no-rounds-text">No detailed round data available for this game.</div>
-                            </div>`
-                        }
-                    </div>
                 </div>
             </div>
         `;

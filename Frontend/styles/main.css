@@ -3891,16 +3891,17 @@ body {
     flex-shrink: 0;
     width: 2rem;
     height: 2rem;
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: transparent;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: none;
+    border: 2px solid rgba(0, 0, 0, 0.2);
 }
 
 .round-index {
-    color: white;
+    color: #2c3e50;
     font-weight: 600;
     font-size: 0.8rem;
 }
@@ -7346,6 +7347,27 @@ body {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Game Action Buttons */
+.game-action-btn.primary {
+    background: linear-gradient(135deg, var(--apple-blue) 0%, var(--apple-blue-light) 100%);
+    color: white;
+    border: none;
+    font-weight: 600;
+}
+
+.game-action-btn.primary:hover {
+    background: linear-gradient(135deg, var(--apple-blue-dark) 0%, var(--apple-blue) 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+}
+
+.game-action-btn.primary:disabled {
+    background: var(--gray-400);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 /* Responsive Design */
