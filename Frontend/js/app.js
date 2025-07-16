@@ -393,6 +393,11 @@ class SmartCourtApp {
         // 已禁用自动模拟 - 等待真实传感器输入
         // this.simulateGameplay(); // 自动模拟已禁用
         
+        // Reset win rate display for new game
+        if (window.winRatePredictor) {
+            window.winRatePredictor.resetWinRateDisplay();
+        }
+        
         // Trigger game state change event to update button states
         document.dispatchEvent(new CustomEvent('gameStateChange', {
             detail: { 
@@ -1041,6 +1046,11 @@ class SmartCourtApp {
         if (feedContainer) {
             feedContainer.innerHTML = '';
             this.addLiveFeedItem('System ready. Waiting for game to start...', 'info');
+        }
+        
+        // Reset win rate display
+        if (window.winRatePredictor) {
+            window.winRatePredictor.resetWinRateDisplay();
         }
         
         // Trigger game state change event

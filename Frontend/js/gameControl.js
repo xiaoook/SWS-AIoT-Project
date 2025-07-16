@@ -887,14 +887,38 @@ class WinRatePredictor {
             if (rateStatus) {
                 rateStatus.textContent = 'Live';
             }
-        } else {
-            // Show inactive state
+        } else if (gameState.status === 'ended') {
+            // Game ended - show final win rate data
             const ballRates = floatingBall.querySelector('.ball-rates');
             if (ballRates) {
                 ballRates.classList.add('inactive');
             }
             
-            // Reset to default values
+            // Keep current win rate values if available, otherwise show default
+            const rateA = floatingBall.querySelector('.rate-a');
+            const rateB = floatingBall.querySelector('.rate-b');
+            const rateStatus = floatingBall.querySelector('.rate-status');
+            
+            // Only reset to default if no valid data exists
+            if (!this.winRateData || typeof this.winRateData.playerA !== 'number') {
+                if (rateA) rateA.textContent = '50%';
+                if (rateB) rateB.textContent = '50%';
+            }
+            
+            if (rateStatus) rateStatus.textContent = 'Final';
+            
+            // Keep detailed panel visible but mark as final
+            this.updateWinRateDisplay();
+            this.updateGameEndedStatus();
+            this.stopPredictionUpdates();
+        } else {
+            // Show inactive state for other statuses (paused, ready, etc.)
+            const ballRates = floatingBall.querySelector('.ball-rates');
+            if (ballRates) {
+                ballRates.classList.add('inactive');
+            }
+            
+            // Reset to default values for non-ended states
             const rateA = floatingBall.querySelector('.rate-a');
             const rateB = floatingBall.querySelector('.rate-b');
             const rateStatus = floatingBall.querySelector('.rate-status');
@@ -903,7 +927,7 @@ class WinRatePredictor {
             if (rateB) rateB.textContent = '50%';
             if (rateStatus) rateStatus.textContent = 'Ready';
             
-            // Hide detailed panel
+            // Hide detailed panel for non-playing, non-ended states
             indicator.style.display = 'none';
             this.stopPredictionUpdates();
         }
@@ -912,8 +936,15 @@ class WinRatePredictor {
     handleWinRatePrediction(data) {
         console.log('🎯 Received win rate prediction data:', data);
         
+        // Handle various data formats
+        if (!data) {
+            console.warn('🎯 No win rate prediction data received');
+            this.showErrorMessage('No prediction data received');
+            return;
+        }
+        
         // Expected data format: { playerA: 65, playerB: 35, confidence: 0.85 }
-        if (data && typeof data.playerA === 'number' && typeof data.playerB === 'number') {
+        if (typeof data.playerA === 'number' && typeof data.playerB === 'number') {
             this.winRateData = {
                 playerA: Math.round(data.playerA),
                 playerB: Math.round(data.playerB)
@@ -933,6 +964,66 @@ class WinRatePredictor {
             console.log('🎯 Win rate prediction updated:', this.winRateData);
         } else {
             console.warn('🎯 Invalid win rate prediction data format:', data);
+            this.showErrorMessage('Invalid prediction data format');
+        }
+    }
+    
+    // Update status when game ends
+    updateGameEndedStatus() {
+        const indicator = document.getElementById('winRateIndicator');
+        if (!indicator) return;
+        
+        const statusText = indicator.querySelector('.status-text');
+        if (statusText) {
+            statusText.textContent = 'Game Ended - Final Results';
+            statusText.style.color = '#666';
+        }
+        
+        // Update status dot to inactive
+        const statusDot = indicator.querySelector('.status-dot');
+        if (statusDot) {
+            statusDot.classList.remove('active');
+            statusDot.classList.add('inactive');
+        }
+        
+        // Update match status
+        const matchStatus = indicator.querySelector('.match-status');
+        if (matchStatus) {
+            matchStatus.textContent = 'Final Results';
+            matchStatus.style.background = 'linear-gradient(135deg, #6c7b7f, #99a3a4)';
+        }
+    }
+    
+    // Show error message in win rate indicator
+    showErrorMessage(message) {
+        const indicator = document.getElementById('winRateIndicator');
+        if (!indicator) return;
+        
+        const statusText = indicator.querySelector('.status-text');
+        if (statusText) {
+            statusText.textContent = message;
+            statusText.style.color = '#ff4444';
+            
+            // Reset to normal status after 5 seconds
+            setTimeout(() => {
+                statusText.textContent = 'CV Model Ready';
+                statusText.style.color = '';
+            }, 5000);
+        }
+        
+        // Also show in floating ball if available
+        const floatingBall = document.getElementById('winRateFloatingBall');
+        if (floatingBall) {
+            const rateStatus = floatingBall.querySelector('.rate-status');
+            if (rateStatus) {
+                rateStatus.textContent = 'Error';
+                rateStatus.style.color = '#ff4444';
+                
+                setTimeout(() => {
+                    rateStatus.textContent = 'Ready';
+                    rateStatus.style.color = '';
+                }, 5000);
+            }
         }
     }
     
@@ -941,6 +1032,12 @@ class WinRatePredictor {
         const floatingBall = document.getElementById('winRateFloatingBall');
         
         if (!indicator) return;
+        
+        // Check if we have valid win rate data
+        if (!this.winRateData || typeof this.winRateData.playerA !== 'number' || typeof this.winRateData.playerB !== 'number') {
+            console.warn('🎯 Cannot update display - invalid win rate data:', this.winRateData);
+            return;
+        }
         
         // Update player names
         const playerAName = this.getPlayerName('playerA');
@@ -965,13 +1062,21 @@ class WinRatePredictor {
         const statusText = indicator.querySelector('.status-text');
         
         if (statusText) {
-            const timeSinceUpdate = this.lastUpdateTime ? Date.now() - this.lastUpdateTime : 0;
-            if (this.winRateData.status === 'waiting_for_model') {
-                statusText.textContent = 'Waiting for model data';
-            } else if (timeSinceUpdate < 5000) {
-                statusText.textContent = 'CV Model Active';
+            // Check if game is ended
+            const gameState = window.smartCourtApp ? window.smartCourtApp.gameState : null;
+            if (gameState && gameState.status === 'ended') {
+                statusText.textContent = 'Game Ended - Final Results';
+                statusText.style.color = '#666';
             } else {
-                statusText.textContent = 'CV Model Ready';
+                const timeSinceUpdate = this.lastUpdateTime ? Date.now() - this.lastUpdateTime : 0;
+                if (this.winRateData.status === 'waiting_for_model') {
+                    statusText.textContent = 'Waiting for model data';
+                } else if (timeSinceUpdate < 5000) {
+                    statusText.textContent = 'CV Model Active';
+                } else {
+                    statusText.textContent = 'CV Model Ready';
+                }
+                statusText.style.color = '';
             }
         }
         
@@ -989,16 +1094,74 @@ class WinRatePredictor {
             
             // Update status
             if (rateStatus) {
-                const timeSinceUpdate = this.lastUpdateTime ? Date.now() - this.lastUpdateTime : 0;
-                if (this.winRateData.status === 'waiting_for_model') {
-                    rateStatus.textContent = 'Waiting';
-                } else if (timeSinceUpdate < 5000) {
-                    rateStatus.textContent = 'Live';
+                // Check if game is ended
+                const gameState = window.smartCourtApp ? window.smartCourtApp.gameState : null;
+                if (gameState && gameState.status === 'ended') {
+                    rateStatus.textContent = 'Final';
+                    rateStatus.style.color = '#666';
                 } else {
-                    rateStatus.textContent = 'Ready';
+                    const timeSinceUpdate = this.lastUpdateTime ? Date.now() - this.lastUpdateTime : 0;
+                    if (this.winRateData.status === 'waiting_for_model') {
+                        rateStatus.textContent = 'Waiting';
+                    } else if (timeSinceUpdate < 5000) {
+                        rateStatus.textContent = 'Live';
+                    } else {
+                        rateStatus.textContent = 'Ready';
+                    }
+                    rateStatus.style.color = '';
                 }
             }
         }
+    }
+    
+    // Reset win rate display for new game
+    resetWinRateDisplay() {
+        const indicator = document.getElementById('winRateIndicator');
+        const floatingBall = document.getElementById('winRateFloatingBall');
+        
+        console.log('🎯 Resetting win rate display for new game');
+        
+        // Reset win rate data
+        this.winRateData = { playerA: 50, playerB: 50 };
+        this.lastUpdateTime = null;
+        
+        // Reset detailed panel
+        if (indicator) {
+            const statusText = indicator.querySelector('.status-text');
+            if (statusText) {
+                statusText.textContent = 'CV Model Ready';
+                statusText.style.color = '';
+            }
+            
+            const statusDot = indicator.querySelector('.status-dot');
+            if (statusDot) {
+                statusDot.classList.remove('inactive');
+                statusDot.classList.add('active');
+            }
+            
+            const matchStatus = indicator.querySelector('.match-status');
+            if (matchStatus) {
+                matchStatus.textContent = 'Live Prediction';
+                matchStatus.style.background = 'linear-gradient(135deg, #4834d4, #686de0)';
+            }
+        }
+        
+        // Reset floating ball
+        if (floatingBall) {
+            const rateA = floatingBall.querySelector('.rate-a');
+            const rateB = floatingBall.querySelector('.rate-b');
+            const rateStatus = floatingBall.querySelector('.rate-status');
+            
+            if (rateA) rateA.textContent = '50%';
+            if (rateB) rateB.textContent = '50%';
+            if (rateStatus) {
+                rateStatus.textContent = 'Ready';
+                rateStatus.style.color = '';
+            }
+        }
+        
+        // Update display with reset values
+        this.updateWinRateDisplay();
     }
     
     getPlayerName(player) {
@@ -1006,6 +1169,52 @@ class WinRatePredictor {
             return window.playerManager.currentPlayers[player] || (player === 'playerA' ? 'Player A' : 'Player B');
         }
         return player === 'playerA' ? 'Player A' : 'Player B';
+    }
+    
+    // Test win rate prediction with different data formats
+    testWinRatePrediction() {
+        console.log('🧪 Testing win rate prediction with various data formats...');
+        
+        // Test 1: Valid data
+        console.log('Test 1: Valid data');
+        this.handleWinRatePrediction({
+            playerA: 65,
+            playerB: 35,
+            confidence: 0.85
+        });
+        
+        setTimeout(() => {
+            // Test 2: Invalid data - null
+            console.log('Test 2: Null data');
+            this.handleWinRatePrediction(null);
+        }, 2000);
+        
+        setTimeout(() => {
+            // Test 3: Invalid data - missing fields
+            console.log('Test 3: Missing fields');
+            this.handleWinRatePrediction({
+                playerA: 60
+                // playerB missing
+            });
+        }, 4000);
+        
+        setTimeout(() => {
+            // Test 4: Invalid data - wrong types
+            console.log('Test 4: Wrong data types');
+            this.handleWinRatePrediction({
+                playerA: "60",
+                playerB: "40"
+            });
+        }, 6000);
+        
+        setTimeout(() => {
+            // Test 5: Valid data again
+            console.log('Test 5: Valid data again');
+            this.handleWinRatePrediction({
+                playerA: 45,
+                playerB: 55
+            });
+        }, 8000);
     }
     
     showIndicator() {

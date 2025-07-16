@@ -246,6 +246,17 @@ class WebSocketManager {
     handleWinRatePrediction(predictionData) {
         console.log('🎯 WebSocket received win rate prediction:', predictionData);
         
+        // Validate data format before processing
+        if (!predictionData) {
+            console.warn('🎯 WebSocket received null win rate prediction data');
+            return;
+        }
+        
+        if (typeof predictionData !== 'object') {
+            console.warn('🎯 WebSocket received invalid win rate prediction data type:', typeof predictionData);
+            return;
+        }
+        
         // Trigger win rate prediction event
         this.emit('win_rate_prediction', predictionData);
         
@@ -527,6 +538,28 @@ class WebSocketManager {
             reconnectAttempts: this.reconnectAttempts,
             serverUrl: this.serverUrl
         };
+    }
+    
+    // Test win rate prediction flow
+    testWinRatePredictionFlow() {
+        console.log('🧪 Testing WebSocket win rate prediction flow...');
+        
+        // Test with valid data
+        this.handleWinRatePrediction({
+            playerA: 70,
+            playerB: 30,
+            confidence: 0.9
+        });
+        
+        // Test with invalid data after 3 seconds
+        setTimeout(() => {
+            this.handleWinRatePrediction(null);
+        }, 3000);
+        
+        // Test with string data
+        setTimeout(() => {
+            this.handleWinRatePrediction("invalid data");
+        }, 5000);
     }
 }
 
