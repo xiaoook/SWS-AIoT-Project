@@ -20,6 +20,65 @@ class AnalysisManager {
         this.refreshAnalysis();
     }
     
+    // 从数据库加载游戏记录
+    async loadGamesFromDatabase() {
+        try {
+            console.log('🔄 Loading games from database for analysis...');
+            
+            const response = await fetch(CONFIG.API_URLS.GAMES, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    limit: 100 // 获取最近100场游戏
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success' && data.games) {
+                    console.log(`✅ Loaded ${data.games.length} games from database for analysis`);
+                    
+                    // 转换数据库格式到前端格式
+                    const games = data.games.map((game) => {
+                        const duration = game.duration || 0;
+                        
+                        return {
+                            gameId: `GAME-${String(game.gid).padStart(3, '0')}`,
+                            gameType: duration > 0 ? 'Completed Match' : 'Live Match',
+                            startTime: new Date(game.date + ' ' + game.time),
+                            endTime: duration > 0 ? new Date(new Date(game.date + ' ' + game.time).getTime() + duration * 1000) : null,
+                            duration: duration,
+                            finalScores: { 
+                                playerA: game.pointA || 0, 
+                                playerB: game.pointB || 0 
+                            },
+                            winner: game.pointA > game.pointB ? 'playerA' : 
+                                   game.pointB > game.pointA ? 'playerB' : null,
+                            status: duration > 0 ? 'ended' : 'playing',
+                            rounds: [], // 轮次数据需要单独获取
+                            databaseGameId: game.gid,
+                            playerNames: {
+                                playerA: game.playerAname || 'Player A',
+                                playerB: game.playerBname || 'Player B'
+                            }
+                        };
+                    });
+                    
+                    return games;
+                } else {
+                    throw new Error(data.message || 'Failed to load games from database');
+                }
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('❌ Failed to load games from database for analysis:', error);
+            return []; // 返回空数组
+        }
+    }
+    
     setupEventListeners() {
         // 简化的模式按钮事件
         document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -107,19 +166,41 @@ class AnalysisManager {
         this.setMode(viewToModeMap[view] || 'rounds');
     }
     
-    refreshAnalysis() {
+    async refreshAnalysis() {
         if (window.smartCourtApp) {
-            // Get all games from history
-            this.games = window.smartCourtApp.getGamesHistory();
-            this.populateGameSelector();
-            
-            // If no current game selected, show current game if available
-            if (!this.currentGame && window.smartCourtApp.currentGameId) {
-                this.loadGameAnalysis(window.smartCourtApp.currentGameId);
-            } else if (!this.currentGame && this.games.length > 0) {
-                // Default to most recent game
-                this.loadGameAnalysis(this.games[this.games.length - 1].gameId);
-            } else {
+            try {
+                console.log('🔄 Refreshing analysis data...');
+                
+                // 优先从数据库获取游戏数据
+                const gamesFromDB = await this.loadGamesFromDatabase();
+                
+                // 如果数据库中有数据，使用数据库数据；否则使用本地数据
+                if (gamesFromDB && gamesFromDB.length > 0) {
+                    this.games = gamesFromDB;
+                    console.log(`✅ Analysis refreshed with ${gamesFromDB.length} games from database`);
+                                 } else {
+                     // 数据库无数据时使用空数组
+                     this.games = [];
+                     console.log(`💾 Analysis: No games available from database`);
+                 }
+                
+                this.populateGameSelector();
+                
+                // If no current game selected, show current game if available
+                if (!this.currentGame && window.smartCourtApp.currentGameId) {
+                    await this.loadGameAnalysis(window.smartCourtApp.currentGameId);
+                } else if (!this.currentGame && this.games.length > 0) {
+                    // Default to most recent game
+                    await this.loadGameAnalysis(this.games[this.games.length - 1].gameId);
+                } else {
+                    this.displayRounds();
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing analysis:', error);
+                // 数据库错误时使用空数组，不显示假数据
+                this.games = [];
+                this.populateGameSelector();
                 this.displayRounds();
             }
         }
@@ -140,17 +221,15 @@ class AnalysisManager {
             option.value = game.gameId;
             const startTime = new Date(game.startTime).toLocaleString();
             const status = game.status === 'ended' ? '✓' : '🔴';
-            const winner = game.winner ? ` (${game.winner.slice(-1)} wins)` : '';
+            const winner = game.winner ? ` (${this.getPlayerName(game, game.winner)} wins)` : '';
             option.textContent = `${status} ${game.gameType} - ${startTime}${winner}`;
             selector.appendChild(option);
         });
     }
     
-    loadGameAnalysis(gameId) {
+    async loadGameAnalysis(gameId) {
         const game = this.games.find(g => g.gameId === gameId);
         if (!game) return;
-        
-        this.currentGame = game;
         
         // Update selector
         const selector = document.getElementById('gameSelector');
@@ -161,7 +240,74 @@ class AnalysisManager {
         // Update button state
         const analyzeBtn = document.getElementById('analyzeGameBtn');
         if (analyzeBtn) {
-            analyzeBtn.disabled = false;
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Loading...';
+        }
+        
+        try {
+            // 获取数据库中的游戏ID
+            const databaseGameId = game.databaseGameId;
+            if (!databaseGameId) {
+                console.warn('No database game ID found, using local data');
+                this.currentGame = game;
+                this.displayGameAnalysis();
+                return;
+            }
+            
+            console.log(`📊 Loading rounds for game ${gameId} (Database ID: ${databaseGameId})`);
+            
+            // 从后端获取轮次数据
+            const roundsResponse = await fetch(CONFIG.getRoundsUrl(databaseGameId), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (roundsResponse.ok) {
+                const roundsData = await roundsResponse.json();
+                if (roundsData.status === 'success' && roundsData.rounds) {
+                    console.log(`✅ Loaded ${roundsData.rounds.length} rounds for game ${gameId}`);
+                    
+                    // 转换后端轮次数据格式到前端格式
+                    const formattedRounds = roundsData.rounds.map((round, index) => ({
+                        id: round.roundInGame,
+                        timestamp: new Date().toISOString(), // 使用当前时间作为默认值
+                        winner: round.pointA > round.pointB ? 'playerA' : 'playerB', // 判断谁得分了
+                        playerAScore: round.pointA,
+                        playerBScore: round.pointB,
+                        analysis: {
+                            feedback: 'Round completed successfully',
+                            suggestions: ['Continue maintaining good performance'],
+                            errorType: null
+                        }
+                    }));
+                    
+                    // 更新当前游戏的轮次数据
+                    this.currentGame = {
+                        ...game,
+                        rounds: formattedRounds
+                    };
+                    
+                    console.log(`🎯 Game analysis data prepared for ${gameId} with ${formattedRounds.length} rounds`);
+                } else {
+                    console.warn('No rounds data received from backend, using local data');
+                    this.currentGame = game;
+                }
+            } else {
+                console.error('Failed to load rounds from backend, using local data');
+                this.currentGame = game;
+            }
+            
+        } catch (error) {
+            console.error('Error loading game analysis:', error);
+            this.currentGame = game; // 回退到本地数据
+        } finally {
+            // 恢复按钮状态
+            if (analyzeBtn) {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = 'Analyze Game';
+            }
         }
         
         this.displayGameAnalysis();
@@ -265,7 +411,7 @@ class AnalysisManager {
                         </div>
                         ${this.currentGame.winner ? `
                             <div class="meta-item">
-                                <strong>Winner:</strong> <span class="winner-badge">🏆 Player ${this.currentGame.winner.slice(-1)}</span>
+                                <strong>Winner:</strong> <span class="winner-badge">🏆 ${this.getWinnerName()}</span>
                             </div>
                         ` : ''}
                         <div class="meta-item">
@@ -288,6 +434,46 @@ class AnalysisManager {
         `;
     }
     
+    getWinnerName() {
+        if (!this.currentGame || !this.currentGame.winner) return '';
+        
+        // 获取真实的玩家名字
+        const playerNames = this.currentGame.playerNames || {
+            playerA: 'Player A',
+            playerB: 'Player B'
+        };
+        
+        // 根据winner值获取对应的玩家名字
+        if (this.currentGame.winner === 'playerA') {
+            return playerNames.playerA;
+        } else if (this.currentGame.winner === 'playerB') {
+            return playerNames.playerB;
+        }
+        
+        // 回退到默认显示方式
+        return `Player ${this.currentGame.winner.slice(-1)}`;
+    }
+    
+    getPlayerName(game, playerType) {
+        if (!game || !playerType) return '';
+        
+        // 获取真实的玩家名字
+        const playerNames = game.playerNames || {
+            playerA: 'Player A',
+            playerB: 'Player B'
+        };
+        
+        // 根据playerType获取对应的玩家名字
+        if (playerType === 'playerA') {
+            return playerNames.playerA;
+        } else if (playerType === 'playerB') {
+            return playerNames.playerB;
+        }
+        
+        // 回退到默认显示方式
+        return `Player ${playerType.slice(-1)}`;
+    }
+    
     formatDuration(seconds) {
         if (!seconds || seconds === 0) return '0:00';
         
@@ -302,6 +488,17 @@ class AnalysisManager {
         }
     }
     
+    // Format win rate for display
+    formatWinRate(winRate) {
+        if (typeof winRate === 'string') {
+            return winRate;  // Return as-is for 'Model Data Required'
+        }
+        if (typeof winRate === 'number') {
+            return `${winRate}%`;  // Add % for numeric values
+        }
+        return winRate;
+    }
+    
     getFilteredRounds() {
         // 简化：始终返回所有回合，不再做复杂的过滤
         if (!this.currentGame || !this.currentGame.rounds) {
@@ -312,8 +509,8 @@ class AnalysisManager {
     
     createRoundHTML(round) {
         const isExpanded = this.expandedRounds.has(round.id);
-        const winnerText = round.winner === 'playerA' ? 'Player A' : 'Player B';
-        const loserText = round.winner === 'playerA' ? 'Player B' : 'Player A';
+        const winnerText = this.getPlayerName(this.currentGame, round.winner);
+        const loserText = this.getPlayerName(this.currentGame, round.winner === 'playerA' ? 'playerB' : 'playerA');
         const timeStr = this.formatTime(round.timestamp);
         const playerAWon = round.winner === 'playerA';
         const playerBWon = round.winner === 'playerB';
@@ -344,7 +541,7 @@ class AnalysisManager {
                         <div class="player-analysis player-a ${playerAWon ? 'winner' : 'loser'}">
                             <div class="player-header">
                                 <span class="player-icon">🔵</span>
-                                <span class="player-name">Player A</span>
+                                <span class="player-name">${this.getPlayerName(this.currentGame, 'playerA')}</span>
                                 <span class="player-result ${playerAWon ? 'won' : 'lost'}">
                                     ${playerAWon ? '✅ Won Point' : '❌ Lost Point'}
                                 </span>
@@ -352,7 +549,7 @@ class AnalysisManager {
                             <div class="player-analysis-content">
                                 ${playerAWon ? 
                                     this.createWinAnalysisHTML(round, 'A') : 
-                                    this.createLossAnalysisHTML(round.analysis, 'Player A')
+                                    this.createLossAnalysisHTML(round.analysis, this.getPlayerName(this.currentGame, 'playerA'))
                                 }
                             </div>
                 </div>
@@ -369,7 +566,7 @@ class AnalysisManager {
                         <div class="player-analysis player-b ${playerBWon ? 'winner' : 'loser'}">
                             <div class="player-header">
                                 <span class="player-icon">🔴</span>
-                                <span class="player-name">Player B</span>
+                                <span class="player-name">${this.getPlayerName(this.currentGame, 'playerB')}</span>
                                 <span class="player-result ${playerBWon ? 'won' : 'lost'}">
                                     ${playerBWon ? '✅ Won Point' : '❌ Lost Point'}
                                 </span>
@@ -377,7 +574,7 @@ class AnalysisManager {
                             <div class="player-analysis-content">
                                 ${playerBWon ? 
                                     this.createWinAnalysisHTML(round, 'B') : 
-                                    this.createLossAnalysisHTML(round.analysis, 'Player B')
+                                    this.createLossAnalysisHTML(round.analysis, this.getPlayerName(this.currentGame, 'playerB'))
                                 }
                             </div>
                         </div>
@@ -877,8 +1074,8 @@ class AnalysisManager {
         const report = {
             summary: {
                 totalRounds: stats.totalRounds,
-                playerAWinRate: ((stats.playerAWins / stats.totalRounds) * 100).toFixed(1),
-                playerBWinRate: ((stats.playerBWins / stats.totalRounds) * 100).toFixed(1),
+                playerAWinRate: 'Model Data Required',  // 胜率由模型提供
+                playerBWinRate: 'Model Data Required',  // 胜率由模型提供
                 averageScore: stats.averageScore
             },
             performance: {
@@ -1141,7 +1338,7 @@ class AnalysisManager {
             <div class="timeline-view">
                 <div class="timeline-header">
                     <h3>🕒 Round-by-Round Timeline Analysis</h3>
-                    <p class="timeline-subtitle">Each round shows Player A and Player B performance breakdown</p>
+                    <p class="timeline-subtitle">Each round shows ${this.getPlayerName(this.currentGame, 'playerA')} and ${this.getPlayerName(this.currentGame, 'playerB')} performance breakdown</p>
                 </div>
                 
                 ${filtersHTML}
@@ -1192,12 +1389,12 @@ class AnalysisManager {
                 <!-- 简化的统计概览 -->
                 <div class="quick-comparison-stats">
                     <div class="quick-stat-item">
-                        <span class="stat-label">🔵 Player A Win Rate:</span>
-                        <span class="stat-value">${comparisonStats.playerA.winRate}%</span>
+                        <span class="stat-label">🔵 ${this.getPlayerName(this.currentGame, 'playerA')} Win Rate:</span>
+                        <span class="stat-value">${this.formatWinRate(comparisonStats.playerA.winRate)}</span>
                     </div>
                     <div class="quick-stat-item">
-                        <span class="stat-label">🔴 Player B Win Rate:</span>
-                        <span class="stat-value">${comparisonStats.playerB.winRate}%</span>
+                        <span class="stat-label">🔴 ${this.getPlayerName(this.currentGame, 'playerB')} Win Rate:</span>
+                        <span class="stat-value">${this.formatWinRate(comparisonStats.playerB.winRate)}</span>
                     </div>
                     <div class="quick-stat-item">
                         <span class="stat-label">📊 Final Score:</span>
@@ -1244,7 +1441,7 @@ class AnalysisManager {
                     <div class="comparison-stats-grid">
                         <div class="player-stats player-a-stats">
                         <div class="player-header">
-                                <h4>🔵 Player A Detailed Analysis</h4>
+                                <h4>🔵 ${this.getPlayerName(this.currentGame, 'playerA')} Detailed Analysis</h4>
                         </div>
                             <div class="stats-content">
                                 <div class="stat-item">
@@ -1256,8 +1453,8 @@ class AnalysisManager {
                                     <span class="stat-value">${comparisonStats.playerA.pointsLost}</span>
                                 </div>
                                 <div class="stat-item">
-                                    <span class="stat-label">Win Rate:</span>
-                                    <span class="stat-value">${comparisonStats.playerA.winRate}%</span>
+                                                                <span class="stat-label">Win Rate:</span>
+                            <span class="stat-value">${this.formatWinRate(comparisonStats.playerA.winRate)}</span>
                                 </div>
                                 <div class="stat-item">
                                     <span class="stat-label">Avg Tech Score:</span>
@@ -1282,16 +1479,16 @@ class AnalysisManager {
                             </div>
                             <div class="winner-badge">
                                 ${comparisonStats.finalScore.playerA > comparisonStats.finalScore.playerB ? 
-                                    '🏆 Player A Wins' : 
+                                    `🏆 ${this.getPlayerName(this.currentGame, 'playerA')} Wins` : 
                                     comparisonStats.finalScore.playerB > comparisonStats.finalScore.playerA ? 
-                                    '🏆 Player B Wins' : 
+                                    `🏆 ${this.getPlayerName(this.currentGame, 'playerB')} Wins` : 
                                     '🤝 Draw'}
                             </div>
                     </div>
                     
                         <div class="player-stats player-b-stats">
                         <div class="player-header">
-                                <h4>🔴 Player B Detailed Analysis</h4>
+                                <h4>🔴 ${this.getPlayerName(this.currentGame, 'playerB')} Detailed Analysis</h4>
                         </div>
                             <div class="stats-content">
                                 <div class="stat-item">
@@ -1303,8 +1500,8 @@ class AnalysisManager {
                                     <span class="stat-value">${comparisonStats.playerB.pointsLost}</span>
                                 </div>
                                 <div class="stat-item">
-                                    <span class="stat-label">Win Rate:</span>
-                                    <span class="stat-value">${comparisonStats.playerB.winRate}%</span>
+                                                                <span class="stat-label">Win Rate:</span>
+                            <span class="stat-value">${this.formatWinRate(comparisonStats.playerB.winRate)}</span>
                                 </div>
                                 <div class="stat-item">
                                     <span class="stat-label">Avg Tech Score:</span>
@@ -1357,18 +1554,18 @@ class AnalysisManager {
                             <h4>🎯 Performance Overview</h4>
                             <div class="performance-comparison">
                                 <div class="player-performance">
-                                    <span class="player-label">🔵 Player A</span>
-                                    <div class="performance-bar">
-                                        <div class="performance-fill player-a" style="width: ${comparisonStats.playerA.winRate}%"></div>
+                                    <span class="player-label">🔵 ${this.getPlayerName(this.currentGame, 'playerA')}</span>
+                                                        <div class="performance-bar">
+                        <div class="performance-fill player-a" style="width: ${typeof comparisonStats.playerA.winRate === 'number' ? comparisonStats.playerA.winRate : 50}%"></div>
                     </div>
-                                    <span class="performance-value">${comparisonStats.playerA.winRate}% Win Rate</span>
+                    <span class="performance-value">${this.formatWinRate(comparisonStats.playerA.winRate)} Win Rate</span>
                                 </div>
                                 <div class="player-performance">
-                                    <span class="player-label">🔴 Player B</span>
-                                    <div class="performance-bar">
-                                        <div class="performance-fill player-b" style="width: ${comparisonStats.playerB.winRate}%"></div>
-                                    </div>
-                                    <span class="performance-value">${comparisonStats.playerB.winRate}% Win Rate</span>
+                                    <span class="player-label">🔴 ${this.getPlayerName(this.currentGame, 'playerB')}</span>
+                                                        <div class="performance-bar">
+                        <div class="performance-fill player-b" style="width: ${typeof comparisonStats.playerB.winRate === 'number' ? comparisonStats.playerB.winRate : 50}%"></div>
+                    </div>
+                    <span class="performance-value">${this.formatWinRate(comparisonStats.playerB.winRate)} Win Rate</span>
                                 </div>
                             </div>
                         </div>
@@ -1377,11 +1574,11 @@ class AnalysisManager {
                             <h4>📊 Technical Scores</h4>
                             <div class="tech-scores-comparison">
                                 <div class="score-item">
-                                    <span class="score-label">🔵 Player A Avg:</span>
+                                    <span class="score-label">🔵 ${this.getPlayerName(this.currentGame, 'playerA')} Avg:</span>
                                     <span class="score-value ${this.getScoreClass(comparisonStats.playerA.avgTechScore)}">${comparisonStats.playerA.avgTechScore}/10</span>
                                 </div>
                                 <div class="score-item">
-                                    <span class="score-label">🔴 Player B Avg:</span>
+                                    <span class="score-label">🔴 ${this.getPlayerName(this.currentGame, 'playerB')} Avg:</span>
                                     <span class="score-value ${this.getScoreClass(comparisonStats.playerB.avgTechScore)}">${comparisonStats.playerB.avgTechScore}/10</span>
                                 </div>
                                 <div class="score-comparison">
@@ -1394,11 +1591,11 @@ class AnalysisManager {
                             <h4>⚠️ Error Analysis</h4>
                             <div class="errors-comparison">
                                 <div class="player-errors">
-                                    <span class="player-label">🔵 Player A:</span>
+                                    <span class="player-label">🔵 ${this.getPlayerName(this.currentGame, 'playerA')}:</span>
                                     <span class="error-value">${comparisonStats.playerA.commonError || 'No common errors'}</span>
                         </div>
                                 <div class="player-errors">
-                                    <span class="player-label">🔴 Player B:</span>
+                                    <span class="player-label">🔴 ${this.getPlayerName(this.currentGame, 'playerB')}:</span>
                                     <span class="error-value">${comparisonStats.playerB.commonError || 'No common errors'}</span>
                     </div>
             </div>
@@ -1414,11 +1611,11 @@ class AnalysisManager {
                             <h5>🎯 Consistency Analysis</h5>
                             <div class="consistency-comparison">
                                 <div class="consistency-item">
-                                    <span class="player-name">🔵 Player A</span>
+                                    <span class="player-name">🔵 ${this.getPlayerName(this.currentGame, 'playerA')}</span>
                                     <span class="consistency-score">${advancedStats.playerA.consistency}%</span>
                                 </div>
                                 <div class="consistency-item">
-                            <span class="player-name">🔴 Player B</span>
+                            <span class="player-name">🔴 ${this.getPlayerName(this.currentGame, 'playerB')}</span>
                                     <span class="consistency-score">${advancedStats.playerB.consistency}%</span>
                         </div>
                             </div>
@@ -1428,11 +1625,11 @@ class AnalysisManager {
                             <h5>📊 Performance Trend</h5>
                             <div class="trend-comparison">
                                 <div class="trend-item">
-                                    <span class="player-name">🔵 Player A</span>
+                                    <span class="player-name">🔵 ${this.getPlayerName(this.currentGame, 'playerA')}</span>
                                     <span class="trend-indicator ${advancedStats.playerA.trend}">${this.getTrendIcon(advancedStats.playerA.trend)} ${advancedStats.playerA.trend}</span>
                                 </div>
                                 <div class="trend-item">
-                                    <span class="player-name">🔴 Player B</span>
+                                    <span class="player-name">🔴 ${this.getPlayerName(this.currentGame, 'playerB')}</span>
                                     <span class="trend-indicator ${advancedStats.playerB.trend}">${this.getTrendIcon(advancedStats.playerB.trend)} ${advancedStats.playerB.trend}</span>
                                 </div>
                             </div>
@@ -1450,11 +1647,11 @@ class AnalysisManager {
                                     <div class="dominance-players">
                                         <div class="dominance-player player-a">
                                             <div class="player-indicator"></div>
-                                            <span>Player A</span>
+                                            <span>${this.getPlayerName(this.currentGame, 'playerA')}</span>
                                         </div>
                                         <div class="dominance-player player-b">
                                             <div class="player-indicator"></div>
-                                            <span>Player B</span>
+                                            <span>${this.getPlayerName(this.currentGame, 'playerB')}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1518,8 +1715,8 @@ class AnalysisManager {
         
         const diff = parseFloat(scoreA) - parseFloat(scoreB);
         if (Math.abs(diff) < 0.5) return '🤝 Very similar performance levels';
-        if (diff > 0) return `🔵 Player A performs ${diff.toFixed(1)} points better`;
-        return `🔴 Player B performs ${Math.abs(diff).toFixed(1)} points better`;
+        if (diff > 0) return `🔵 ${this.getPlayerName(this.currentGame, 'playerA')} performs ${diff.toFixed(1)} points better`;
+        return `🔴 ${this.getPlayerName(this.currentGame, 'playerB')} performs ${Math.abs(diff).toFixed(1)} points better`;
     }
 
     getTrendIcon(trend) {
@@ -1536,8 +1733,9 @@ class AnalysisManager {
     calculateDominancePosition(stats) {
         const scoreA = parseFloat(stats.playerA.avgTechScore) || 5;
         const scoreB = parseFloat(stats.playerB.avgTechScore) || 5;
-        const winRateA = parseFloat(stats.playerA.winRate) || 50;
-        const winRateB = parseFloat(stats.playerB.winRate) || 50;
+        // 胜率由模型提供，前端不计算优势位置
+        const winRateA = typeof stats.playerA.winRate === 'number' ? stats.playerA.winRate : 50;
+        const winRateB = typeof stats.playerB.winRate === 'number' ? stats.playerB.winRate : 50;
         
         // 综合评分：技术分数权重40%，胜率权重60%
         const totalA = (scoreA * 0.4) + (winRateA * 0.6 / 10);
@@ -1554,20 +1752,24 @@ class AnalysisManager {
         if (Math.abs(position - 50) < 10) {
             return "Balanced Match";
         } else if (position > 65) {
-            return "Player A Dominance";
+            return `${this.getPlayerName(this.currentGame, 'playerA')} Dominance`;
         } else if (position < 35) {
-            return "Player B Dominance";
+            return `${this.getPlayerName(this.currentGame, 'playerB')} Dominance`;
         } else if (position > 55) {
-            return "Player A Advantage";
+            return `${this.getPlayerName(this.currentGame, 'playerA')} Advantage`;
         } else {
-            return "Player B Advantage";
+            return `${this.getPlayerName(this.currentGame, 'playerB')} Advantage`;
         }
     }
 
     getDominanceDescription(stats) {
         const position = this.calculateDominancePosition(stats);
-        const playerAWinRate = parseFloat(stats.playerA.winRate) || 50;
-        const playerBWinRate = parseFloat(stats.playerB.winRate) || 50;
+        const playerAWinRate = typeof stats.playerA.winRate === 'number' ? stats.playerA.winRate : 'N/A';
+        const playerBWinRate = typeof stats.playerB.winRate === 'number' ? stats.playerB.winRate : 'N/A';
+        
+        if (playerAWinRate === 'N/A' || playerBWinRate === 'N/A') {
+            return 'Performance analysis requires model data for accurate win rate calculation';
+        }
         
         if (Math.abs(position - 50) < 10) {
             return `Very close competition with ${playerAWinRate}% vs ${playerBWinRate}% win rates`;
@@ -1646,10 +1848,9 @@ class AnalysisManager {
             stats.finalScore.playerB = round.playerBScore;
         });
 
-        // 计算胜率
-        const totalRounds = rounds.length;
-        stats.playerA.winRate = ((stats.playerA.pointsWon / totalRounds) * 100).toFixed(1);
-        stats.playerB.winRate = ((stats.playerB.pointsWon / totalRounds) * 100).toFixed(1);
+        // 胜率由模型提供，前端不计算
+        stats.playerA.winRate = 'Model Data Required';
+        stats.playerB.winRate = 'Model Data Required';
 
         // 计算平均技术评分
         if (playerATechScores.length > 0) {
@@ -1740,7 +1941,7 @@ class AnalysisManager {
                     <div class="timeline-player-result player-a ${playerALost ? 'lost-point' : 'won-point'}">
                         <div class="player-icon">🔵</div>
                         <div class="player-status">
-                            <span class="player-name">Player A</span>
+                            <span class="player-name">${this.getPlayerName(this.currentGame, 'playerA')}</span>
                             <span class="result-text ${playerALost ? 'lost' : 'won'}">
                                 ${playerALost ? 'Lost Point' : 'Won Point'}
                             </span>
@@ -1757,7 +1958,7 @@ class AnalysisManager {
                     <div class="timeline-player-result player-b ${playerBLost ? 'lost-point' : 'won-point'}">
                         <div class="player-icon">🔴</div>
                         <div class="player-status">
-                            <span class="player-name">Player B</span>
+                            <span class="player-name">${this.getPlayerName(this.currentGame, 'playerB')}</span>
                             <span class="result-text ${playerBLost ? 'lost' : 'won'}">
                                 ${playerBLost ? 'Lost Point' : 'Won Point'}
                             </span>
@@ -1788,7 +1989,7 @@ class AnalysisManager {
                     <div class="detailed-player-analysis player-a ${playerALost ? 'lost-point' : 'won-point'}">
                         <div class="detailed-player-header">
                             <span class="player-icon">🔵</span>
-                            <span class="player-name">Player A</span>
+                            <span class="player-name">${this.getPlayerName(this.currentGame, 'playerA')}</span>
                             <span class="detailed-result ${playerALost ? 'lost' : 'won'}">
                                 ${playerALost ? '❌ Lost' : '✅ Won'}
                             </span>
@@ -1805,7 +2006,7 @@ class AnalysisManager {
                     <div class="detailed-player-analysis player-b ${playerBLost ? 'lost-point' : 'won-point'}">
                         <div class="detailed-player-header">
                             <span class="player-icon">🔴</span>
-                            <span class="player-name">Player B</span>
+                            <span class="player-name">${this.getPlayerName(this.currentGame, 'playerB')}</span>
                             <span class="detailed-result ${playerBLost ? 'lost' : 'won'}">
                                 ${playerBLost ? '❌ Lost' : '✅ Won'}
                             </span>
@@ -1932,8 +2133,8 @@ class AnalysisManager {
             chartHTML += `
                 <div class="timeline-point" data-round="${round.id}">
                     <div class="score-bars">
-                        <div class="score-bar player-a-bar" style="height: ${heightA}%" title="Player A: ${round.playerAScore}"></div>
-                        <div class="score-bar player-b-bar" style="height: ${heightB}%" title="Player B: ${round.playerBScore}"></div>
+                        <div class="score-bar player-a-bar" style="height: ${heightA}%" title="${this.getPlayerName(this.currentGame, 'playerA')}: ${round.playerAScore}"></div>
+                        <div class="score-bar player-b-bar" style="height: ${heightB}%" title="${this.getPlayerName(this.currentGame, 'playerB')}: ${round.playerBScore}"></div>
                     </div>
                     <div class="round-label">R${round.id}</div>
                 </div>
@@ -1945,11 +2146,11 @@ class AnalysisManager {
                 <div class="timeline-legend">
                     <div class="legend-item">
                         <div class="legend-color player-a"></div>
-                        <span>Player A</span>
+                        <span>${this.getPlayerName(this.currentGame, 'playerA')}</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color player-b"></div>
-                        <span>Player B</span>
+                        <span>${this.getPlayerName(this.currentGame, 'playerB')}</span>
                     </div>
                 </div>
             </div>
@@ -1980,8 +2181,8 @@ class AnalysisManager {
             chartHTML += `
                 <div class="trend-point" data-round="${round.id}">
                     <div class="trend-lines">
-                        <div class="trend-line player-a-trend" style="height: ${playerAWinRate}%" title="Player A Win Rate: ${playerAWinRate.toFixed(1)}%"></div>
-                        <div class="trend-line player-b-trend" style="height: ${playerBWinRate}%" title="Player B Win Rate: ${playerBWinRate.toFixed(1)}%"></div>
+                        <div class="trend-line player-a-trend" style="height: ${playerAWinRate}%" title="${this.getPlayerName(this.currentGame, 'playerA')} Win Rate: ${playerAWinRate.toFixed(1)}%"></div>
+                        <div class="trend-line player-b-trend" style="height: ${playerBWinRate}%" title="${this.getPlayerName(this.currentGame, 'playerB')} Win Rate: ${playerBWinRate.toFixed(1)}%"></div>
                     </div>
                     <div class="trend-label">R${round.id}</div>
                 </div>
@@ -1993,11 +2194,11 @@ class AnalysisManager {
                 <div class="trend-legend">
                     <div class="legend-item">
                         <div class="legend-line player-a-line"></div>
-                        <span>Player A Win Rate</span>
+                        <span>${this.getPlayerName(this.currentGame, 'playerA')} Win Rate</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-line player-b-line"></div>
-                        <span>Player B Win Rate</span>
+                        <span>${this.getPlayerName(this.currentGame, 'playerB')} Win Rate</span>
                     </div>
                 </div>
             </div>
@@ -2026,8 +2227,8 @@ class AnalysisManager {
                             <div class="win-segment player-b-wins" style="width: ${playerBPercentage}%"></div>
                 </div>
                         <div class="distribution-labels">
-                            <span class="label-left">Player A: ${playerAWins} wins</span>
-                            <span class="label-right">Player B: ${playerBWins} wins</span>
+                            <span class="label-left">${this.getPlayerName(this.currentGame, 'playerA')}: ${playerAWins} wins</span>
+                            <span class="label-right">${this.getPlayerName(this.currentGame, 'playerB')}: ${playerBWins} wins</span>
                         </div>
                     </div>
                 </div>
@@ -2036,15 +2237,15 @@ class AnalysisManager {
                     <div class="stat-item">
                         <div class="stat-icon">🔵</div>
                         <div class="stat-content">
-                            <div class="stat-value">${playerAPercentage.toFixed(1)}%</div>
-                            <div class="stat-label">Player A Win Rate</div>
+                            <div class="stat-value">Model Data Required</div>
+                            <div class="stat-label">${this.getPlayerName(this.currentGame, 'playerA')} Win Rate</div>
                         </div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-icon">🔴</div>
                         <div class="stat-content">
-                            <div class="stat-value">${playerBPercentage.toFixed(1)}%</div>
-                            <div class="stat-label">Player B Win Rate</div>
+                            <div class="stat-value">Model Data Required</div>
+                            <div class="stat-label">${this.getPlayerName(this.currentGame, 'playerB')} Win Rate</div>
                         </div>
                     </div>
                 </div>
@@ -2346,8 +2547,8 @@ class AnalysisManager {
     }
     
     createCompactItem(round) {
-        const winnerText = round.winner === 'playerA' ? 'Player A' : 'Player B';
-        const loserText = round.winner === 'playerA' ? 'Player B' : 'Player A';
+        const winnerText = this.getPlayerName(this.currentGame, round.winner);
+        const loserText = this.getPlayerName(this.currentGame, round.winner === 'playerA' ? 'playerB' : 'playerA');
         const timeStr = this.formatTime(round.timestamp);
         const errorType = round.analysis?.errorType || 'Unknown';
         const riskLevel = round.analysis ? this.getRiskLevel(Math.max(1, 10 - this.calculateRoundScore(round.analysis))) : 'Medium';
@@ -2398,7 +2599,7 @@ class AnalysisManager {
     }
     
     createTableRow(round) {
-        const loserText = round.winner === 'playerA' ? 'Player B' : 'Player A';
+        const loserText = this.getPlayerName(this.currentGame, round.winner === 'playerA' ? 'playerB' : 'playerA');
         const timeStr = this.formatTime(round.timestamp);
         const errorType = round.analysis?.errorType || 'Unknown';
         const score = round.analysis ? this.calculateRoundScore(round.analysis) : 5;
@@ -2443,11 +2644,11 @@ class AnalysisManager {
                                 <span class="stat-value">${stats.totalRounds}</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label">Player A Losses:</span>
+                                <span class="stat-label">${this.getPlayerName(this.currentGame, 'playerA')} Losses:</span>
                                 <span class="stat-value">${stats.playerALosses}</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label">Player B Losses:</span>
+                                <span class="stat-label">${this.getPlayerName(this.currentGame, 'playerB')} Losses:</span>
                                 <span class="stat-value">${stats.playerBLosses}</span>
                             </div>
                             <div class="stat-item">
@@ -2523,7 +2724,7 @@ class AnalysisManager {
     }
     
     createSummaryRoundCard(round) {
-        const loserText = round.winner === 'playerA' ? 'Player B' : 'Player A';
+        const loserText = this.getPlayerName(this.currentGame, round.winner === 'playerA' ? 'playerB' : 'playerA');
         const score = round.analysis ? this.calculateRoundScore(round.analysis) : 5;
         const riskLevel = round.analysis ? this.getRiskLevel(Math.max(1, 10 - score)) : 'Medium';
         const errorType = round.analysis?.errorType || 'Unknown';
@@ -2615,7 +2816,7 @@ class AnalysisManager {
         const round = this.currentGame.rounds.find(r => r.id === roundId);
         if (!round) return;
         
-        const loserText = round.winner === 'playerA' ? 'Player B' : 'Player A';
+        const loserText = this.getPlayerName(this.currentGame, round.winner === 'playerA' ? 'playerB' : 'playerA');
         const modal = document.createElement('div');
         modal.className = 'round-detail-modal';
         modal.innerHTML = `
@@ -2664,8 +2865,8 @@ class AnalysisManager {
                         <label class="filter-label">👥 Player Focus:</label>
                         <select class="filter-select" id="playerFilter" onchange="analysisManager.updateRoundFilter('player', this.value)">
                             <option value="all" ${this.roundFilters.player === 'all' ? 'selected' : ''}>All Players</option>
-                            <option value="playerA" ${this.roundFilters.player === 'playerA' ? 'selected' : ''}>🔵 Player A Only</option>
-                            <option value="playerB" ${this.roundFilters.player === 'playerB' ? 'selected' : ''}>🔴 Player B Only</option>
+                            <option value="playerA" ${this.roundFilters.player === 'playerA' ? 'selected' : ''}>🔵 ${this.getPlayerName(this.currentGame, 'playerA')} Only</option>
+                            <option value="playerB" ${this.roundFilters.player === 'playerB' ? 'selected' : ''}>🔴 ${this.getPlayerName(this.currentGame, 'playerB')} Only</option>
                         </select>
                     </div>
                     
@@ -2781,7 +2982,7 @@ class AnalysisManager {
         let summary = `<div class="filter-summary">`;
         
         if (this.roundFilters.player !== 'all') {
-            const playerName = this.roundFilters.player === 'playerA' ? '🔵 Player A' : '🔴 Player B';
+            const playerName = this.roundFilters.player === 'playerA' ? `🔵 ${this.getPlayerName(this.currentGame, 'playerA')}` : `🔴 ${this.getPlayerName(this.currentGame, 'playerB')}`;
             let resultText = '';
             
             if (this.roundFilters.result === 'wins') {
@@ -2794,7 +2995,7 @@ class AnalysisManager {
             
             summary += `<span class="summary-item">Focus: ${playerName}${resultText}</span>`;
         } else {
-            summary += `<span class="summary-item">🔵 A: ${playerAWins} wins | 🔴 B: ${playerBWins} wins</span>`;
+            summary += `<span class="summary-item">🔵 ${this.getPlayerName(this.currentGame, 'playerA')}: ${playerAWins} wins | 🔴 ${this.getPlayerName(this.currentGame, 'playerB')}: ${playerBWins} wins</span>`;
         }
         
         if (this.roundFilters.result !== 'all' && this.roundFilters.player === 'all') {

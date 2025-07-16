@@ -2051,6 +2051,9 @@ body {
     display: flex;
     justify-content: space-around;
     text-align: center;
+    gap: 1rem;
+    align-items: stretch;
+    min-height: 140px;
 }
 
 .score-item {
@@ -2062,15 +2065,52 @@ body {
     box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
     border: 2px solid rgba(102, 126, 234, 0.15);
     backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.score-item.winner {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 193, 7, 0.08));
+    border: 2px solid rgba(255, 215, 0, 0.3);
+    box-shadow: 0 8px 25px rgba(255, 215, 0, 0.2);
+}
+
+.score-item .score-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 1rem;
+    min-height: 3.5rem;
+    flex-shrink: 0;
+    position: relative;
+    text-align: center;
+    padding: 0 3rem;
+    box-sizing: border-box;
+}
+
+.score-item .score-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    position: relative;
+    z-index: 0;
+    min-height: 3.5rem;
 }
 
 .score-item .player {
     display: block;
     font-size: 1.2rem;
-    margin-bottom: 0.5rem;
     color: #667eea;
     font-weight: 600;
     opacity: 1;
+    text-align: center;
+    line-height: 1.2;
 }
 
 .score-item .score {
@@ -2078,6 +2118,83 @@ body {
     font-weight: 800;
     color: #2d3748;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    line-height: 1;
+    text-align: center;
+    width: 100%;
+    margin: 0;
+}
+
+.score-item .winner-badge {
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    transform: translateY(-50%);
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    backdrop-filter: blur(5px);
+}
+
+.score-progress-bar {
+    width: 100%;
+    height: 18px;
+    background: rgba(226, 232, 240, 0.9);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: auto;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(203, 213, 225, 0.5);
+    flex-shrink: 0;
+    position: relative;
+    display: block;
+}
+
+.score-progress-fill {
+    height: 100%;
+    border-radius: 8px;
+    transition: width 0.8s ease;
+    position: relative;
+    box-shadow: none;
+    display: block;
+}
+
+.score-progress-fill.player-a {
+    background: linear-gradient(90deg, #3b82f6, #1e40af);
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.5);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+}
+
+.score-progress-fill.player-b {
+    background: linear-gradient(90deg, #ef4444, #b91c1c);
+    box-shadow: 0 1px 3px rgba(239, 68, 68, 0.5);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+}
+
+.score-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 2s infinite;
+    border-radius: 8px;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 
 .chart-container {

@@ -198,24 +198,14 @@ class GameHistoryManager {
             // 从数据库获取真实的游戏记录，而不是前端虚拟数据
             const games = await this.loadGamesFromDatabase();
             
-            // 如果数据库中没有游戏记录，尝试显示本地游戏历史
-            if (games.length === 0 && this.app.gamesHistory && this.app.gamesHistory.length > 0) {
-                console.log('📝 No games in database, showing local games history');
-                const localGames = this.app.gamesHistory.map(game => ({
-                    ...game,
-                    playerNames: {
-                        playerA: game.playerNames?.playerA || 'Player A',
-                        playerB: game.playerNames?.playerB || 'Player B'
-                    }
-                }));
-                this.loadedGames = localGames;
-                this.updateStats(localGames);
-                this.displayGames(localGames);
-                console.log(`✅ Local game history displayed: ${localGames.length} games loaded`);
+            // 直接使用数据库中的游戏记录，不再显示本地游戏历史
+            this.loadedGames = games; // Store loaded games for later use
+            this.updateStats(games);
+            this.displayGames(games);
+            
+            if (games.length === 0) {
+                console.log('📝 No games found in database, showing empty state');
             } else {
-                this.loadedGames = games; // Store loaded games for later use
-                this.updateStats(games);
-                this.displayGames(games);
                 console.log(`✅ Game history refreshed: ${games.length} games loaded`);
             }
             
@@ -257,7 +247,13 @@ class GameHistoryManager {
         if (!container) return;
         
         if (games.length === 0) {
-            container.innerHTML = '<div class="no-games">No games found. Start a new game to see history.</div>';
+            container.innerHTML = `
+                <div class="no-games">
+                    <div class="no-games-icon">🎮</div>
+                    <div class="no-games-title">No Game History</div>
+                    <div class="no-games-message">No games have been played yet. Start a new game to begin recording match history.</div>
+                </div>
+            `;
             return;
         }
         
@@ -437,7 +433,7 @@ class GameHistoryManager {
     
 
     
-    showGameDetails(gameId) {
+    async showGameDetails(gameId) {
         const game = this.loadedGames.find(g => g.gameId === gameId);
         
         if (!game) {
@@ -447,9 +443,72 @@ class GameHistoryManager {
         }
         
         const detailsContainer = document.getElementById('gameDetails');
-        detailsContainer.innerHTML = this.createGameDetailsHTML(game);
+        
+        // 显示加载状态
+        detailsContainer.innerHTML = `
+            <div class="loading-game-details">
+                <div class="loading-spinner">🔄</div>
+                <div class="loading-text">Loading game details...</div>
+            </div>
+        `;
         
         this.modal.classList.add('show');
+        
+        try {
+            // 获取数据库中的游戏ID
+            const databaseGameId = game.databaseGameId;
+            if (!databaseGameId) {
+                console.warn('No database game ID found, using local data');
+                detailsContainer.innerHTML = this.createGameDetailsHTML(game);
+                return;
+            }
+            
+            console.log(`📊 Loading rounds for game details ${gameId} (Database ID: ${databaseGameId})`);
+            
+            // 从后端获取轮次数据
+            const roundsResponse = await fetch(CONFIG.getRoundsUrl(databaseGameId), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (roundsResponse.ok) {
+                const roundsData = await roundsResponse.json();
+                if (roundsData.status === 'success' && roundsData.rounds) {
+                    console.log(`✅ Loaded ${roundsData.rounds.length} rounds for game details ${gameId}`);
+                    
+                    // 转换后端轮次数据格式到前端格式
+                    const formattedRounds = roundsData.rounds.map((round, index) => ({
+                        id: round.roundInGame,
+                        timestamp: new Date().toISOString(), // 使用当前时间作为默认值
+                        winner: round.pointA > round.pointB ? 'playerA' : 'playerB', // 判断谁得分了
+                        playerAScore: round.pointA,
+                        playerBScore: round.pointB,
+                        databaseRound: round // 保存原始数据
+                    }));
+                    
+                    // 更新游戏的轮次数据
+                    const gameWithRounds = {
+                        ...game,
+                        rounds: formattedRounds
+                    };
+                    
+                    detailsContainer.innerHTML = this.createGameDetailsHTML(gameWithRounds);
+                    console.log(`🎯 Game details displayed for ${gameId} with ${formattedRounds.length} rounds`);
+                } else {
+                    console.warn('No rounds data received from backend, using local data');
+                    detailsContainer.innerHTML = this.createGameDetailsHTML(game);
+                }
+            } else {
+                console.error('Failed to load rounds from backend, using local data');
+                detailsContainer.innerHTML = this.createGameDetailsHTML(game);
+            }
+            
+        } catch (error) {
+            console.error('Error loading game details:', error);
+            detailsContainer.innerHTML = this.createGameDetailsHTML(game); // 回退到本地数据
+        }
     }
     
     createGameDetailsHTML(game) {
@@ -495,13 +554,29 @@ class GameHistoryManager {
                 <div class="players-score-card">
                     <h3>🏆 Players & Final Score</h3>
                     <div class="final-score">
-                        <div class="score-item">
-                            <span class="player">${playerAName}:</span>
-                            <span class="score">${game.finalScores.playerA}</span>
+                        <div class="score-item ${game.finalScores.playerA > game.finalScores.playerB ? 'winner' : ''}">
+                            <div class="score-header">
+                                <div class="score-content">
+                                    <span class="player">${playerAName}</span>
+                                    <span class="score">${game.finalScores.playerA}</span>
+                                </div>
+                                ${game.finalScores.playerA > game.finalScores.playerB ? '<div class="winner-badge">🏆</div>' : ''}
+                            </div>
+                            <div class="score-progress-bar">
+                                <div class="score-progress-fill player-a" style="width: ${(game.finalScores.playerA / Math.max(game.finalScores.playerA, game.finalScores.playerB, 1)) * 100}%"></div>
+                            </div>
                         </div>
-                        <div class="score-item">
-                            <span class="player">${playerBName}:</span>
-                            <span class="score">${game.finalScores.playerB}</span>
+                        <div class="score-item ${game.finalScores.playerB > game.finalScores.playerA ? 'winner' : ''}">
+                            <div class="score-header">
+                                <div class="score-content">
+                                    <span class="player">${playerBName}</span>
+                                    <span class="score">${game.finalScores.playerB}</span>
+                                </div>
+                                ${game.finalScores.playerB > game.finalScores.playerA ? '<div class="winner-badge">🏆</div>' : ''}
+                            </div>
+                            <div class="score-progress-bar">
+                                <div class="score-progress-fill player-b" style="width: ${(game.finalScores.playerB / Math.max(game.finalScores.playerA, game.finalScores.playerB, 1)) * 100}%"></div>
+                            </div>
                         </div>
                     </div>
                     ${game.winner ? `<div class="game-winner">

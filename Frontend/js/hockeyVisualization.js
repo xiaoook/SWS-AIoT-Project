@@ -1,4 +1,4 @@
-// Real-time Hockey Game Visualization Module with Real Scale & Collision Detection
+// Real-time Hockey Game Visualization Module with Real Scale & MQTT Data Integration
 class HockeyVisualization {
     constructor() {
         this.isInitialized = false;
@@ -60,26 +60,15 @@ class HockeyVisualization {
             puck: { x: 21.5, y: 13 }     // Center of table
         };
         
-        // Velocity data (cm/s)
-        this.velocities = {
-            pusherA: { x: 0, y: 0 },
-            pusherB: { x: 0, y: 0 },
-            puck: { x: 0, y: 0 }
-        };
+        // Velocity data removed - MQTT provides position data only
         
-        // Physics properties - Enhanced for realistic ice hockey
-        this.physics = {
+        // Display properties - For boundary detection and visualization
+        this.display = {
             puckRadius: this.realDimensions.puckDiameter / 2,      // 2cm
             pusherRadius: this.realDimensions.pusherDiameter / 2,  // 2.5cm
-            friction: 0.995,          // High friction for ice surface
-            bounceDamping: 0.9,       // Less energy loss on collision
-            minVelocity: 0.05,        // Lower minimum velocity threshold
-            maxVelocity: 80,          // Higher maximum velocity for faster gameplay
-            wallBounce: 0.85,         // Wall bounce coefficient
-            puckPusherBounce: 0.95,   // Puck-pusher collision coefficient
-            pusherPusherBounce: 0.7,  // Pusher-pusher collision coefficient
-            speedMultiplier: 1.5,     // Global speed multiplier
-            impulseStrength: 15       // Stronger impulse for manual control
+            minVelocity: 0.05,        // Lower minimum velocity threshold for display
+            maxVelocity: 80,          // Higher maximum velocity for display
+            updateRate: 16            // Update rate in ms (60fps)
         };
         
         // Game state
@@ -101,26 +90,28 @@ class HockeyVisualization {
         this.lastUpdateTime = Date.now();
         this.updateRate = 0;
         
-        // Physics loop
-        this.lastPhysicsTime = Date.now();
-        this.physicsRunning = false;
+        // Visualization loop
+        this.lastVisualizationTime = Date.now();
+        this.visualizationRunning = false;
         
-        console.log('🏒 HockeyVisualization initialized with real-world scale:', this.realDimensions);
+        console.log('🏒 HockeyVisualization initialized with real-world scale (MQTT data driven):', this.realDimensions);
         console.log('📏 Aspect ratio:', this.aspectRatio.toFixed(2) + ':1');
         console.log('🥅 Goal size:', this.realDimensions.goalLength + 'cm');
+        console.log('📡 Data source: MQTT sensors (no physics simulation)');
     }
 
     // Initialize visualization system
     async initialize() {
         try {
-            console.log('🚀 Initializing hockey visualization...');
+            console.log('🚀 Initializing hockey visualization (MQTT data driven)...');
             
             // Log boundary information for debugging
             console.log(`📏 Real dimensions: ${this.realDimensions.tableLength}cm × ${this.realDimensions.tableWidth}cm`);
             console.log(`🎯 Physical boundaries: X(0 - ${this.realDimensions.tableLength}cm), Y(0 - ${this.realDimensions.tableWidth}cm)`);
-            console.log(`⚽ Puck radius: ${this.physics.puckRadius}cm, Pusher radius: ${this.physics.pusherRadius}cm`);
+            console.log(`⚽ Puck radius: ${this.display.puckRadius}cm, Pusher radius: ${this.display.pusherRadius}cm`);
             console.log(`🔄 Boundary system: NO BUFFER - exact real dimensions for perfect alignment`);
             console.log(`🎯 Coordinate system: Origin at RED BORDER inner edge (not outer container)`);
+            console.log(`📡 Data source: MQTT sensors (no collision simulation)`);
             
             // Initialize DOM elements
             this.initializeElements();
@@ -134,16 +125,14 @@ class HockeyVisualization {
             // Set initial positions
             this.setInitialPositions();
             
-            // Start physics simulation
-            this.startPhysicsLoop();
-            
-            // Start update loop
-            this.startUpdateLoop();
+            // Start visualization update loop
+            this.startVisualizationLoop();
             
             this.isInitialized = true;
-            console.log('✅ Hockey visualization initialized successfully');
+            console.log('✅ Hockey visualization initialized successfully (MQTT data driven)');
             console.log('🎯 Physical boundaries match visual boundaries exactly');
             console.log('🔴 Origin: Red border inner edge (43×26cm game area)');
+            console.log('📡 Ready to receive MQTT sensor data');
             
             return true;
         } catch (error) {
@@ -179,8 +168,8 @@ class HockeyVisualization {
             positionInfo.style.display = this.showTrails ? 'flex' : 'none';
         }
         
-        // Add physics enabled class to enable physics-specific CSS
-        this.tableSurface.classList.add('physics-enabled');
+        // Add MQTT enabled class to enable MQTT-specific CSS
+        this.tableSurface.classList.add('mqtt-enabled');
         
         // Update element sizes based on real dimensions
         this.updateElementSizes();
@@ -298,153 +287,23 @@ class HockeyVisualization {
         };
     }
 
-    // Physics-based collision detection
-    checkCollisions() {
-        // Check puck-pusher collisions
-        this.checkPuckPusherCollision('pusherA');
-        this.checkPuckPusherCollision('pusherB');
-        
-        // Check boundary collisions (including goals)
-        this.checkBoundaryCollisions();
-        
-        // Check pusher-pusher collision
-        this.checkPusherPusherCollision();
+    // Boundary detection for object position validation
+    validateObjectPositions() {
+        // Check boundary constraints (prevent objects from going out of bounds)
+        this.checkBoundaryConstraints();
         
         // Check goal scoring
         this.checkGoalScoring();
     }
 
-    // Check collision between puck and pusher
-    checkPuckPusherCollision(pusherName) {
-        const puckPos = this.currentPositions.puck;
-        const pusherPos = this.currentPositions[pusherName];
-        
-        // Calculate distance between centers
-        const dx = puckPos.x - pusherPos.x;
-        const dy = puckPos.y - pusherPos.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Check if collision occurred
-        const minDistance = this.physics.puckRadius + this.physics.pusherRadius;
-        
-        if (distance < minDistance && distance > 0) {
-            // Collision detected - resolve collision
-            this.resolvePuckPusherCollision(pusherName, dx, dy, distance);
-        }
-    }
-
-    // Resolve collision between puck and pusher - Enhanced for realistic ice hockey
-    resolvePuckPusherCollision(pusherName, dx, dy, distance) {
-        const puckPos = this.currentPositions.puck;
-        const pusherPos = this.currentPositions[pusherName];
-        const pusherVel = this.velocities[pusherName];
-        
-        // Normalize collision vector
-        const nx = dx / distance;
-        const ny = dy / distance;
-        
-        // Separate objects to prevent overlap
-        const overlap = (this.physics.puckRadius + this.physics.pusherRadius) - distance;
-        const separationX = nx * overlap * 0.6;
-        const separationY = ny * overlap * 0.6;
-        
-        // Move puck away from pusher
-        puckPos.x += separationX;
-        puckPos.y += separationY;
-        
-        // Move pusher away from puck (less movement)
-        pusherPos.x -= separationX * 0.1;
-        pusherPos.y -= separationY * 0.1;
-        
-        // Calculate relative velocity
-        const puckVel = this.velocities.puck;
-        const relativeVelX = puckVel.x - pusherVel.x;
-        const relativeVelY = puckVel.y - pusherVel.y;
-        
-        // Calculate relative velocity in collision normal direction
-        const relativeVelNormal = relativeVelX * nx + relativeVelY * ny;
-        
-        // Do not resolve if velocities are separating
-        if (relativeVelNormal > 0) return;
-        
-        // Calculate collision impulse with enhanced bounce coefficient
-        const impulse = -relativeVelNormal * this.physics.puckPusherBounce;
-        
-        // Apply impulse to puck (pusher is much heavier, so gets less effect)
-        puckVel.x += impulse * nx * 0.95;
-        puckVel.y += impulse * ny * 0.95;
-        
-        // Add pusher velocity to puck (pusher "hits" puck) - Enhanced transfer
-        const pusherSpeed = Math.sqrt(pusherVel.x * pusherVel.x + pusherVel.y * pusherVel.y);
-        const transferFactor = Math.min(0.8, 0.3 + pusherSpeed * 0.02);
-        
-        puckVel.x += pusherVel.x * transferFactor;
-        puckVel.y += pusherVel.y * transferFactor;
-        
-        // Limit velocity
-        this.limitVelocity('puck');
-        
-        // Add collision effect
-        this.addCollisionEffect('puck');
-        this.addCollisionEffect(pusherName);
-        
-        console.log(`💥 Collision: ${pusherName} hit puck (impulse: ${impulse.toFixed(2)})`);
-    }
-
-    // Check pusher-pusher collision
-    checkPusherPusherCollision() {
-        const pusherAPos = this.currentPositions.pusherA;
-        const pusherBPos = this.currentPositions.pusherB;
-        
-        // Calculate distance between centers
-        const dx = pusherAPos.x - pusherBPos.x;
-        const dy = pusherAPos.y - pusherBPos.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Check if collision occurred
-        const minDistance = this.physics.pusherRadius * 2;
-        
-        if (distance < minDistance && distance > 0) {
-            // Collision detected - separate pushers with enhanced physics
-            const nx = dx / distance;
-            const ny = dy / distance;
-            
-            const overlap = minDistance - distance;
-            const separationX = nx * overlap * 0.6;
-            const separationY = ny * overlap * 0.6;
-            
-            pusherAPos.x += separationX;
-            pusherAPos.y += separationY;
-            pusherBPos.x -= separationX;
-            pusherBPos.y -= separationY;
-            
-            // Apply bounce effect to velocities
-            const velA = this.velocities.pusherA;
-            const velB = this.velocities.pusherB;
-            
-            const relativeVelX = velA.x - velB.x;
-            const relativeVelY = velA.y - velB.y;
-            const relativeVelNormal = relativeVelX * nx + relativeVelY * ny;
-            
-            if (relativeVelNormal < 0) {
-                const impulse = -relativeVelNormal * this.physics.pusherPusherBounce;
-                
-                velA.x += impulse * nx * 0.5;
-                velA.y += impulse * ny * 0.5;
-                velB.x -= impulse * nx * 0.5;
-                velB.y -= impulse * ny * 0.5;
-            }
-            
-            console.log('💥 Pusher collision detected with enhanced physics');
-        }
-    }
+    // Collision simulation removed - Data comes from MQTT sensors only
 
     // Check if puck scored in goals
     checkGoalScoring() {
         if (this.gameState.goalCooldown) return;
         
         const puckPos = this.currentPositions.puck;
-        const puckRadius = this.physics.puckRadius;
+        const puckRadius = this.display.puckRadius;
         
         // Use exact real dimensions without any buffer - consistent with boundary detection
         const minX = 0;
@@ -483,9 +342,7 @@ class HockeyVisualization {
             this.gameState.goalCooldown = false;
         }, 2000);
         
-        // Reset puck to center
-        this.currentPositions.puck = { x: 21.5, y: 13 };
-        this.velocities.puck = { x: 0, y: 0 };
+        // Puck reset handled by MQTT data - no manual position reset
         
         // Add goal effect
         this.addGoalEffect(scoringSide);
@@ -511,21 +368,19 @@ class HockeyVisualization {
         }, 1000);
     }
 
-    // Check boundary collisions
-    checkBoundaryCollisions() {
+    // Check boundary constraints (prevent objects from going out of bounds)
+    checkBoundaryConstraints() {
         // Check puck boundaries
-        this.checkObjectBoundaries('puck', this.physics.puckRadius);
+        this.checkObjectBoundaries('puck', this.display.puckRadius);
         
         // Check pusher boundaries
-        this.checkObjectBoundaries('pusherA', this.physics.pusherRadius);
-        this.checkObjectBoundaries('pusherB', this.physics.pusherRadius);
+        this.checkObjectBoundaries('pusherA', this.display.pusherRadius);
+        this.checkObjectBoundaries('pusherB', this.display.pusherRadius);
     }
 
-    // Check object boundaries (updated with goal detection and real edge collision)
+    // Check object boundaries (prevent objects from going out of bounds)
     checkObjectBoundaries(objectName, radius) {
         const pos = this.currentPositions[objectName];
-        const vel = this.velocities[objectName];
-        let bounced = false;
         
         // Use exact real dimensions without any buffer - this ensures perfect alignment
         const minX = 0;
@@ -533,19 +388,18 @@ class HockeyVisualization {
         const minY = 0;
         const maxY = this.realDimensions.tableWidth;
         
+        // Constrain position to boundaries (no bouncing physics)
         // Special handling for puck near goals
         if (objectName === 'puck') {
             // Check left boundary with goal
             if (pos.x - radius <= minX) {
                 // Check if in goal area
                 if (pos.y >= this.goals.left.y && pos.y <= this.goals.left.y + this.goals.left.height) {
-                    // Puck is in goal - don't bounce, let goal detection handle it
+                    // Puck is in goal - allow it through for goal detection
                     return;
                 } else {
-                    // Bounce off wall - place puck exactly at boundary
+                    // Constrain to boundary
                     pos.x = minX + radius;
-                    vel.x = Math.abs(vel.x) * this.physics.wallBounce;
-                    bounced = true;
                 }
             }
             
@@ -553,13 +407,11 @@ class HockeyVisualization {
             if (pos.x + radius >= maxX) {
                 // Check if in goal area
                 if (pos.y >= this.goals.right.y && pos.y <= this.goals.right.y + this.goals.right.height) {
-                    // Puck is in goal - don't bounce, let goal detection handle it
+                    // Puck is in goal - allow it through for goal detection
                     return;
                 } else {
-                    // Bounce off wall - place puck exactly at boundary
+                    // Constrain to boundary
                     pos.x = maxX - radius;
-                    vel.x = -Math.abs(vel.x) * this.physics.wallBounce;
-                    bounced = true;
                 }
             }
         } else {
@@ -567,172 +419,72 @@ class HockeyVisualization {
             // Check left boundary
             if (pos.x - radius <= minX) {
                 pos.x = minX + radius;
-                vel.x = Math.abs(vel.x) * this.physics.pusherPusherBounce;
-                bounced = true;
             }
             
             // Check right boundary
             if (pos.x + radius >= maxX) {
                 pos.x = maxX - radius;
-                vel.x = -Math.abs(vel.x) * this.physics.pusherPusherBounce;
-                bounced = true;
             }
         }
         
-        // Check top boundary (all objects) - exact boundary alignment
+        // Check top boundary (all objects)
         if (pos.y - radius <= minY) {
             pos.y = minY + radius;
-            vel.y = Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
-            bounced = true;
         }
         
-        // Check bottom boundary (all objects) - enhanced detection with stricter checking
+        // Check bottom boundary (all objects)
         if (pos.y + radius >= maxY) {
-            // Force position to be exactly at the boundary to prevent any sinking
             pos.y = maxY - radius;
-            vel.y = -Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
-            bounced = true;
-            
-            // Additional safety check - if object is still somehow beyond boundary, force it back
-            if (pos.y + radius > maxY) {
-                pos.y = maxY - radius - 0.01; // Add tiny buffer to ensure it's inside
-                console.warn(`⚠️ Force corrected ${objectName} position at bottom boundary: y=${pos.y.toFixed(3)}`);
-            }
-        }
-        
-        // Additional safety check for bottom boundary - early detection
-        if (pos.y + radius > maxY - 0.05) {
-            pos.y = maxY - radius;
-            if (vel.y > 0) { // Only reverse if moving towards boundary
-                vel.y = -Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
-                bounced = true;
-            }
-        }
-        
-        // Add boundary collision effect
-        if (bounced) {
-            this.addBoundaryCollisionEffect(objectName);
-            
-            // Enhanced logging for boundary collisions, especially bottom boundary
-            const boundaryType = pos.y + radius >= maxY ? 'BOTTOM' : 
-                                pos.y - radius <= minY ? 'TOP' : 
-                                pos.x - radius <= minX ? 'LEFT' : 'RIGHT';
-            
-            console.log(`🏒 ${boundaryType} boundary collision: ${objectName} at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}) - Table bounds: (0,0) to (${maxX},${maxY})`);
-            
-            // Special logging for bottom boundary issues
-            if (boundaryType === 'BOTTOM') {
-                console.log(`🔍 Bottom boundary details: pos.y=${pos.y.toFixed(3)}, radius=${radius.toFixed(3)}, maxY=${maxY}, pos.y+radius=${(pos.y + radius).toFixed(3)}`);
-            }
         }
     }
 
-    // Add collision effect
-    addCollisionEffect(objectName) {
-        const element = this[objectName];
-        if (element) {
-            element.classList.add('collision');
-            setTimeout(() => {
-                element.classList.remove('collision');
-            }, 300);
-        }
+    // Collision effects removed - Data comes from MQTT sensors only
+
+    // Update visualization based on MQTT data (no physics simulation)
+    updateVisualization() {
+        // Only validate positions and check goals
+        // No physics simulation - positions come from MQTT sensors
+        
+        // Validate object positions to prevent out-of-bounds
+        this.validateObjectPositions();
+        
+        // Update visual elements on display
+        this.updateVisualPositions();
     }
 
-    // Add boundary collision effect
-    addBoundaryCollisionEffect(objectName) {
-        const element = this[objectName];
-        if (element) {
-            element.classList.add('boundary-collision');
-            setTimeout(() => {
-                element.classList.remove('boundary-collision');
-            }, 200);
-        }
-    }
+    // Velocity limiting removed - Data comes from MQTT sensors
 
-    // Apply physics simulation - Enhanced for realistic ice hockey
-    updatePhysics(deltaTime) {
-        // Apply speed multiplier for faster gameplay
-        const effectiveDeltaTime = deltaTime * this.physics.speedMultiplier;
+    // Start visualization loop
+    startVisualizationLoop() {
+        this.visualizationRunning = true;
+        this.lastVisualizationTime = Date.now();
         
-        // Update positions based on velocities
-        Object.keys(this.currentPositions).forEach(objectName => {
-            const pos = this.currentPositions[objectName];
-            const vel = this.velocities[objectName];
-            
-            // Update position with enhanced delta time
-            pos.x += vel.x * effectiveDeltaTime;
-            pos.y += vel.y * effectiveDeltaTime;
-            
-            // Apply friction (different for puck and pushers)
-            if (objectName === 'puck') {
-                // High friction for ice surface
-                vel.x *= this.physics.friction;
-                vel.y *= this.physics.friction;
-                
-                // Stop very slow movement
-                if (Math.abs(vel.x) < this.physics.minVelocity) vel.x = 0;
-                if (Math.abs(vel.y) < this.physics.minVelocity) vel.y = 0;
-            } else {
-                // Pushers have more friction when not being controlled
-                vel.x *= 0.9;
-                vel.y *= 0.9;
-                
-                // Stop pusher movement faster
-                if (Math.abs(vel.x) < 0.1) vel.x = 0;
-                if (Math.abs(vel.y) < 0.1) vel.y = 0;
-            }
-        });
-        
-        // Check collisions
-        this.checkCollisions();
-    }
-
-    // Limit velocity to maximum
-    limitVelocity(objectName) {
-        const vel = this.velocities[objectName];
-        const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
-        
-        if (speed > this.physics.maxVelocity) {
-            const factor = this.physics.maxVelocity / speed;
-            vel.x *= factor;
-            vel.y *= factor;
-        }
-    }
-
-    // Start physics loop
-    startPhysicsLoop() {
-        this.physicsRunning = true;
-        this.lastPhysicsTime = Date.now();
-        
-        const physicsLoop = () => {
-            if (!this.physicsRunning || this.isPaused) {
-                if (this.physicsRunning) {
-                    requestAnimationFrame(physicsLoop);
+        const visualizationLoop = () => {
+            if (!this.visualizationRunning || this.isPaused) {
+                if (this.visualizationRunning) {
+                    requestAnimationFrame(visualizationLoop);
                 }
                 return;
             }
             
             const currentTime = Date.now();
-            const deltaTime = (currentTime - this.lastPhysicsTime) / 1000; // Convert to seconds
-            this.lastPhysicsTime = currentTime;
+            const deltaTime = (currentTime - this.lastVisualizationTime) / 1000; // Convert to seconds
+            this.lastVisualizationTime = currentTime;
             
-            // Update physics
-            this.updatePhysics(deltaTime);
-        
-        // Update visual positions
-        this.updateVisualPositions();
-        
-            requestAnimationFrame(physicsLoop);
+            // Update visualization (no physics)
+            this.updateVisualization();
+            
+            requestAnimationFrame(visualizationLoop);
         };
         
-        requestAnimationFrame(physicsLoop);
-        console.log('⚡ Physics loop started');
+        requestAnimationFrame(visualizationLoop);
+        console.log('🎨 Visualization loop started (MQTT data driven)');
     }
 
-    // Stop physics loop
-    stopPhysicsLoop() {
-        this.physicsRunning = false;
-        console.log('⏸️ Physics loop stopped');
+    // Stop visualization loop
+    stopVisualizationLoop() {
+        this.visualizationRunning = false;
+        console.log('⏸️ Visualization loop stopped');
     }
 
     // Set initial positions based on real dimensions
@@ -744,12 +496,7 @@ class HockeyVisualization {
             puck: { x: 21.5, y: 13 }       // Center of table
         };
         
-        // Reset velocities
-        this.velocities = {
-            pusherA: { x: 0, y: 0 },
-            pusherB: { x: 0, y: 0 },
-            puck: { x: 0, y: 0 }
-        };
+        // Velocity reset removed - MQTT provides position data only
         
         // Reset game state
         this.gameState.score = { left: 0, right: 0 };
@@ -798,9 +545,6 @@ class HockeyVisualization {
                 if (realPos) {
                     this.currentPositions.pusherA = realPos;
                     
-                    // Calculate velocity based on position change
-                    this.updateVelocity('pusherA', realPos);
-                    
                     console.log(`📍 Pusher A updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
                 } else {
                     console.log(`⚠️ Failed to convert pusher1 coordinates, keeping current position: (${this.currentPositions.pusherA.x.toFixed(2)}, ${this.currentPositions.pusherA.y.toFixed(2)})`);
@@ -818,7 +562,6 @@ class HockeyVisualization {
                 // Double-check that conversion was successful
                 if (realPos) {
                     this.currentPositions.pusherB = realPos;
-                    this.updateVelocity('pusherB', realPos);
                     
                     console.log(`📍 Pusher B updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
                 } else {
@@ -837,7 +580,6 @@ class HockeyVisualization {
                 // Double-check that conversion was successful
                 if (realPos) {
                     this.currentPositions.puck = realPos;
-                    this.updateVelocity('puck', realPos);
                     
                     console.log(`📍 Puck updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
                 } else {
@@ -907,24 +649,7 @@ class HockeyVisualization {
         return { x: boundedX, y: boundedY };
     }
 
-    // Update velocity based on position change
-    updateVelocity(objectName, newPos) {
-        const currentTime = Date.now();
-        const lastPos = this.currentPositions[objectName];
-        
-        if (this.lastUpdateTime) {
-            const deltaTime = (currentTime - this.lastUpdateTime) / 1000;
-            
-            if (deltaTime > 0) {
-                const vel = this.velocities[objectName];
-                vel.x = (newPos.x - lastPos.x) / deltaTime;
-                vel.y = (newPos.y - lastPos.y) / deltaTime;
-                
-                // Limit velocity
-                this.limitVelocity(objectName);
-            }
-        }
-    }
+    // Velocity calculation removed - MQTT provides position data only
 
     // Update performance metrics
     updatePerformanceMetrics() {
@@ -1157,7 +882,7 @@ class HockeyVisualization {
 
     // Clean up
     destroy() {
-        this.stopPhysicsLoop();
+        this.stopVisualizationLoop();
         this.isInitialized = false;
         console.log('🧹 HockeyVisualization destroyed');
     }

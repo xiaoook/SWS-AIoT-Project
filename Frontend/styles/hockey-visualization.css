@@ -761,13 +761,13 @@
     }
 }
 
-/* 物理仿真相关样式 */
-.physics-enabled .pusher {
-    transition: none; /* 物理仿真时禁用CSS过渡 */
+/* MQTT数据驱动的实时可视化样式 */
+.mqtt-enabled .pusher {
+    transition: all 0.1s ease-out; /* 平滑的MQTT数据更新 */
 }
 
-.physics-enabled .puck {
-    transition: none; /* 物理仿真时禁用CSS过渡 */
+.mqtt-enabled .puck {
+    transition: all 0.1s ease-out; /* 平滑的MQTT数据更新 */
 }
 
 /* 速度指示器 */

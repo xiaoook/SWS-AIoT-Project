@@ -291,8 +291,8 @@ class ExportManager {
         const statsData = [
             ['Statistics Item', 'Value/Description'],
             ['Total Rounds', gameData.rounds.length],
-            ['Player A Win Rate', gameData.rounds.length ? ((gameData.scores.playerA / gameData.rounds.length) * 100).toFixed(1) + '%' : '0%'],
-            ['Player B Win Rate', gameData.rounds.length ? ((gameData.scores.playerB / gameData.rounds.length) * 100).toFixed(1) + '%' : '0%'],
+            ['Player A Win Rate', 'Model Data Required'],  // 胜率由模型提供
+            ['Player B Win Rate', 'Model Data Required'],  // 胜率由模型提供
             [''],
             ['Error Statistics', 'Count']
         ];
@@ -364,17 +364,14 @@ class ExportManager {
             }
         });
         
-        // Generate suggestions based on overall performance
+        // 胜率分析建议需要后端模型数据
         if (gameData.rounds.length > 0) {
-            const playerAWinRate = (gameData.scores.playerA / gameData.rounds.length) * 100;
-            const playerBWinRate = (gameData.scores.playerB / gameData.rounds.length) * 100;
-            
-            if (Math.abs(playerAWinRate - playerBWinRate) > 30) {
-                suggestions.push({
-                    title: 'Balance Suggestion',
-                    content: 'There is a significant skill gap in the match. Recommend strengthening training for the weaker player.'
-                });
-            }
+            // 胜率由模型提供，前端不计算
+            // 当有模型数据时，可以基于模型提供的胜率数据来生成建议
+            suggestions.push({
+                title: 'Performance Analysis',
+                content: 'Detailed win rate analysis requires backend model data. Please ensure model is connected.'
+            });
         }
         
         return suggestions;
