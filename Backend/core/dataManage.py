@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from pathlib import Path
 from Backend.logger import logger
@@ -264,6 +265,10 @@ def get_game_analysis(gid):
             conn.close()
 
     analysis = dict(result)
+    analysis["A_type"] = json.loads(analysis["A_type"])
+    analysis["B_type"] = json.loads(analysis["B_type"])
+    analysis["A_analysis"] = json.loads(analysis["A_analysis"])
+    analysis["B_analysis"] = json.loads(analysis["B_analysis"])
     return analysis
 
 def insert_game_analysis(gid, error_type_a, analysis_a, error_type_b, analysis_b):
@@ -273,7 +278,7 @@ def insert_game_analysis(gid, error_type_a, analysis_a, error_type_b, analysis_b
         cur = conn.cursor()
         cur.execute("""
         INSERT INTO GameAnalysis (gid, A_type, A_analysis, B_type, B_analysis) 
-        VALUES (?, ?, ?, ?, ?)""", (gid, error_type_a, analysis_a, error_type_b, analysis_b))
+        VALUES (?, ?, ?, ?, ?)""", (gid, json.dumps(error_type_a), json.dumps(analysis_a), json.dumps(error_type_b), json.dumps(analysis_b)))
         conn.commit()
         logger.info(f"Analysis of game {gid} inserted successfully")
     except sqlite3.OperationalError as e:
