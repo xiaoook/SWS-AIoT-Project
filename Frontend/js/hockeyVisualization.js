@@ -60,7 +60,19 @@ class HockeyVisualization {
             puck: { x: 21.5, y: 13 }     // Center of table
         };
         
-        // Velocity data removed - MQTT provides position data only
+        // Initialize velocities for display purposes (even though MQTT provides position data only)
+        this.velocities = {
+            pusherA: { x: 0, y: 0 },
+            pusherB: { x: 0, y: 0 },
+            puck: { x: 0, y: 0 }
+        };
+        
+        // Previous positions for velocity calculation
+        this.previousPositions = {
+            pusherA: { x: 8, y: 13 },
+            pusherB: { x: 35, y: 13 },
+            puck: { x: 21.5, y: 13 }
+        };
         
         // Display properties - For boundary detection and visualization
         this.display = {
@@ -496,7 +508,18 @@ class HockeyVisualization {
             puck: { x: 21.5, y: 13 }       // Center of table
         };
         
-        // Velocity reset removed - MQTT provides position data only
+        // Reset velocities and previous positions
+        this.velocities = {
+            pusherA: { x: 0, y: 0 },
+            pusherB: { x: 0, y: 0 },
+            puck: { x: 0, y: 0 }
+        };
+        
+        this.previousPositions = {
+            pusherA: { x: 8, y: 13 },
+            pusherB: { x: 35, y: 13 },
+            puck: { x: 21.5, y: 13 }
+        };
         
         // Reset game state
         this.gameState.score = { left: 0, right: 0 };
@@ -533,6 +556,15 @@ class HockeyVisualization {
     handlePositionUpdate(data) {
         if (!this.isInitialized || this.isPaused) return;
         
+        // Validate data structure
+        if (!data || typeof data !== 'object') {
+            console.warn('⚠️ Invalid position data received:', data);
+            return;
+        }
+        
+        // Log data reception for debugging
+        console.log('📡 Position data received:', data);
+        
         // Convert MQTT data to real-world coordinates
         // Assuming MQTT sends data in the format: { pusher1: {x, y}, pusher2: {x, y}, puck: {x, y} }
         
@@ -543,6 +575,13 @@ class HockeyVisualization {
                 
                 // Double-check that conversion was successful
                 if (realPos) {
+                    // Calculate velocity based on position change
+                    this.calculateVelocity('pusherA', realPos);
+                    
+                    // Update previous position for next calculation
+                    this.previousPositions.pusherA = { ...this.currentPositions.pusherA };
+                    
+                    // Update current position
                     this.currentPositions.pusherA = realPos;
                     
                     console.log(`📍 Pusher A updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
@@ -561,6 +600,13 @@ class HockeyVisualization {
                 
                 // Double-check that conversion was successful
                 if (realPos) {
+                    // Calculate velocity based on position change
+                    this.calculateVelocity('pusherB', realPos);
+                    
+                    // Update previous position for next calculation
+                    this.previousPositions.pusherB = { ...this.currentPositions.pusherB };
+                    
+                    // Update current position
                     this.currentPositions.pusherB = realPos;
                     
                     console.log(`📍 Pusher B updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
@@ -579,6 +625,13 @@ class HockeyVisualization {
                 
                 // Double-check that conversion was successful
                 if (realPos) {
+                    // Calculate velocity based on position change
+                    this.calculateVelocity('puck', realPos);
+                    
+                    // Update previous position for next calculation
+                    this.previousPositions.puck = { ...this.currentPositions.puck };
+                    
+                    // Update current position
                     this.currentPositions.puck = realPos;
                     
                     console.log(`📍 Puck updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
@@ -592,6 +645,38 @@ class HockeyVisualization {
         
         // Update performance metrics
         this.updatePerformanceMetrics();
+    }
+
+    // Calculate velocity based on position change
+    calculateVelocity(objectName, newPosition) {
+        if (!this.velocities || !this.previousPositions || !this.currentPositions) {
+            return;
+        }
+        
+        const previousPos = this.previousPositions[objectName];
+        const currentPos = this.currentPositions[objectName];
+        
+        if (!previousPos || !currentPos) {
+            // Initialize velocity to zero if no previous position
+            this.velocities[objectName] = { x: 0, y: 0 };
+            return;
+        }
+        
+        // Calculate time difference (assuming 60fps update rate)
+        const deltaTime = 1/60; // seconds
+        
+        // Calculate velocity (cm/s)
+        const velX = (newPosition.x - currentPos.x) / deltaTime;
+        const velY = (newPosition.y - currentPos.y) / deltaTime;
+        
+        // Update velocity with some smoothing to avoid jittery display
+        if (this.velocities[objectName]) {
+            const smoothingFactor = 0.7; // Smooth velocity changes
+            this.velocities[objectName].x = this.velocities[objectName].x * smoothingFactor + velX * (1 - smoothingFactor);
+            this.velocities[objectName].y = this.velocities[objectName].y * smoothingFactor + velY * (1 - smoothingFactor);
+        } else {
+            this.velocities[objectName] = { x: velX, y: velY };
+        }
     }
 
     // Check if position data is valid (not null, undefined, or NaN)
@@ -678,10 +763,13 @@ class HockeyVisualization {
         
         // Display velocity
         if (velElement) {
-            const vel = this.velocities[object];
-            if (vel) {
+            // Check if velocities object exists and has the object key
+            if (this.velocities && this.velocities[object]) {
+                const vel = this.velocities[object];
                 const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
                 velElement.textContent = `V: ${speed.toFixed(1)} cm/s`;
+            } else {
+                velElement.textContent = `V: 0.0 cm/s`;
             }
         }
     }
@@ -857,6 +945,8 @@ class HockeyVisualization {
 
     // Update connection status
     updateConnectionStatus(isConnected) {
+        this.isWebSocketConnected = isConnected;
+        
         const statusElement = document.getElementById('mqttStatus');
         if (statusElement) {
             statusElement.textContent = isConnected ? 'Connected - Real Data' : 'Disconnected';
@@ -864,6 +954,11 @@ class HockeyVisualization {
         }
         
         console.log(`🔗 Connection status: ${isConnected ? 'connected' : 'disconnected'}`);
+        
+        // If disconnected, maintain last known positions
+        if (!isConnected) {
+            console.log('📡 WebSocket disconnected, keeping last known positions');
+        }
     }
 
     // Start update loop
@@ -885,6 +980,18 @@ class HockeyVisualization {
         this.stopVisualizationLoop();
         this.isInitialized = false;
         console.log('🧹 HockeyVisualization destroyed');
+    }
+    
+    // Test function to simulate position data
+    testPositionUpdate() {
+        const testData = {
+            pusher1: { x: 100 + Math.random() * 600, y: 50 + Math.random() * 300 },
+            pusher2: { x: 200 + Math.random() * 600, y: 50 + Math.random() * 300 },
+            puck: { x: 300 + Math.random() * 200, y: 100 + Math.random() * 200 }
+        };
+        
+        console.log('🧪 Testing position update with:', testData);
+        this.handlePositionUpdate(testData);
     }
 
     // Update mouse position display

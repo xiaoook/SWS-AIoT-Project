@@ -31,6 +31,10 @@ const CONFIG = {
         PLAYER_ALL: '/player/all',
         PLAYER_CREATE: '/player/create',
         
+        // 分析相关
+        ANALYSIS_GAME: '/analysis/game',
+        ANALYSIS_GAME_NEW: '/analysis/game/new',
+        
         // 其他
         ROOT: '/'
     },
@@ -57,6 +61,8 @@ const CONFIG = {
             GOAL: this.getApiUrl(this.API_ENDPOINTS.GOAL),
             PLAYER_ALL: this.getApiUrl(this.API_ENDPOINTS.PLAYER_ALL),
             PLAYER_CREATE: this.getApiUrl(this.API_ENDPOINTS.PLAYER_CREATE),
+            ANALYSIS_GAME: this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_GAME),
+            ANALYSIS_GAME_NEW: this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_GAME_NEW),
             ROOT: this.getApiUrl(this.API_ENDPOINTS.ROOT)
         };
     }

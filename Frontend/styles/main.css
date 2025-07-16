@@ -7174,3 +7174,197 @@ body {
 
 
 /* Live information feed */
+
+/* Backend Analysis Styles */
+.backend-analysis-header {
+    margin-top: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    border-left: 4px solid var(--apple-blue);
+}
+
+.backend-analysis-header h4 {
+    margin: 0 0 15px 0;
+    color: var(--apple-blue);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.analysis-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.player-analysis-summary {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    justify-content: space-between;
+}
+
+.player-summary {
+    flex: 1;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+}
+
+.player-summary .player-name {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--label-primary);
+}
+
+.vs-divider {
+    font-weight: bold;
+    color: var(--gray-500);
+    padding: 0 10px;
+}
+
+.error-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.error-type-badge {
+    background: var(--apple-red);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.no-errors {
+    color: var(--apple-green);
+    font-weight: 500;
+}
+
+.analysis-timestamp {
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 0.9rem;
+    margin-top: 10px;
+}
+
+/* Backend Error Types in Analysis */
+.section-backend {
+    background: linear-gradient(135deg, #fff8f0 0%, #f0f8ff 100%);
+    border-left: 4px solid var(--apple-blue);
+}
+
+.backend-error-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.backend-error-badge {
+    background: var(--apple-blue);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Analysis Error Display */
+.analysis-error {
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+    border: 1px solid #f8bbd9;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+    text-align: center;
+}
+
+.analysis-error .error-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.analysis-error h3 {
+    color: var(--apple-red);
+    margin: 0 0 15px 0;
+    font-size: 1.3rem;
+}
+
+.analysis-error .error-message {
+    color: var(--label-primary);
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+.analysis-error .error-suggestion {
+    color: var(--gray-600);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* Analysis Success Display */
+.analysis-success {
+    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+    border: 1px solid #81c784;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+    text-align: center;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.analysis-success .success-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.analysis-success h3 {
+    color: var(--apple-green);
+    margin: 0 0 15px 0;
+    font-size: 1.3rem;
+}
+
+.analysis-success .success-message {
+    color: var(--label-primary);
+    font-weight: 500;
+    margin: 0;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .player-analysis-summary {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .vs-divider {
+        transform: rotate(90deg);
+        padding: 10px 0;
+    }
+    
+    .backend-error-types {
+        justify-content: center;
+    }
+    
+    .error-types {
+        justify-content: center;
+    }
+}
