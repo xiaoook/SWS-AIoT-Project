@@ -141,6 +141,12 @@ class WebSocketManager {
             this.handlePositionUpdate(position_data);
         });
         
+        // Receive win rate predictions - From CV model
+        this.socket.on('win_rate_prediction', (prediction_data) => {
+            console.log('Win rate prediction received:', prediction_data);
+            this.handleWinRatePrediction(prediction_data);
+        });
+        
         // Connection error
         this.socket.on('connect_error', (error) => {
             console.error('WebSocket connection error:', error);
@@ -227,6 +233,22 @@ class WebSocketManager {
         // Call position update callback (compatible with old API)
         if (this.callbacks.onPositionUpdate) {
             this.callbacks.onPositionUpdate(positionData);
+        }
+    }
+    
+    // Handle win rate prediction - From CV model
+    handleWinRatePrediction(predictionData) {
+        // Trigger win rate prediction event
+        this.emit('win_rate_prediction', predictionData);
+        
+        // Call win rate prediction callback (compatible with old API)
+        if (this.callbacks.onWinRatePrediction) {
+            this.callbacks.onWinRatePrediction(predictionData);
+        }
+        
+        // Update win rate predictor if available
+        if (window.winRatePredictor) {
+            window.winRatePredictor.handleWinRatePrediction(predictionData);
         }
     }
     

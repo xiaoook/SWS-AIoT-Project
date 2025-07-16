@@ -4,13 +4,16 @@ class ReportManager {
         this.chart = null;
         this.reportData = null;
         this.gameData = null;
+        this.games = [];
+        this.currentGame = null;
         this.init();
     }
     
     init() {
         this.setupEventListeners();
+        this.createGameSelector();
         this.initializeChart();
-        this.generateReport();
+        this.refreshGameData();
     }
     
     setupEventListeners() {
@@ -25,8 +28,273 @@ class ReportManager {
         });
     }
     
+    createGameSelector() {
+        // Find report toolbar and add game selector
+        const toolbar = document.querySelector('.report-toolbar');
+        if (!toolbar) return;
+        
+        // Create game selector section
+        const gameSelectorHTML = `
+            <div class="game-selector-section">
+                <label class="selector-label">Select Game for Report:</label>
+                <select id="reportGameSelector" class="game-selector">
+                    <option value="">Choose a game...</option>
+                </select>
+                <button id="generateReportBtn" class="btn btn-primary" disabled>Generate Report</button>
+            </div>
+        `;
+        
+        // Insert at the beginning of toolbar
+        toolbar.insertAdjacentHTML('afterbegin', gameSelectorHTML);
+        
+        // Add event listeners
+        const selector = document.getElementById('reportGameSelector');
+        const generateBtn = document.getElementById('generateReportBtn');
+        
+        selector.addEventListener('change', (e) => {
+            generateBtn.disabled = !e.target.value;
+        });
+        
+        generateBtn.addEventListener('click', () => {
+            const selectedGameId = selector.value;
+            if (selectedGameId) {
+                this.loadGameReport(selectedGameId);
+            }
+        });
+    }
+    
+    // 从数据库加载游戏记录
+    async loadGamesFromDatabase() {
+        try {
+            console.log('🔄 Loading games from database for report...');
+            
+            const response = await fetch(CONFIG.API_URLS.GAMES, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    limit: 100 // 获取最近100场游戏
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success' && data.games) {
+                    console.log(`✅ Loaded ${data.games.length} games from database for report`);
+                    
+                    // 转换数据库格式到前端格式
+                    const games = data.games.map((game) => {
+                        const duration = game.duration || 0;
+                        
+                        return {
+                            gameId: `GAME-${String(game.gid).padStart(3, '0')}`,
+                            gameType: duration > 0 ? 'Completed Match' : 'Live Match',
+                            startTime: new Date(game.date + ' ' + game.time),
+                            endTime: duration > 0 ? new Date(new Date(game.date + ' ' + game.time).getTime() + duration * 1000) : null,
+                            duration: duration,
+                            finalScores: { 
+                                playerA: game.pointA || 0, 
+                                playerB: game.pointB || 0 
+                            },
+                            winner: game.pointA > game.pointB ? 'playerA' : 
+                                   game.pointB > game.pointA ? 'playerB' : null,
+                            status: duration > 0 ? 'ended' : 'playing',
+                            rounds: [], // 轮次数据需要单独获取
+                            databaseGameId: game.gid,
+                            playerNames: {
+                                playerA: game.playerAname || 'Player A',
+                                playerB: game.playerBname || 'Player B'
+                            }
+                        };
+                    });
+                    
+                    return games;
+                } else {
+                    throw new Error(data.message || 'Failed to load games from database');
+                }
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('❌ Failed to load games from database for report:', error);
+            return []; // 返回空数组
+        }
+    }
+    
+    async refreshGameData() {
+        try {
+            console.log('🔄 Refreshing game data for report...');
+            
+            // 优先从数据库获取游戏数据
+            const gamesFromDB = await this.loadGamesFromDatabase();
+            
+            // 如果数据库中有数据，使用数据库数据；否则使用本地数据
+            if (gamesFromDB && gamesFromDB.length > 0) {
+                this.games = gamesFromDB;
+                console.log(`✅ Report refreshed with ${gamesFromDB.length} games from database`);
+            } else {
+                                 // 数据库无数据时使用空数组
+                 this.games = [];
+                 console.log(`💾 Report: No games available from database`);
+            }
+            
+            this.populateGameSelector();
+            
+            // 如果有游戏数据，默认选择最新的完成的游戏
+            if (this.games.length > 0) {
+                const completedGames = this.games.filter(g => g.status === 'ended');
+                if (completedGames.length > 0) {
+                    const latestGame = completedGames.sort((a, b) => new Date(b.startTime) - new Date(a.startTime))[0];
+                    this.loadGameReport(latestGame.gameId);
+                }
+            } else {
+                this.generateReport();
+            }
+            
+        } catch (error) {
+            console.error('Error refreshing game data for report:', error);
+            // 数据库错误时使用空数组，不显示假数据
+            this.games = [];
+            this.populateGameSelector();
+            this.generateReport();
+        }
+    }
+    
+    populateGameSelector() {
+        const selector = document.getElementById('reportGameSelector');
+        if (!selector || this.games.length === 0) return;
+        
+        // Clear existing options except the first one
+        selector.innerHTML = '<option value="">Choose a game...</option>';
+        
+        // Sort games by start time (newest first)
+        const sortedGames = [...this.games].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+        
+        sortedGames.forEach(game => {
+            const option = document.createElement('option');
+            option.value = game.gameId;
+            const startTime = new Date(game.startTime).toLocaleString();
+            const status = game.status === 'ended' ? '✓' : '🔴';
+            const winner = game.winner ? ` (${game.winner.slice(-1)} wins)` : '';
+            option.textContent = `${status} ${game.gameType} - ${startTime}${winner}`;
+            selector.appendChild(option);
+        });
+    }
+    
+    async loadGameReport(gameId) {
+        const game = this.games.find(g => g.gameId === gameId);
+        if (!game) return;
+        
+        // Update selector
+        const selector = document.getElementById('reportGameSelector');
+        if (selector) {
+            selector.value = gameId;
+        }
+        
+        // Update button state
+        const generateBtn = document.getElementById('generateReportBtn');
+        if (generateBtn) {
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Loading...';
+        }
+        
+        try {
+            // 获取数据库中的游戏ID
+            const databaseGameId = game.databaseGameId;
+            if (!databaseGameId) {
+                console.warn('No database game ID found, using local data');
+                this.currentGame = game;
+                this.gameData = this.convertGameToReportFormat(game);
+                this.generateReport();
+                return;
+            }
+            
+            console.log(`📊 Loading rounds for report ${gameId} (Database ID: ${databaseGameId})`);
+            
+            // 从后端获取轮次数据
+            const roundsResponse = await fetch(CONFIG.getRoundsUrl(databaseGameId), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (roundsResponse.ok) {
+                const roundsData = await roundsResponse.json();
+                if (roundsData.status === 'success' && roundsData.rounds) {
+                    console.log(`✅ Loaded ${roundsData.rounds.length} rounds for report ${gameId}`);
+                    
+                    // 转换后端轮次数据格式到前端格式
+                    const formattedRounds = roundsData.rounds.map((round, index) => ({
+                        id: round.roundInGame,
+                        timestamp: new Date().toISOString(),
+                        winner: round.pointA > round.pointB ? 'playerA' : 'playerB',
+                        playerAScore: round.pointA,
+                        playerBScore: round.pointB,
+                        analysis: {
+                            feedback: 'Round completed successfully',
+                            suggestions: ['Continue maintaining good performance'],
+                            errorType: null
+                        }
+                    }));
+                    
+                    // 更新当前游戏的轮次数据
+                    this.currentGame = {
+                        ...game,
+                        rounds: formattedRounds
+                    };
+                    
+                    // 转换为报告格式
+                    this.gameData = this.convertGameToReportFormat(this.currentGame);
+                    
+                    console.log(`🎯 Report data prepared for ${gameId} with ${formattedRounds.length} rounds`);
+                } else {
+                    console.warn('No rounds data received from backend, using local data');
+                    this.currentGame = game;
+                    this.gameData = this.convertGameToReportFormat(game);
+                }
+            } else {
+                console.error('Failed to load rounds from backend, using local data');
+                this.currentGame = game;
+                this.gameData = this.convertGameToReportFormat(game);
+            }
+            
+        } catch (error) {
+            console.error('Error loading game report:', error);
+            this.currentGame = game;
+            this.gameData = this.convertGameToReportFormat(game);
+        } finally {
+            // 恢复按钮状态
+            if (generateBtn) {
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate Report';
+            }
+        }
+        
+        this.generateReport();
+    }
+    
+    convertGameToReportFormat(game) {
+        return {
+            scores: {
+                playerA: game.finalScores.playerA,
+                playerB: game.finalScores.playerB
+            },
+            rounds: game.rounds || [],
+            playerNames: game.playerNames || {
+                playerA: 'Player A',
+                playerB: 'Player B'
+            }
+        };
+    }
+    
     generateReport() {
-        if (window.smartCourtApp && window.smartCourtApp.gameState) {
+        if (this.gameData) {
+            this.updateFinalScore();
+            this.generateErrorChart();
+            this.generateAISuggestions();
+        } else if (window.smartCourtApp && window.smartCourtApp.gameState) {
             this.gameData = window.smartCourtApp.getGameState();
             this.updateFinalScore();
             this.generateErrorChart();
@@ -38,16 +306,38 @@ class ReportManager {
         const finalScoreElement = document.getElementById('finalScore');
         if (!finalScoreElement || !this.gameData) return;
         
+        const playerAName = this.gameData.playerNames ? this.gameData.playerNames.playerA : 'Player A';
+        const playerBName = this.gameData.playerNames ? this.gameData.playerNames.playerB : 'Player B';
+        
+        // 计算得分比例用于进度条
+        const maxScore = Math.max(this.gameData.scores.playerA, this.gameData.scores.playerB, 1);
+        const playerAPercentage = (this.gameData.scores.playerA / maxScore) * 100;
+        const playerBPercentage = (this.gameData.scores.playerB / maxScore) * 100;
+        
         finalScoreElement.innerHTML = `
             <div class="score-item ${this.gameData.scores.playerA > this.gameData.scores.playerB ? 'winner' : ''}">
-                <span class="player">Player A</span>
-                <span class="score">${this.gameData.scores.playerA}</span>
-                ${this.gameData.scores.playerA > this.gameData.scores.playerB ? '<div class="winner-badge">🏆</div>' : ''}
+                <div class="score-header">
+                    <div class="score-content">
+                        <span class="player">${playerAName}</span>
+                        <span class="score">${this.gameData.scores.playerA}</span>
+                    </div>
+                    ${this.gameData.scores.playerA > this.gameData.scores.playerB ? '<div class="winner-badge">🏆</div>' : ''}
+                </div>
+                <div class="score-progress-bar">
+                    <div class="score-progress-fill player-a" style="width: ${playerAPercentage}%"></div>
+                </div>
             </div>
             <div class="score-item ${this.gameData.scores.playerB > this.gameData.scores.playerA ? 'winner' : ''}">
-                <span class="player">Player B</span>
-                <span class="score">${this.gameData.scores.playerB}</span>
-                ${this.gameData.scores.playerB > this.gameData.scores.playerA ? '<div class="winner-badge">🏆</div>' : ''}
+                <div class="score-header">
+                    <div class="score-content">
+                        <span class="player">${playerBName}</span>
+                        <span class="score">${this.gameData.scores.playerB}</span>
+                    </div>
+                    ${this.gameData.scores.playerB > this.gameData.scores.playerA ? '<div class="winner-badge">🏆</div>' : ''}
+                </div>
+                <div class="score-progress-bar">
+                    <div class="score-progress-fill player-b" style="width: ${playerBPercentage}%"></div>
+                </div>
             </div>
         `;
     }
@@ -340,6 +630,18 @@ class ReportManager {
     clearReports() {
         this.reportData = null;
         this.gameData = null;
+        this.currentGame = null;
+        
+        // Reset game selector
+        const selector = document.getElementById('reportGameSelector');
+        if (selector) {
+            selector.value = '';
+        }
+        
+        const generateBtn = document.getElementById('generateReportBtn');
+        if (generateBtn) {
+            generateBtn.disabled = true;
+        }
         
         const finalScoreElement = document.getElementById('finalScore');
         if (finalScoreElement) {
@@ -381,6 +683,18 @@ class ReportManager {
     }
     
     generateFinalReport() {
+        if (!this.currentGame) {
+            // 如果没有选择游戏，提示用户
+            const selector = document.getElementById('reportGameSelector');
+            if (selector && this.games.length > 0) {
+                selector.focus();
+                if (window.smartCourtApp) {
+                    window.smartCourtApp.showMessage('Please select a game to generate report', 'warning');
+                }
+                return;
+            }
+        }
+        
         this.generateReport();
     }
 }

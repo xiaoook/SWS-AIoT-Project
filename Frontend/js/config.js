@@ -24,6 +24,9 @@ const CONFIG = {
         GAMES_SELECT: '/games/select',
         GOAL: '/goal',
         
+        // 轮次相关
+        ROUNDS: '/games/{gid}/rounds',
+        
         // 玩家相关
         PLAYER_ALL: '/player/all',
         PLAYER_CREATE: '/player/create',
@@ -35,6 +38,11 @@ const CONFIG = {
     // 完整的API URL生成器
     getApiUrl(endpoint) {
         return this.BACKEND_URL + endpoint;
+    },
+    
+    // 获取轮次数据的URL生成器
+    getRoundsUrl(gid) {
+        return this.getApiUrl(this.API_ENDPOINTS.ROUNDS.replace('{gid}', gid));
     },
     
     // 常用的完整URL
