@@ -206,6 +206,12 @@ class WebSocketManager {
     
     // Handle score update - Adapt backend {A: 0, B: 0} format
     handleScoreUpdate(scoreData) {
+        // Check if game is in progress before updating score
+        if (window.smartCourtApp && window.smartCourtApp.gameState.status !== 'playing') {
+            console.log(`🚫 Score update from backend ignored - game is ${window.smartCourtApp.gameState.status}`);
+            return;
+        }
+        
         // Backend sends format {A: 0, B: 0}, need to convert to frontend format
         const convertedScore = {
             playerA: scoreData.A || 0,
@@ -238,6 +244,8 @@ class WebSocketManager {
     
     // Handle win rate prediction - From CV model
     handleWinRatePrediction(predictionData) {
+        console.log('🎯 WebSocket received win rate prediction:', predictionData);
+        
         // Trigger win rate prediction event
         this.emit('win_rate_prediction', predictionData);
         

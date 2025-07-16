@@ -823,12 +823,20 @@ class WinRatePredictor {
     }
     
     setupWebSocketConnection() {
-        // Listen for CV prediction data via WebSocket
-        if (window.websocketManager) {
-            window.websocketManager.on('win_rate_prediction', (data) => {
-                this.handleWinRatePrediction(data);
-            });
-        }
+        // Wait for websocket manager to be available
+        const connectToWebSocket = () => {
+            if (window.websocketManager) {
+                window.websocketManager.on('win_rate_prediction', (data) => {
+                    this.handleWinRatePrediction(data);
+                });
+                console.log('🎯 Win rate predictor connected to WebSocket');
+            } else {
+                console.log('🎯 WebSocket manager not available yet, retrying...');
+                setTimeout(connectToWebSocket, 500);
+            }
+        };
+        
+        connectToWebSocket();
         
         // Also try to connect to MQTT for CV prediction data
         if (window.mqttManager) {
@@ -837,7 +845,7 @@ class WinRatePredictor {
             });
         }
         
-        console.log('🎯 Win rate predictor connected to data sources');
+        console.log('🎯 Win rate predictor setup initiated');
     }
     
     setupGameStateListener() {
@@ -902,6 +910,8 @@ class WinRatePredictor {
     }
     
     handleWinRatePrediction(data) {
+        console.log('🎯 Received win rate prediction data:', data);
+        
         // Expected data format: { playerA: 65, playerB: 35, confidence: 0.85 }
         if (data && typeof data.playerA === 'number' && typeof data.playerB === 'number') {
             this.winRateData = {
@@ -909,10 +919,20 @@ class WinRatePredictor {
                 playerB: Math.round(data.playerB)
             };
             
+            // Remove waiting status
+            delete this.winRateData.status;
+            
             this.updateWinRateDisplay();
             this.lastUpdateTime = Date.now();
             
+            // Update analysis manager if available
+            if (window.analysisManager) {
+                window.analysisManager.updateWinRateData(this.winRateData);
+            }
+            
             console.log('🎯 Win rate prediction updated:', this.winRateData);
+        } else {
+            console.warn('🎯 Invalid win rate prediction data format:', data);
         }
     }
     
@@ -1524,6 +1544,14 @@ class WinRatePredictor {
             confidence: 0.85,
             timestamp: Date.now()
         });
+        
+        // Also update analysis manager if available
+        if (window.analysisManager) {
+            window.analysisManager.updateWinRateData({
+                playerA: playerARate,
+                playerB: playerBRate
+            });
+        }
         
         console.log('🎨 Enhanced Win Rate Panel Features:');
         console.log('- 🎯 Permanent vertical floating ball in bottom-left corner');

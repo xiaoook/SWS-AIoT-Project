@@ -52,7 +52,17 @@ class ReportManager {
         const generateBtn = document.getElementById('generateReportBtn');
         
         selector.addEventListener('change', (e) => {
-            generateBtn.disabled = !e.target.value;
+            const selectedGameId = e.target.value;
+            generateBtn.disabled = !selectedGameId;
+            
+            // 不立即加载游戏，等用户点击按钮
+            if (!selectedGameId) {
+                this.currentGame = null;
+                this.displayNoGameMessage();
+            } else {
+                // 选择了游戏但还没生成报告，显示等待生成的提示
+                this.displayWaitingForReport();
+            }
         });
         
         generateBtn.addEventListener('click', () => {
@@ -141,15 +151,12 @@ class ReportManager {
             
             this.populateGameSelector();
             
-            // 如果有游戏数据，默认选择最新的完成的游戏
-            if (this.games.length > 0) {
-                const completedGames = this.games.filter(g => g.status === 'ended');
-                if (completedGames.length > 0) {
-                    const latestGame = completedGames.sort((a, b) => new Date(b.startTime) - new Date(a.startTime))[0];
-                    this.loadGameReport(latestGame.gameId);
-                }
-            } else {
+            // 只有在用户主动选择游戏时才显示内容
+            if (this.currentGame) {
                 this.generateReport();
+            } else {
+                // 没有选择游戏时显示选择提示
+                this.displayNoGameMessage();
             }
             
         } catch (error) {
@@ -157,7 +164,7 @@ class ReportManager {
             // 数据库错误时使用空数组，不显示假数据
             this.games = [];
             this.populateGameSelector();
-            this.generateReport();
+            this.displayNoGameMessage();
         }
     }
     
@@ -180,6 +187,40 @@ class ReportManager {
             option.textContent = `${status} ${game.gameType} - ${startTime}${winner}`;
             selector.appendChild(option);
         });
+    }
+    
+    displayNoGameMessage() {
+        const container = document.getElementById('reportContainer');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="no-game-selected">
+                <div class="no-game-icon">📊</div>
+                <h3>No Game Selected</h3>
+                <p>Please select a game from the dropdown above to view the match report.</p>
+                ${this.games.length === 0 ? 
+                    '<p><em>No games available. Start a new game to begin reporting.</em></p>' : 
+                    '<p><em>Choose from available games in the selector.</em></p>'
+                }
+            </div>
+        `;
+    }
+    
+    displayWaitingForReport() {
+        const container = document.getElementById('reportContainer');
+        if (!container) return;
+        
+        const selectedGame = document.getElementById('reportGameSelector').value;
+        if (!selectedGame) return;
+        
+        container.innerHTML = `
+            <div class="waiting-for-report">
+                <div class="waiting-icon">⏳</div>
+                <h3>Game Selected</h3>
+                <p>Click the <strong>"Generate Report"</strong> button to view the match report.</p>
+                <p><em>Selected game: ${selectedGame}</em></p>
+            </div>
+        `;
     }
     
     async loadGameReport(gameId) {
@@ -254,8 +295,13 @@ class ReportManager {
                     this.currentGame = game;
                     this.gameData = this.convertGameToReportFormat(game);
                 }
+            } else if (roundsResponse.status === 404) {
+                // 404错误 - 轮次数据不存在，这是正常情况
+                console.log(`ℹ️ No rounds found for report ${gameId} (Database ID: ${databaseGameId}) - 404`);
+                this.currentGame = game;
+                this.gameData = this.convertGameToReportFormat(game);
             } else {
-                console.error('Failed to load rounds from backend, using local data');
+                console.error(`Failed to load rounds from backend: HTTP ${roundsResponse.status}, using local data`);
                 this.currentGame = game;
                 this.gameData = this.convertGameToReportFormat(game);
             }
@@ -542,6 +588,13 @@ class ReportManager {
             return;
         }
         
+        // 优先显示后端AI分析结果
+        if (this.currentGame && this.currentGame.backendAnalysis) {
+            this.generateBackendAIAnalysis();
+            return;
+        }
+        
+        // 如果没有后端分析，使用原有的建议逻辑
         const suggestions = this.calculateAISuggestions();
         
         if (suggestions.length === 0) {
@@ -562,6 +615,126 @@ class ReportManager {
         `).join('');
         
         suggestionsContainer.innerHTML = suggestionsHTML;
+    }
+    
+    // 生成后端AI分析结果
+    generateBackendAIAnalysis() {
+        const suggestionsContainer = document.getElementById('aiSuggestions');
+        if (!suggestionsContainer) return;
+        
+        const analysis = this.currentGame.backendAnalysis;
+        const playerAName = this.getPlayerName('playerA');
+        const playerBName = this.getPlayerName('playerB');
+        
+        const analysisHTML = `
+            <div class="backend-ai-analysis">
+                <div class="ai-analysis-header">
+                    <div class="ai-icon">🤖</div>
+                    <h4>AI Analysis Results</h4>
+                    <div class="ai-timestamp">
+                        Analysis Time: ${new Date(analysis.playerA.timestamp).toLocaleString()}
+                    </div>
+                </div>
+                
+                <div class="ai-players-analysis">
+                    ${analysis.playerA.errorTypes.length > 0 ? `
+                        <div class="ai-player-analysis">
+                            <div class="ai-player-header">
+                                <span class="player-icon">🔵</span>
+                                <span class="player-name">${playerAName}</span>
+                            </div>
+                            
+                            <div class="ai-identified-issues">
+                                <h5>🎯 Identified Issues</h5>
+                                <div class="ai-error-badges">
+                                    ${analysis.playerA.errorTypes.map(errorType => 
+                                        `<span class="ai-error-badge">${this.translateErrorType(errorType)}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="ai-improvement-suggestions">
+                                <h5>💡 Improvement Suggestions</h5>
+                                <div class="ai-suggestions-list">
+                                    ${analysis.playerA.analysis.map(suggestion => `
+                                        <div class="ai-suggestion-item">
+                                            <span class="suggestion-icon">💡</span>
+                                            <span class="suggestion-text">${this.translateAnalysisSuggestion(suggestion)}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${analysis.playerB.errorTypes.length > 0 ? `
+                        <div class="ai-player-analysis">
+                            <div class="ai-player-header">
+                                <span class="player-icon">🔴</span>
+                                <span class="player-name">${playerBName}</span>
+                            </div>
+                            
+                            <div class="ai-identified-issues">
+                                <h5>🎯 Identified Issues</h5>
+                                <div class="ai-error-badges">
+                                    ${analysis.playerB.errorTypes.map(errorType => 
+                                        `<span class="ai-error-badge">${this.translateErrorType(errorType)}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="ai-improvement-suggestions">
+                                <h5>💡 Improvement Suggestions</h5>
+                                <div class="ai-suggestions-list">
+                                    ${analysis.playerB.analysis.map(suggestion => `
+                                        <div class="ai-suggestion-item">
+                                            <span class="suggestion-icon">💡</span>
+                                            <span class="suggestion-text">${this.translateAnalysisSuggestion(suggestion)}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        suggestionsContainer.innerHTML = analysisHTML;
+    }
+    
+    // 翻译错误类型 - 后端分析器的5种错误类型
+    translateErrorType(errorType) {
+        const errorTypeMap = {
+            'slow_reaction': 'Slow Reaction',
+            'low_activity': 'Low Activity',
+            'weak_defense': 'Weak Defense',
+            'poor_alignment': 'Poor Alignment',
+            'coverage_gap': 'Coverage Gap'
+        };
+        
+        return errorTypeMap[errorType] || errorType;
+    }
+    
+    // 翻译分析建议 - 后端分析器的5种建议
+    translateAnalysisSuggestion(suggestion) {
+        const suggestionMap = {
+            'Try to react more quickly to incoming plays.': 'Try to react more quickly to incoming plays',
+            'Move more actively to stay engaged in the game.': 'Move more actively to stay engaged in the game',
+            'Improve your defense to prevent goals when under threat.': 'Improve your defense to prevent goals when under threat',
+            'Align your movement better with the direction of the ball.': 'Align your movement better with the direction of the ball',
+            'Increase your coverage area to better influence the game.': 'Increase your coverage area to better influence the game'
+        };
+        
+        return suggestionMap[suggestion] || suggestion;
+    }
+    
+    // 获取玩家名称
+    getPlayerName(player) {
+        if (this.currentGame && this.currentGame.playerNames) {
+            return this.currentGame.playerNames[player] || (player === 'playerA' ? 'Player A' : 'Player B');
+        }
+        return player === 'playerA' ? 'Player A' : 'Player B';
     }
     
     calculateAISuggestions() {

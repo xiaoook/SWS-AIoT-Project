@@ -10,6 +10,7 @@ class AnalysisManager {
             result: 'all',    // 'all', 'wins', 'losses'
             errorType: 'all'  // 'all', specific error types
         };
+        this.winRateData = null; // Store win rate data
         
         this.init();
     }
@@ -117,7 +118,17 @@ class AnalysisManager {
         const analyzeBtn = document.getElementById('analyzeGameBtn');
         
         selector.addEventListener('change', (e) => {
-            analyzeBtn.disabled = !e.target.value;
+            const selectedGameId = e.target.value;
+            analyzeBtn.disabled = !selectedGameId;
+            
+            // 不立即加载游戏，等用户点击按钮
+            if (!selectedGameId) {
+                this.currentGame = null;
+                this.displayNoGameMessage();
+            } else {
+                // 选择了游戏但还没分析，显示等待分析的提示
+                this.displayWaitingForAnalysis();
+            }
         });
         
         analyzeBtn.addEventListener('click', () => {
@@ -186,14 +197,12 @@ class AnalysisManager {
                 
                 this.populateGameSelector();
                 
-                // If no current game selected, show current game if available
-                if (!this.currentGame && window.smartCourtApp.currentGameId) {
-                    await this.loadGameAnalysis(window.smartCourtApp.currentGameId);
-                } else if (!this.currentGame && this.games.length > 0) {
-                    // Default to most recent game
-                    await this.loadGameAnalysis(this.games[this.games.length - 1].gameId);
+                // 只有在用户主动选择游戏时才显示内容
+                if (this.currentGame) {
+                    this.displayGameAnalysis();
                 } else {
-                    this.displayRounds();
+                    // 没有选择游戏时显示选择提示
+                    this.displayNoGameMessage();
                 }
                 
             } catch (error) {
@@ -201,7 +210,7 @@ class AnalysisManager {
                 // 数据库错误时使用空数组，不显示假数据
                 this.games = [];
                 this.populateGameSelector();
-                this.displayRounds();
+                this.displayNoGameMessage();
             }
         }
     }
@@ -297,8 +306,14 @@ class AnalysisManager {
                     console.warn('No rounds data received from backend, using local data');
                     this.currentGame = game;
                 }
+            } else if (roundsResponse.status === 404) {
+                // 404错误 - 轮次数据不存在，这是正常情况
+                console.log(`ℹ️ No rounds found for game ${gameId} (Database ID: ${databaseGameId}) - 404`);
+                this.currentGame = game;
+                // 即使没有轮次数据，也尝试获取分析数据
+                await this.loadBackendAnalysis(databaseGameId);
             } else {
-                console.error('Failed to load rounds from backend, using local data');
+                console.error(`Failed to load rounds from backend: HTTP ${roundsResponse.status}, using local data`);
                 this.currentGame = game;
             }
             
@@ -341,13 +356,22 @@ class AnalysisManager {
                 } else {
                     console.warn('No analysis data available from backend');
                 }
+            } else if (analysisResponse.status === 404) {
+                // 404错误 - 分析数据不存在，这是正常情况
+                console.log(`ℹ️ No analysis data found for game ${databaseGameId} (404)`);
+                this.showAnalysisMessage('No analysis data available for this game yet.');
             } else {
-                const errorData = await analysisResponse.json();
-                if (errorData.status === 'error') {
-                    this.showAnalysisError(errorData.message);
-                    console.error(`❌ Backend analysis request failed: ${errorData.message}`);
-                } else {
-                    console.error('Failed to load backend analysis');
+                try {
+                    const errorData = await analysisResponse.json();
+                    if (errorData.status === 'error') {
+                        this.showAnalysisError(errorData.message);
+                        console.error(`❌ Backend analysis request failed: ${errorData.message}`);
+                    } else {
+                        console.error('Failed to load backend analysis');
+                    }
+                } catch (parseError) {
+                    console.error(`❌ Backend analysis request failed: HTTP ${analysisResponse.status}`);
+                    this.showAnalysisError(`Backend analysis service unavailable (${analysisResponse.status})`);
                 }
             }
         } catch (error) {
@@ -364,17 +388,724 @@ class AnalysisManager {
         this.currentGame.backendAnalysis = {
             playerA: {
                 errorTypes: backendAnalysis.A_type || [],
-                analysis: backendAnalysis.A_analysis || {},
+                analysis: backendAnalysis.A_analysis || [],
                 timestamp: new Date().toISOString()
             },
             playerB: {
                 errorTypes: backendAnalysis.B_type || [],
-                analysis: backendAnalysis.B_analysis || {},
+                analysis: backendAnalysis.B_analysis || [],
                 timestamp: new Date().toISOString()
             }
         };
         
         console.log('✅ Backend analysis integrated into current game');
+    }
+    
+    // 创建AI分析结果显示区域
+    createAIAnalysisSection() {
+        if (!this.currentGame || !this.currentGame.backendAnalysis) {
+            return '';
+        }
+        
+        const analysis = this.currentGame.backendAnalysis;
+        const playerAName = this.getPlayerName(this.currentGame, 'playerA');
+        const playerBName = this.getPlayerName(this.currentGame, 'playerB');
+        
+        return `
+            <div class="ai-analysis-section">
+                <h4>🤖 AI Analysis Results</h4>
+                <div class="analysis-timestamp">
+                    <small>Analysis Time: ${new Date(analysis.playerA.timestamp).toLocaleString()}</small>
+                </div>
+                <div class="players-analysis">
+                    <div class="player-analysis player-a-analysis">
+                        <div class="player-header">
+                            <span class="player-icon">🔵</span>
+                            <span class="player-name">${playerAName}</span>
+                        </div>
+                        <div class="analysis-content">
+                            ${this.formatPlayerAnalysis(analysis.playerA)}
+                        </div>
+                    </div>
+                    <div class="player-analysis player-b-analysis">
+                        <div class="player-header">
+                            <span class="player-icon">🔴</span>
+                            <span class="player-name">${playerBName}</span>
+                        </div>
+                        <div class="analysis-content">
+                            ${this.formatPlayerAnalysis(analysis.playerB)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // 格式化单个玩家的分析结果
+    formatPlayerAnalysis(playerData) {
+        const errorTypes = playerData.errorTypes || [];
+        const analysis = playerData.analysis || [];
+        
+        let content = '';
+        
+        // 显示错误类型
+        if (errorTypes.length > 0) {
+            content += `
+                <div class="error-types-section">
+                    <h5>🎯 Identified Issues</h5>
+                    <div class="error-types">
+                        ${errorTypes.map(errorType => 
+                            `<span class="error-type-badge">${this.translateErrorType(errorType)}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 显示分析建议
+        if (analysis.length > 0) {
+            content += `
+                <div class="analysis-suggestions">
+                    <h5>💡 Improvement Suggestions</h5>
+                    <ul class="suggestions-list">
+                        ${analysis.map(suggestion => 
+                            `<li>${this.translateAnalysisSuggestion(suggestion)}</li>`
+                        ).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        if (!content) {
+            content = '<div class="no-issues">✅ No major issues identified</div>';
+        }
+        
+        return content;
+    }
+    
+    // 翻译错误类型为英文显示 - 基于后端分析器返回的5种错误类型
+    translateErrorType(errorType) {
+        const errorTypeMap = {
+            // 后端分析器返回的5种错误类型
+            'slow_reaction': 'Slow Reaction',
+            'low_activity': 'Low Activity', 
+            'weak_defense': 'Weak Defense',
+            'poor_alignment': 'Poor Alignment',
+            'coverage_gap': 'Coverage Gap'
+        };
+        
+        return errorTypeMap[errorType] || this.formatErrorTypeName(errorType);
+    }
+    
+    // 格式化错误类型名称（处理未知类型）
+    formatErrorTypeName(errorType) {
+        if (typeof errorType !== 'string') return 'Unknown';
+        
+        // 将下划线替换为空格，并首字母大写
+        return errorType.replace(/_/g, ' ')
+                        .split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                        .join(' ');
+    }
+    
+    // 翻译分析建议为英文显示 - 基于后端分析器返回的5种建议
+    translateAnalysisSuggestion(suggestion) {
+        const suggestionMap = {
+            // 后端分析器返回的5种建议
+            'Try to react more quickly to incoming plays.': 'Try to react more quickly to incoming plays',
+            'Move more actively to stay engaged in the game.': 'Move more actively to stay engaged in the game',
+            'Improve your defense to prevent goals when under threat.': 'Improve your defense to prevent goals when under threat',
+            'Align your movement better with the direction of the ball.': 'Align your movement better with the direction of the ball',
+            'Increase your coverage area to better influence the game.': 'Increase your coverage area to better influence the game'
+        };
+        
+        return suggestionMap[suggestion] || this.formatSuggestionText(suggestion);
+    }
+    
+    // 格式化建议文本（处理未知建议）
+    formatSuggestionText(suggestion) {
+        if (typeof suggestion !== 'string') return 'Continue practicing';
+        
+        // 确保建议以大写字母开头
+        return suggestion.charAt(0).toUpperCase() + suggestion.slice(1);
+    }
+    
+    // 测试后端分析数据的显示
+    testBackendAnalysisDisplay() {
+        const testData = {
+            A_type: ['positioning', 'timing'],
+            A_analysis: ['Focus on defensive positioning', 'Improve reaction timing'],
+            B_type: ['strategy', 'precision'],
+            B_analysis: ['Develop offensive strategy', 'Enhance shot precision']
+        };
+        
+        console.log('🧪 Testing backend analysis display with test data:', testData);
+        
+        this.integrateBackendAnalysis(testData);
+        this.displayGameAnalysis();
+        
+        console.log('✅ Backend analysis test completed');
+    }
+    
+    // 测试后端5种错误类型
+    testBackendErrorTypes() {
+        console.log('🧪 Testing Backend 5 Error Types...');
+        
+        // 使用后端分析器的5种错误类型和对应建议
+        const backendAnalysisData = {
+            playerA: {
+                errorTypes: ['slow_reaction', 'low_activity', 'weak_defense'],
+                analysis: [
+                    'Try to react more quickly to incoming plays.',
+                    'Move more actively to stay engaged in the game.',
+                    'Improve your defense to prevent goals when under threat.'
+                ],
+                timestamp: new Date().toISOString()
+            },
+            playerB: {
+                errorTypes: ['poor_alignment', 'coverage_gap'],
+                analysis: [
+                    'Align your movement better with the direction of the ball.',
+                    'Increase your coverage area to better influence the game.'
+                ],
+                timestamp: new Date().toISOString()
+            }
+        };
+        
+        if (this.currentGame) {
+            this.currentGame.backendAnalysis = backendAnalysisData;
+            console.log('✅ Backend analysis data added with 5 error types');
+            console.log('📝 Error types used:', [...backendAnalysisData.playerA.errorTypes, ...backendAnalysisData.playerB.errorTypes]);
+            
+            // 清理并更新每个回合的错误类型，确保使用后端的5种错误类型
+            if (this.currentGame.rounds && this.currentGame.rounds.length > 0) {
+                const allErrorTypes = [...backendAnalysisData.playerA.errorTypes, ...backendAnalysisData.playerB.errorTypes];
+                
+                this.currentGame.rounds.forEach((round, index) => {
+                    if (round.analysis) {
+                        // 循环分配5种错误类型
+                        const errorType = allErrorTypes[index % allErrorTypes.length];
+                        round.analysis.errorType = errorType;
+                        console.log(`Round ${round.id}: assigned error type ${errorType}`);
+                    }
+                });
+            }
+            
+            // 测试错误类型翻译
+            console.log('🔍 Testing error type translations:');
+            const allErrorTypes = [...backendAnalysisData.playerA.errorTypes, ...backendAnalysisData.playerB.errorTypes];
+            allErrorTypes.forEach(errorType => {
+                const translated = this.translateErrorType(errorType);
+                console.log(`  ${errorType} → ${translated}`);
+            });
+            
+            // 刷新显示
+            this.displayGameAnalysis();
+            console.log('✅ Display updated with backend 5 error types');
+            
+            // 强制重新计算统计数据
+            const rounds = this.currentGame.rounds || [];
+            const stats = this.calculateViewStats(rounds);
+            console.log('📊 Updated error statistics:', stats.commonErrors);
+            
+            // 验证所有统计数据只包含5种错误类型
+            const expectedErrorTypes = ['Slow Reaction', 'Low Activity', 'Weak Defense', 'Poor Alignment', 'Coverage Gap'];
+            const actualErrorTypes = Object.keys(stats.commonErrors);
+            const unexpectedTypes = actualErrorTypes.filter(type => !expectedErrorTypes.includes(type));
+            
+            if (unexpectedTypes.length > 0) {
+                console.warn('⚠️ Found unexpected error types in statistics:', unexpectedTypes);
+            } else {
+                console.log('✅ All error types are from backend analyzer');
+            }
+        } else {
+            console.log('❌ No current game selected');
+        }
+    }
+    
+    // 清除AI分析数据
+    clearAIAnalysisData() {
+        if (this.currentGame) {
+            delete this.currentGame.backendAnalysis;
+            this.displayGameAnalysis();
+            console.log('✅ AI analysis data cleared');
+        }
+    }
+    
+    // 验证前端只显示5种错误类型
+    validateErrorTypes() {
+        console.log('🔍 Validating error types...');
+        
+        // 定义后端分析器的5种错误类型
+        const expectedErrorTypes = [
+            'slow_reaction',
+            'low_activity', 
+            'weak_defense',
+            'poor_alignment',
+            'coverage_gap'
+        ];
+        
+        // 测试翻译映射
+        console.log('📝 Testing error type translations:');
+        expectedErrorTypes.forEach(errorType => {
+            const translated = this.translateErrorType(errorType);
+            console.log(`  ${errorType} → ${translated}`);
+        });
+        
+        // 测试建议映射
+        const expectedSuggestions = [
+            'Try to react more quickly to incoming plays.',
+            'Move more actively to stay engaged in the game.',
+            'Improve your defense to prevent goals when under threat.',
+            'Align your movement better with the direction of the ball.',
+            'Increase your coverage area to better influence the game.'
+        ];
+        
+        console.log('📝 Testing suggestion translations:');
+        expectedSuggestions.forEach(suggestion => {
+            const translated = this.translateAnalysisSuggestion(suggestion);
+            console.log(`  ${suggestion} → ${translated}`);
+        });
+        
+        // 检查过滤器中的错误类型
+        const availableErrorTypes = this.getAvailableErrorTypes();
+        console.log('📊 Available error types in filter:', availableErrorTypes);
+        console.log('📊 Total error types count:', availableErrorTypes.length);
+        
+        // 验证过滤器选项是否正确更新
+        this.updateErrorFilterOptions();
+        
+        // 检查当前游戏的错误类型
+        if (this.currentGame && this.currentGame.rounds) {
+            // 检查是否有非预期的错误类型
+            const translatedExpected = expectedErrorTypes.map(type => this.translateErrorType(type));
+            const unexpectedTypes = availableErrorTypes.filter(type => 
+                !translatedExpected.includes(type)
+            );
+            
+            if (unexpectedTypes.length > 0) {
+                console.warn('⚠️ Found unexpected error types:', unexpectedTypes);
+            } else {
+                console.log('✅ All error types match expected backend types');
+            }
+        }
+        
+        console.log('✅ Error type validation completed');
+    }
+    
+    // 测试错误类型过滤器更新
+    testErrorTypeFilter() {
+        console.log('🧪 Testing Error Type Filter...');
+        
+        // 首先应用测试数据
+        this.testBackendErrorTypes();
+        
+        // 等待一下让数据加载
+        setTimeout(() => {
+            // 检查过滤器选项
+            const errorFilter = document.getElementById('errorFilter');
+            if (errorFilter) {
+                const options = Array.from(errorFilter.options).map(option => option.value);
+                console.log('📋 Error filter options:', options);
+                
+                // 测试每个错误类型过滤
+                const availableTypes = this.getAvailableErrorTypes();
+                console.log('🔍 Testing each error type filter:');
+                
+                availableTypes.forEach(errorType => {
+                    console.log(`  Testing filter: ${errorType}`);
+                    this.updateRoundFilter('errorType', errorType);
+                    
+                    // 获取过滤后的结果
+                    if (this.currentGame && this.currentGame.rounds) {
+                        const filteredRounds = this.applyRoundFilters(this.currentGame.rounds);
+                        console.log(`    Filtered rounds count: ${filteredRounds.length}`);
+                    }
+                });
+                
+                // 重置过滤器
+                this.updateRoundFilter('errorType', 'all');
+                console.log('✅ Filter test completed, reset to "all"');
+            } else {
+                console.warn('❌ Error filter element not found');
+            }
+        }, 100);
+    }
+    
+    // 清理旧的错误类型数据，确保只使用后端分析器的5种错误类型
+    cleanupOldErrorTypes() {
+        console.log('🧹 Cleaning up old error types...');
+        
+        if (this.currentGame && this.currentGame.rounds) {
+            // 清理所有回合中的旧错误类型
+            this.currentGame.rounds.forEach(round => {
+                if (round.analysis && round.analysis.errorType) {
+                    // 如果错误类型不是后端分析器的5种类型之一，则清除
+                    const backendErrorTypes = ['slow_reaction', 'low_activity', 'weak_defense', 'poor_alignment', 'coverage_gap'];
+                    if (!backendErrorTypes.includes(round.analysis.errorType)) {
+                        console.log(`Clearing old error type: ${round.analysis.errorType} from round ${round.id}`);
+                        delete round.analysis.errorType;
+                    }
+                }
+            });
+            
+            console.log('✅ Old error types cleaned up');
+        }
+    }
+    
+    // 测试完整的后端错误类型集成
+    testCompleteBackendIntegration() {
+        console.log('🧪 Testing Complete Backend Integration...');
+        
+        // 1. 清理旧的错误类型数据
+        this.cleanupOldErrorTypes();
+        
+        // 2. 测试后端错误类型
+        this.testBackendErrorTypes();
+        
+        // 3. 等待数据加载完成后测试其他功能
+        setTimeout(() => {
+            // 验证错误类型
+            this.validateErrorTypes();
+            
+            // 测试过滤器
+            this.testErrorTypeFilter();
+            
+            // 强制刷新统计数据
+            this.forceRefreshStats();
+            
+            // 如果有report页面，测试AI建议
+            if (window.reportManager) {
+                console.log('🔄 Testing report page AI suggestions...');
+                window.reportManager.currentGame = this.currentGame;
+                window.reportManager.gameData = this.currentGame;
+                window.reportManager.generateAISuggestions();
+            }
+            
+            console.log('✅ Complete backend integration test finished');
+        }, 200);
+    }
+    
+    // 强制刷新所有统计数据
+    forceRefreshStats() {
+        console.log('🔄 Force refreshing all statistics...');
+        
+        if (this.currentGame) {
+            // 强制重新计算并显示
+            this.displayGameAnalysis();
+            
+            // 更新错误过滤器选项
+            this.updateErrorFilterOptions();
+            
+            // 验证统计数据
+            if (this.currentGame.rounds) {
+                const stats = this.calculateViewStats(this.currentGame.rounds);
+                console.log('📊 Current error statistics:', stats.commonErrors);
+                
+                // 验证只包含5种错误类型
+                const expectedErrorTypes = ['Slow Reaction', 'Low Activity', 'Weak Defense', 'Poor Alignment', 'Coverage Gap'];
+                const actualErrorTypes = Object.keys(stats.commonErrors);
+                const hasOnlyExpectedTypes = actualErrorTypes.every(type => expectedErrorTypes.includes(type));
+                
+                if (hasOnlyExpectedTypes) {
+                    console.log('✅ Statistics contain only backend analyzer error types');
+                } else {
+                    console.warn('⚠️ Statistics still contain unexpected error types:', actualErrorTypes);
+                }
+            }
+            
+            console.log('✅ Statistics refresh completed');
+        }
+    }
+    
+    // 向后兼容的测试函数
+    testAIAnalysisIntegration() {
+        console.log('🔄 Redirecting to testCompleteBackendIntegration() for complete testing...');
+        this.testCompleteBackendIntegration();
+    }
+    
+    // 测试所有后端分析器错误类型和建议
+    testAllBackendAnalysisTypes() {
+        console.log('🧪 Testing ALL 5 backend analyzer error types and suggestions...');
+        
+        // 包含所有后端分析器可能返回的5种错误类型和建议
+        const allAnalysisData = {
+            playerA: {
+                errorTypes: ['slow_reaction', 'low_activity', 'weak_defense'],
+                analysis: [
+                    'Try to react more quickly to incoming plays.',
+                    'Move more actively to stay engaged in the game.',
+                    'Improve your defense to prevent goals when under threat.'
+                ],
+                timestamp: new Date().toISOString()
+            },
+            playerB: {
+                errorTypes: ['poor_alignment', 'coverage_gap'],
+                analysis: [
+                    'Align your movement better with the direction of the ball.',
+                    'Increase your coverage area to better influence the game.'
+                ],
+                timestamp: new Date().toISOString()
+            }
+        };
+        
+        if (this.currentGame) {
+            this.currentGame.backendAnalysis = allAnalysisData;
+            
+            // 测试错误类型翻译
+            console.log('🔍 Testing ALL 5 error type translations:');
+            const allErrorTypes = [...allAnalysisData.playerA.errorTypes, ...allAnalysisData.playerB.errorTypes];
+            allErrorTypes.forEach(errorType => {
+                const translated = this.translateErrorType(errorType);
+                console.log(`  ${errorType} → ${translated}`);
+            });
+            
+            // 测试建议翻译
+            console.log('🔍 Testing ALL 5 suggestion translations:');
+            const allSuggestions = [...allAnalysisData.playerA.analysis, ...allAnalysisData.playerB.analysis];
+            allSuggestions.forEach(suggestion => {
+                const translated = this.translateAnalysisSuggestion(suggestion);
+                console.log(`  ${suggestion} → ${translated}`);
+            });
+            
+            // 更新回合数据，确保使用正确的5种错误类型
+            if (this.currentGame.rounds && this.currentGame.rounds.length > 0) {
+                this.currentGame.rounds.forEach((round, index) => {
+                    if (round.analysis) {
+                        // 循环分配5种错误类型
+                        const errorType = allErrorTypes[index % allErrorTypes.length];
+                        round.analysis.errorType = errorType;
+                        console.log(`Round ${round.id}: assigned error type ${errorType}`);
+                    }
+                });
+            }
+            
+            // 刷新显示
+            this.displayGameAnalysis();
+            console.log('✅ ALL 5 backend analysis types tested and displayed');
+            
+            // 显示可用的错误类型
+            const availableErrorTypes = this.getAvailableErrorTypes();
+            console.log('📊 Available error types in filter:', availableErrorTypes);
+            console.log('📊 Total error types count:', availableErrorTypes.length);
+        } else {
+            console.log('❌ No current game selected');
+        }
+    }
+    
+    // 处理后端分析数据（用于实际的后端集成）
+    handleBackendAnalysis(analysisData) {
+        console.log('🔄 Processing backend analysis data:', analysisData);
+        
+        if (!this.currentGame) {
+            console.warn('⚠️ No current game to apply backend analysis');
+            return;
+        }
+        
+        // 验证分析数据格式
+        if (!analysisData || !analysisData.playerA || !analysisData.playerB) {
+            console.error('❌ Invalid backend analysis data format');
+            return;
+        }
+        
+        // 验证错误类型是否为已知类型
+        const knownErrorTypes = ['slow_reaction', 'low_activity', 'weak_defense', 'poor_alignment', 'coverage_gap'];
+        const knownSuggestions = [
+            'Try to react more quickly to incoming plays.',
+            'Move more actively to stay engaged in the game.',
+            'Improve your defense to prevent goals when under threat.',
+            'Align your movement better with the direction of the ball.',
+            'Increase your coverage area to better influence the game.'
+        ];
+        
+        // 验证playerA数据
+        if (analysisData.playerA.errorTypes) {
+            const unknownErrorsA = analysisData.playerA.errorTypes.filter(error => !knownErrorTypes.includes(error));
+            if (unknownErrorsA.length > 0) {
+                console.warn('⚠️ Unknown error types for playerA:', unknownErrorsA);
+            }
+        }
+        
+        // 验证playerB数据
+        if (analysisData.playerB.errorTypes) {
+            const unknownErrorsB = analysisData.playerB.errorTypes.filter(error => !knownErrorTypes.includes(error));
+            if (unknownErrorsB.length > 0) {
+                console.warn('⚠️ Unknown error types for playerB:', unknownErrorsB);
+            }
+        }
+        
+        // 存储后端分析数据
+        this.currentGame.backendAnalysis = {
+            playerA: {
+                errorTypes: analysisData.playerA.errorTypes || [],
+                analysis: analysisData.playerA.analysis || [],
+                timestamp: analysisData.playerA.timestamp || new Date().toISOString()
+            },
+            playerB: {
+                errorTypes: analysisData.playerB.errorTypes || [],
+                analysis: analysisData.playerB.analysis || [],
+                timestamp: analysisData.playerB.timestamp || new Date().toISOString()
+            }
+        };
+        
+        console.log('✅ Backend analysis data processed successfully');
+        console.log('📝 Processed error types:', {
+            playerA: this.currentGame.backendAnalysis.playerA.errorTypes,
+            playerB: this.currentGame.backendAnalysis.playerB.errorTypes
+        });
+        
+        // 刷新显示
+        this.displayGameAnalysis();
+        
+        // 更新错误过滤器选项
+        this.updateErrorFilterOptions();
+        
+        console.log('🔄 Analysis view updated with backend data');
+    }
+    
+    // 更新错误过滤器选项
+    updateErrorFilterOptions() {
+        const errorFilter = document.getElementById('errorFilter');
+        if (!errorFilter) return;
+        
+        const availableErrorTypes = this.getAvailableErrorTypes();
+        const currentValue = errorFilter.value;
+        
+        // 重新生成选项
+        errorFilter.innerHTML = `
+            <option value="all">All Error Types</option>
+            ${availableErrorTypes.map(error => 
+                `<option value="${error}" ${currentValue === error ? 'selected' : ''}>${error}</option>`
+            ).join('')}
+        `;
+        
+        console.log('🔄 Error filter options updated with 5 backend error types:', availableErrorTypes);
+    }
+    
+    // 获取AI错误分析结果
+    getAIErrorAnalysis(playerKey) {
+        if (!this.currentGame || !this.currentGame.backendAnalysis) {
+            return '';
+        }
+        
+        const analysis = this.currentGame.backendAnalysis;
+        const playerData = analysis[playerKey];
+        
+        if (!playerData || !playerData.errorTypes || playerData.errorTypes.length === 0) {
+            return '';
+        }
+        
+        const errorBadges = playerData.errorTypes.map(errorType => 
+            `<span class="ai-error-badge">${this.translateErrorType(errorType)}</span>`
+        ).join('');
+        
+        return `
+            <div class="ai-error-analysis">
+                <div class="ai-label">🤖 AI Identified:</div>
+                <div class="ai-error-types">${errorBadges}</div>
+            </div>
+        `;
+    }
+    
+    // 获取特定回合的后端错误信息
+    getBackendErrorsForRound(round) {
+        if (!this.currentGame || !this.currentGame.backendAnalysis) {
+            return '';
+        }
+        
+        // 基于回合的败者来显示相关错误
+        const loser = round.winner === 'playerA' ? 'playerB' : 'playerA';
+        const playerData = this.currentGame.backendAnalysis[loser];
+        
+        if (!playerData || !playerData.errorTypes || playerData.errorTypes.length === 0) {
+            return '';
+        }
+        
+        const errorBadges = playerData.errorTypes.map(errorType => 
+            `<span class="round-ai-error">${this.translateErrorType(errorType)}</span>`
+        ).join('');
+        
+        return `
+            <div class="round-ai-analysis">
+                <div class="round-ai-label">🤖 AI Detected:</div>
+                <div class="round-ai-errors">${errorBadges}</div>
+            </div>
+        `;
+    }
+    
+    // 获取AI分析摘要（用于summary view）
+    getAIAnalysisSummary() {
+        if (!this.currentGame || !this.currentGame.backendAnalysis) {
+            return '';
+        }
+        
+        const analysis = this.currentGame.backendAnalysis;
+        const playerAName = this.getPlayerName(this.currentGame, 'playerA');
+        const playerBName = this.getPlayerName(this.currentGame, 'playerB');
+        
+        const playerAErrors = analysis.playerA.errorTypes || [];
+        const playerBErrors = analysis.playerB.errorTypes || [];
+        const playerASuggestions = analysis.playerA.analysis || [];
+        const playerBSuggestions = analysis.playerB.analysis || [];
+        
+        if (playerAErrors.length === 0 && playerBErrors.length === 0) {
+            return '';
+        }
+        
+        return `
+            <div class="ai-analysis-summary">
+                <div class="ai-summary-header">
+                    <div class="ai-icon">🤖</div>
+                    <h5>AI Analysis Results</h5>
+                    <div class="ai-timestamp">
+                        ${new Date(analysis.playerA.timestamp).toLocaleString()}
+                    </div>
+                </div>
+                <div class="ai-players-summary">
+                    ${playerAErrors.length > 0 ? `
+                        <div class="ai-player-summary">
+                            <div class="ai-player-header">
+                                <span class="player-icon">🔵</span>
+                                <span class="player-name">${playerAName}</span>
+                            </div>
+                            <div class="ai-error-badges">
+                                ${playerAErrors.map(error => 
+                                    `<span class="ai-error-badge">${this.translateErrorType(error)}</span>`
+                                ).join('')}
+                            </div>
+                            ${playerASuggestions.length > 0 ? `
+                                <div class="ai-suggestions-preview">
+                                    <span class="suggestion-icon">💡</span>
+                                    <span class="suggestion-text">${this.translateAnalysisSuggestion(playerASuggestions[0])}</span>
+                                    ${playerASuggestions.length > 1 ? `<span class="more-suggestions">+${playerASuggestions.length - 1} more</span>` : ''}
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+                    
+                    ${playerBErrors.length > 0 ? `
+                        <div class="ai-player-summary">
+                            <div class="ai-player-header">
+                                <span class="player-icon">🔴</span>
+                                <span class="player-name">${playerBName}</span>
+                            </div>
+                            <div class="ai-error-badges">
+                                ${playerBErrors.map(error => 
+                                    `<span class="ai-error-badge">${this.translateErrorType(error)}</span>`
+                                ).join('')}
+                            </div>
+                            ${playerBSuggestions.length > 0 ? `
+                                <div class="ai-suggestions-preview">
+                                    <span class="suggestion-icon">💡</span>
+                                    <span class="suggestion-text">${this.translateAnalysisSuggestion(playerBSuggestions[0])}</span>
+                                    ${playerBSuggestions.length > 1 ? `<span class="more-suggestions">+${playerBSuggestions.length - 1} more</span>` : ''}
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
     }
     
     // 显示分析错误信息
@@ -396,6 +1127,28 @@ class AnalysisManager {
             container.insertAdjacentHTML('afterbegin', errorHTML);
         } else {
             container.innerHTML = errorHTML;
+        }
+    }
+    
+    // 显示分析信息提示
+    showAnalysisMessage(message) {
+        const container = document.getElementById('pointBreakdown');
+        if (!container) return;
+        
+        const messageHTML = `
+            <div class="analysis-message">
+                <div class="message-icon">ℹ️</div>
+                <h3>Analysis Information</h3>
+                <p class="message-text">${message}</p>
+                <p class="message-suggestion">Analysis data will be available once the game generates sufficient data.</p>
+            </div>
+        `;
+        
+        // 如果已经有内容，在顶部添加信息
+        if (container.innerHTML.trim()) {
+            container.insertAdjacentHTML('afterbegin', messageHTML);
+        } else {
+            container.innerHTML = messageHTML;
         }
     }
     
@@ -542,6 +1295,23 @@ class AnalysisManager {
         `;
     }
     
+    displayWaitingForAnalysis() {
+        const container = document.getElementById('pointBreakdown');
+        if (!container) return;
+        
+        const selectedGame = document.getElementById('gameSelector').value;
+        if (!selectedGame) return;
+        
+        container.innerHTML = `
+            <div class="waiting-for-analysis">
+                <div class="waiting-icon">⏳</div>
+                <h3>Game Selected</h3>
+                <p>Click the <strong>"Analyze Game"</strong> button to view detailed round analysis.</p>
+                <p><em>Selected game: ${selectedGame}</em></p>
+            </div>
+        `;
+    }
+    
     createGameHeaderHTML() {
         if (!this.currentGame) return '';
         
@@ -585,79 +1355,14 @@ class AnalysisManager {
                         </div>
                         ` : ''}
                     </div>
-                    
-                    ${this.createBackendAnalysisHeader()}
                 </div>
             </div>
         `;
     }
     
-    // 创建后端分析数据的头部显示
-    createBackendAnalysisHeader() {
-        if (!this.currentGame || !this.currentGame.backendAnalysis) {
-            return '';
-        }
-        
-        const backendAnalysis = this.currentGame.backendAnalysis;
-        const playerAName = this.getPlayerName(this.currentGame, 'playerA');
-        const playerBName = this.getPlayerName(this.currentGame, 'playerB');
-        
-        return `
-            <div class="backend-analysis-header">
-                <h4>🤖 AI 分析结果</h4>
-                <div class="analysis-overview">
-                    <div class="player-analysis-summary">
-                        <div class="player-summary player-a-summary">
-                            <div class="player-name">🔵 ${playerAName}</div>
-                            <div class="error-types">
-                                ${this.formatErrorTypes(backendAnalysis.playerA.errorTypes)}
-                            </div>
-                        </div>
-                        <div class="vs-divider">VS</div>
-                        <div class="player-summary player-b-summary">
-                            <div class="player-name">🔴 ${playerBName}</div>
-                            <div class="error-types">
-                                ${this.formatErrorTypes(backendAnalysis.playerB.errorTypes)}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="analysis-timestamp">
-                        <small>分析时间: ${new Date(backendAnalysis.playerA.timestamp).toLocaleString()}</small>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+
     
-    // 格式化错误类型显示
-    formatErrorTypes(errorTypes) {
-        if (!errorTypes || errorTypes.length === 0) {
-            return '<span class="no-errors">✅ 无主要错误</span>';
-        }
-        
-        return errorTypes.map(errorType => 
-            `<span class="error-type-badge">${errorType}</span>`
-        ).join('');
-    }
-    
-    // 获取后端分析数据中的错误类型
-    getBackendErrorTypes(playerName) {
-        if (!this.currentGame || !this.currentGame.backendAnalysis) {
-            return [];
-        }
-        
-        const backendAnalysis = this.currentGame.backendAnalysis;
-        const playerAName = this.getPlayerName(this.currentGame, 'playerA');
-        const playerBName = this.getPlayerName(this.currentGame, 'playerB');
-        
-        if (playerName === playerAName) {
-            return backendAnalysis.playerA.errorTypes || [];
-        } else if (playerName === playerBName) {
-            return backendAnalysis.playerB.errorTypes || [];
-        }
-        
-        return [];
-    }
+
     
     getWinnerName() {
         if (!this.currentGame || !this.currentGame.winner) return '';
@@ -722,6 +1427,17 @@ class AnalysisManager {
             return `${winRate}%`;  // Add % for numeric values
         }
         return winRate;
+    }
+    
+    // Update win rate data from backend
+    updateWinRateData(winRateData) {
+        console.log('📊 Updating win rate data in analysis manager:', winRateData);
+        this.winRateData = winRateData;
+        
+        // Refresh the current view if it's displaying comparison stats
+        if (this.currentMode === 'comparison') {
+            this.displayGameAnalysis();
+        }
     }
     
     getFilteredRounds() {
@@ -932,8 +1648,7 @@ class AnalysisManager {
         const defenseScore = Math.max(1, 10 - this.calculateRoundScore(analysis));
         const preventionTips = this.generatePreventionTips(analysis);
         
-        // 获取后端分析数据中的错误类型
-        const backendErrorTypes = this.getBackendErrorTypes(loser);
+
         
         return `
             <div class="ai-analysis loss-analysis">
@@ -961,21 +1676,7 @@ class AnalysisManager {
                         </div>
                     ` : ''}
                     
-                    ${backendErrorTypes.length > 0 ? `
-                        <div class="analysis-section section-backend">
-                            <div class="section-header">
-                                <span class="section-number">🤖</span>
-                                <strong class="section-title">AI 识别的错误类型</strong>
-                            </div>
-                            <div class="section-content">
-                                <div class="backend-error-types">
-                                    ${backendErrorTypes.map(errorType => 
-                                        `<span class="backend-error-badge">🎯 ${errorType}</span>`
-                                    ).join('')}
-                                </div>
-                            </div>
-                        </div>
-                    ` : ''}
+
                     
                     <div class="analysis-section section-3">
                         <div class="section-header">
@@ -1085,8 +1786,17 @@ class AnalysisManager {
     }
 
     translateErrorType(errorType) {
-        // Return error type in English (no translation needed)
-        return errorType;
+        // 错误类型映射 - 只基于后端分析器返回的5种错误类型
+        const errorTypeMap = {
+            // 后端分析器返回的5种错误类型
+            'slow_reaction': 'Slow Reaction',
+            'low_activity': 'Low Activity',
+            'weak_defense': 'Weak Defense',
+            'poor_alignment': 'Poor Alignment',
+            'coverage_gap': 'Coverage Gap'
+        };
+        
+        return errorTypeMap[errorType] || errorType;
     }
 
     getDefenseAssessment(defenseScore) {
@@ -1252,11 +1962,35 @@ class AnalysisManager {
         });
         stats.averageScore = (totalScore / gameRounds.length).toFixed(1);
         
-        // Count common errors
+        // Count common errors (combining frontend and backend data)
         gameRounds.forEach(round => {
+            // 统计前端分析的错误
             if (round.analysis && round.analysis.errorType) {
                 stats.commonErrors[round.analysis.errorType] = 
                     (stats.commonErrors[round.analysis.errorType] || 0) + 1;
+            }
+            
+            // 统计后端AI分析的错误
+            if (this.currentGame && this.currentGame.backendAnalysis) {
+                const backendAnalysis = this.currentGame.backendAnalysis;
+                
+                // 统计playerA的错误
+                if (backendAnalysis.playerA && backendAnalysis.playerA.errorTypes) {
+                    backendAnalysis.playerA.errorTypes.forEach(errorType => {
+                        const translatedError = this.translateErrorType(errorType);
+                        stats.commonErrors[translatedError] = 
+                            (stats.commonErrors[translatedError] || 0) + 1;
+                    });
+                }
+                
+                // 统计playerB的错误
+                if (backendAnalysis.playerB && backendAnalysis.playerB.errorTypes) {
+                    backendAnalysis.playerB.errorTypes.forEach(errorType => {
+                        const translatedError = this.translateErrorType(errorType);
+                        stats.commonErrors[translatedError] = 
+                            (stats.commonErrors[translatedError] || 0) + 1;
+                    });
+                }
             }
         });
         
@@ -1837,10 +2571,12 @@ class AnalysisManager {
                                 <div class="player-errors">
                                     <span class="player-label">🔵 ${this.getPlayerName(this.currentGame, 'playerA')}:</span>
                                     <span class="error-value">${comparisonStats.playerA.commonError || 'No common errors'}</span>
+                                    ${this.getAIErrorAnalysis('playerA')}
                         </div>
                                 <div class="player-errors">
                                     <span class="player-label">🔴 ${this.getPlayerName(this.currentGame, 'playerB')}:</span>
                                     <span class="error-value">${comparisonStats.playerB.commonError || 'No common errors'}</span>
+                                    ${this.getAIErrorAnalysis('playerB')}
                     </div>
             </div>
                         </div>
@@ -2066,35 +2802,55 @@ class AnalysisManager {
                 stats.playerA.pointsLost++;
             }
 
-            // 收集技术评分和错误信息
+            // 收集技术评分
             if (round.analysis) {
                 const techScore = this.calculateRoundScore(round.analysis);
                 
                 if (round.winner === 'playerB') {
                     // Player A 失分
                     playerATechScores.push(techScore);
-                    if (round.analysis.errorType) {
-                        stats.playerA.errors[round.analysis.errorType] = 
-                            (stats.playerA.errors[round.analysis.errorType] || 0) + 1;
-                    }
                 } else {
                     // Player B 失分
                     playerBTechScores.push(techScore);
-                    if (round.analysis.errorType) {
-                        stats.playerB.errors[round.analysis.errorType] = 
-                            (stats.playerB.errors[round.analysis.errorType] || 0) + 1;
-                    }
                 }
-        }
-        
+            }
+            
             // 最终比分
             stats.finalScore.playerA = round.playerAScore;
             stats.finalScore.playerB = round.playerBScore;
         });
+        
+        // 只从后端分析器获取错误信息
+        if (this.currentGame && this.currentGame.backendAnalysis) {
+            const backendAnalysis = this.currentGame.backendAnalysis;
+            
+            // 统计playerA的错误
+            if (backendAnalysis.playerA && backendAnalysis.playerA.errorTypes) {
+                backendAnalysis.playerA.errorTypes.forEach(errorType => {
+                    const translatedError = this.translateErrorType(errorType);
+                    stats.playerA.errors[translatedError] = 
+                        (stats.playerA.errors[translatedError] || 0) + 1;
+                });
+            }
+            
+            // 统计playerB的错误
+            if (backendAnalysis.playerB && backendAnalysis.playerB.errorTypes) {
+                backendAnalysis.playerB.errorTypes.forEach(errorType => {
+                    const translatedError = this.translateErrorType(errorType);
+                    stats.playerB.errors[translatedError] = 
+                        (stats.playerB.errors[translatedError] || 0) + 1;
+                });
+            }
+        }
 
-        // 胜率由模型提供，前端不计算
-        stats.playerA.winRate = 'Model Data Required';
-        stats.playerB.winRate = 'Model Data Required';
+        // 使用实时胜率数据，如果有的话
+        if (this.winRateData && typeof this.winRateData.playerA === 'number') {
+            stats.playerA.winRate = this.winRateData.playerA;
+            stats.playerB.winRate = this.winRateData.playerB;
+        } else {
+            stats.playerA.winRate = 'Model Data Required';
+            stats.playerB.winRate = 'Model Data Required';
+        }
 
         // 计算平均技术评分
         if (playerATechScores.length > 0) {
@@ -2914,6 +3670,7 @@ class AnalysisManager {
                                     </div>
                                 </div>
                             `).join('')}
+
                         </div>
                     </div>
                     
@@ -2973,6 +3730,9 @@ class AnalysisManager {
         const riskLevel = round.analysis ? this.getRiskLevel(Math.max(1, 10 - score)) : 'Medium';
         const errorType = round.analysis?.errorType || 'Unknown';
         
+        // 获取后端AI分析的错误信息
+        const backendErrors = this.getBackendErrorsForRound(round);
+        
         return `
             <div class="summary-round-card" data-round-id="${round.id}">
                 <div class="round-header">
@@ -2983,6 +3743,7 @@ class AnalysisManager {
                     <div class="round-loser">${loserText} Lost Point</div>
                     <div class="round-error">${this.translateErrorType(errorType)}</div>
                     <div class="round-risk risk-${riskLevel.toLowerCase().replace(' ', '-')}">${riskLevel}</div>
+                    ${backendErrors}
                 </div>
             </div>
         `;
@@ -3008,12 +3769,40 @@ class AnalysisManager {
                 const risk = this.getRiskLevel(Math.max(1, 10 - score));
                 stats.riskDistribution[risk] = (stats.riskDistribution[risk] || 0) + 1;
                 
-                if (round.analysis.errorType) {
-                    stats.commonErrors[round.analysis.errorType] = 
-                        (stats.commonErrors[round.analysis.errorType] || 0) + 1;
-                }
+                // 不再统计rounds中的错误类型，只使用后端分析器的数据
+                // 这里暂时跳过rounds的错误类型统计
             }
         });
+        
+        // 只显示后端分析器的5种错误类型统计
+        if (this.currentGame && this.currentGame.backendAnalysis) {
+            const backendAnalysis = this.currentGame.backendAnalysis;
+            
+            // 统计playerA的错误
+            if (backendAnalysis.playerA && backendAnalysis.playerA.errorTypes) {
+                backendAnalysis.playerA.errorTypes.forEach(errorType => {
+                    const translatedError = this.translateErrorType(errorType);
+                    stats.commonErrors[translatedError] = 
+                        (stats.commonErrors[translatedError] || 0) + 1;
+                });
+            }
+            
+            // 统计playerB的错误
+            if (backendAnalysis.playerB && backendAnalysis.playerB.errorTypes) {
+                backendAnalysis.playerB.errorTypes.forEach(errorType => {
+                    const translatedError = this.translateErrorType(errorType);
+                    stats.commonErrors[translatedError] = 
+                        (stats.commonErrors[translatedError] || 0) + 1;
+                });
+            }
+        } else {
+            // 如果没有后端分析数据，显示空的统计或默认5种错误类型
+            const defaultBackendErrors = ['slow_reaction', 'low_activity', 'weak_defense', 'poor_alignment', 'coverage_gap'];
+            defaultBackendErrors.forEach(errorType => {
+                const translatedError = this.translateErrorType(errorType);
+                stats.commonErrors[translatedError] = 0;
+            });
+        }
         
         stats.avgScore = (totalScore / rounds.length).toFixed(1);
         
@@ -3140,16 +3929,17 @@ class AnalysisManager {
     
     // 获取可用的错误类型
     getAvailableErrorTypes() {
-        if (!this.currentGame || !this.currentGame.rounds) return [];
+        // 返回后端分析器的5种错误类型（已翻译）
+        const backendErrorTypes = [
+            'slow_reaction',
+            'low_activity',
+            'weak_defense', 
+            'poor_alignment',
+            'coverage_gap'
+        ];
         
-        const errorTypes = new Set();
-        this.currentGame.rounds.forEach(round => {
-            if (round.analysis && round.analysis.errorType) {
-                errorTypes.add(round.analysis.errorType);
-            }
-        });
-        
-        return Array.from(errorTypes).sort();
+        // 翻译错误类型并返回
+        return backendErrorTypes.map(errorType => this.translateErrorType(errorType)).sort();
     }
     
     // 应用回合筛选
@@ -3184,7 +3974,13 @@ class AnalysisManager {
             
             // Error Type筛选
             if (this.roundFilters.errorType !== 'all') {
-                if (!round.analysis || round.analysis.errorType !== this.roundFilters.errorType) {
+                if (!round.analysis || !round.analysis.errorType) {
+                    return false;
+                }
+                
+                // 翻译回合的错误类型并与过滤器值比较
+                const translatedErrorType = this.translateErrorType(round.analysis.errorType);
+                if (translatedErrorType !== this.roundFilters.errorType) {
                     return false;
                 }
             }

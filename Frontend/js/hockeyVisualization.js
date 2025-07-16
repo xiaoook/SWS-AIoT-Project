@@ -342,6 +342,12 @@ class HockeyVisualization {
 
     // Handle goal scoring
     onGoalScored(scoringSide) {
+        // Check if game is in progress before recording goal
+        if (window.smartCourtApp && window.smartCourtApp.gameState.status !== 'playing') {
+            console.log(`🚫 Goal not recorded - game is ${window.smartCourtApp.gameState.status}`);
+            return;
+        }
+        
         this.gameState.score[scoringSide]++;
         this.gameState.lastGoal = {
             side: scoringSide,

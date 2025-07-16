@@ -70,7 +70,7 @@ def handle_mqtt_message(client, userdata, message):
         payload = message.payload.decode()
         logger.debug(f'Received prediction: {payload}')
         prediction = json.loads(payload)
-        socketio.emit('request_win_rate_prediction', prediction)
+        socketio.emit('win_rate_prediction', prediction)
 
 # emit the current score when the new client connects
 @socketio.on('connect')
