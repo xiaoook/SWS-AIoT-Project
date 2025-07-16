@@ -10,8 +10,11 @@ from flask_cors import CORS
 from flask_mqtt import Mqtt
 from Backend.config import *
 
+from Backend.route.analysis import analysis_bp
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'hockey!'
+app.register_blueprint(analysis_bp)
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
@@ -58,7 +61,7 @@ def handle_connect_mqtt(client, userdata, flags, rc):
 def handle_mqtt_message(client, userdata, message):
     global latest_position
     payload = message.payload.decode()
-    # logger.debug(f'Received position: {payload}')
+    logger.debug(f'Received position: {payload}')
     latest_position = json.loads(payload)
     socketio.emit('position_update', latest_position)
 

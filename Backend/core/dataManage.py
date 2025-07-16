@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from pathlib import Path
 from Backend.logger import logger
@@ -239,6 +240,47 @@ def delete_all_games():
         cur.execute("DELETE FROM Round")
         conn.commit()
         logger.info(f"All games deleted")
+    except sqlite3.OperationalError as e:
+        logger.error(f"Error: {e}")
+        raise RuntimeError(f"Error: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
+
+def get_game_analysis(gid):
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM GameAnalysis WHERE gid = ?", (gid,))
+        result = cur.fetchone()
+        if result is None:
+            return None
+    except sqlite3.OperationalError as e:
+        logger.error(f"Error: {e}")
+        raise RuntimeError(f"Error: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
+
+    analysis = dict(result)
+    analysis["A_type"] = json.loads(analysis["A_type"])
+    analysis["B_type"] = json.loads(analysis["B_type"])
+    analysis["A_analysis"] = json.loads(analysis["A_analysis"])
+    analysis["B_analysis"] = json.loads(analysis["B_analysis"])
+    return analysis
+
+def insert_game_analysis(gid, error_type_a, analysis_a, error_type_b, analysis_b):
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO GameAnalysis (gid, A_type, A_analysis, B_type, B_analysis) 
+        VALUES (?, ?, ?, ?, ?)""", (gid, json.dumps(error_type_a), json.dumps(analysis_a), json.dumps(error_type_b), json.dumps(analysis_b)))
+        conn.commit()
+        logger.info(f"Analysis of game {gid} inserted successfully")
     except sqlite3.OperationalError as e:
         logger.error(f"Error: {e}")
         raise RuntimeError(f"Error: {e}")
