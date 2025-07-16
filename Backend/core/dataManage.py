@@ -266,16 +266,16 @@ def get_game_analysis(gid):
     analysis = dict(result)
     return analysis
 
-def insert_game_analysis(gid, error_type, analysis):
+def insert_game_analysis(gid, error_type_a, analysis_a, error_type_b, analysis_b):
     conn = None
     try:
         conn = sqlite3.connect(DB_FILE)
         cur = conn.cursor()
         cur.execute("""
-        INSERT INTO GameAnalysis (gid, type, analysis) 
-        VALUES (?, ?, ?)""", (gid, error_type, analysis))
+        INSERT INTO GameAnalysis (gid, A_type, A_analysis, B_type, B_analysis) 
+        VALUES (?, ?, ?, ?, ?)""", (gid, error_type_a, analysis_a, error_type_b, analysis_b))
         conn.commit()
-        logger.info(f"Game {gid} inserted successfully")
+        logger.info(f"Analysis of game {gid} inserted successfully")
     except sqlite3.OperationalError as e:
         logger.error(f"Error: {e}")
         raise RuntimeError(f"Error: {e}")

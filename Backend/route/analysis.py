@@ -28,8 +28,10 @@ def game_analysis():
 def new_game_analysis():
     data = request.get_json()
     gid = data['gid']
-    error_type = data['type']
-    analysis = data['analysis']
+    error_type_a = data['A_type']
+    analysis_a = data['A_analysis']
+    error_type_b = data['B_type']
+    analysis_b = data['B_analysis']
     if gid is None:
         return jsonify({
             'status': 'error',
@@ -37,7 +39,7 @@ def new_game_analysis():
         }), 400
 
     try:
-        insert_game_analysis(gid, error_type, analysis)
+        insert_game_analysis(gid, error_type_a, analysis_a, error_type_b, analysis_b)
     except RuntimeError as e:
         return jsonify({
             'status': 'error',
