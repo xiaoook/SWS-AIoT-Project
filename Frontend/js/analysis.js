@@ -371,36 +371,162 @@ class AnalysisManager {
             if (analysisResponse.ok) {
                 const analysisData = await analysisResponse.json();
                 if (analysisData.status === 'success' && analysisData.analysis) {
-                    console.log(`✅ Loaded backend analysis for game ${databaseGameId}`);
+                    console.log(`✅ Loaded backend game analysis for game ${databaseGameId}`);
                     this.integrateBackendAnalysis(analysisData.analysis);
                 } else if (analysisData.status === 'error') {
-                    // 显示后端错误信息
-                    this.showAnalysisError(analysisData.message);
-                    console.warn(`⚠️ Backend analysis error: ${analysisData.message}`);
+                    console.log(`ℹ️ Backend game analysis error: ${analysisData.message}`);
                 } else {
-                    console.warn('No analysis data available from backend');
+                    console.log(`ℹ️ No game analysis data available from backend for game ${databaseGameId}`);
                 }
             } else if (analysisResponse.status === 404) {
                 // 404错误 - 分析数据不存在，这是正常情况
-                console.log(`ℹ️ No analysis data found for game ${databaseGameId} (404)`);
-                this.showAnalysisMessage('No analysis data available for this game yet.');
+                console.log(`ℹ️ No game analysis data found for game ${databaseGameId} (404 - normal)`);
             } else {
                 try {
                     const errorData = await analysisResponse.json();
                     if (errorData.status === 'error') {
-                        this.showAnalysisError(errorData.message);
-                        console.error(`❌ Backend analysis request failed: ${errorData.message}`);
+                        console.log(`ℹ️ Backend game analysis request failed: ${errorData.message}`);
                     } else {
-                        console.error('Failed to load backend analysis');
+                        console.log(`ℹ️ Failed to load backend game analysis (${analysisResponse.status})`);
                     }
                 } catch (parseError) {
-                    console.error(`❌ Backend analysis request failed: HTTP ${analysisResponse.status}`);
-                    this.showAnalysisError(`Backend analysis service unavailable (${analysisResponse.status})`);
+                    console.log(`ℹ️ Backend game analysis request failed: HTTP ${analysisResponse.status}`);
+                }
+            }
+            
+            // 同时加载轮次分析数据
+            await this.loadRoundAnalysis(databaseGameId);
+        } catch (error) {
+            console.warn('Warning: Failed to connect to analysis service:', error);
+            // 不显示错误信息，只是警告，让用户能继续使用其他功能
+            await this.loadRoundAnalysis(databaseGameId);
+        }
+    }
+    
+    // 从后端获取轮次分析数据
+    async loadRoundAnalysis(databaseGameId) {
+        try {
+            console.log(`📊 Loading round analysis for game ${databaseGameId}`);
+            
+            // 获取轮次分析数据
+            const roundAnalysisResponse = await fetch(CONFIG.getRoundAnalysisUrl(databaseGameId), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (roundAnalysisResponse.ok) {
+                const roundAnalysisData = await roundAnalysisResponse.json();
+                if (roundAnalysisData.status === 'success') {
+                    // 后端总是返回analyses数组，可能为空
+                    const analyses = roundAnalysisData.analyses || [];
+                    if (analyses.length > 0) {
+                        console.log(`✅ Loaded ${analyses.length} round analyses for game ${databaseGameId}`);
+                        this.integrateRoundAnalysis(analyses);
+                    } else {
+                        console.log(`ℹ️ No round analysis data found for game ${databaseGameId} (empty array)`);
+                    }
+                } else if (roundAnalysisData.status === 'error') {
+                    console.warn(`⚠️ Round analysis error: ${roundAnalysisData.message}`);
+                } else {
+                    console.log(`ℹ️ Unexpected response format from backend for game ${databaseGameId}`);
+                }
+            } else if (roundAnalysisResponse.status === 404) {
+                // 404错误 - 轮次分析数据不存在，这是正常情况
+                console.log(`ℹ️ No round analysis found for game ${databaseGameId} (404)`);
+            } else {
+                try {
+                    const errorData = await roundAnalysisResponse.json();
+                    if (errorData.status === 'error') {
+                        console.warn(`⚠️ Round analysis request failed: ${errorData.message}`);
+                    } else {
+                        console.warn('Failed to load round analysis');
+                    }
+                } catch (parseError) {
+                    console.warn(`⚠️ Round analysis request failed: HTTP ${roundAnalysisResponse.status}`);
                 }
             }
         } catch (error) {
-            console.error('Error loading backend analysis:', error);
-            this.showAnalysisError('Failed to connect to analysis service');
+            console.warn('Warning: Failed to load round analysis:', error);
+        }
+    }
+    
+    // 整合轮次分析数据到当前游戏
+    integrateRoundAnalysis(roundAnalyses) {
+        if (!this.currentGame || !this.currentGame.rounds) {
+            console.warn('No current game or rounds to integrate round analysis');
+            return;
+        }
+        
+        console.log('🔄 Integrating round analysis data:', roundAnalyses);
+        
+        // 为每个轮次分析数据找到对应的回合
+        roundAnalyses.forEach(analysis => {
+            const roundId = analysis.rid;
+            const gameRound = this.currentGame.rounds.find(round => round.id === roundId);
+            
+            if (gameRound) {
+                // 整合轮次分析数据
+                gameRound.backendAnalysis = {
+                    playerA: {
+                        errorTypes: analysis.A_type || [],
+                        analysis: analysis.A_analysis || [],
+                        timestamp: new Date().toISOString()
+                    },
+                    playerB: {
+                        errorTypes: analysis.B_type || [],
+                        analysis: analysis.B_analysis || [],
+                        timestamp: new Date().toISOString()
+                    }
+                };
+                
+                console.log(`✅ Round ${roundId} analysis integrated`);
+            } else {
+                console.warn(`⚠️ Round ${roundId} not found in current game rounds`);
+            }
+        });
+        
+        console.log('✅ Round analysis integration completed');
+    }
+    
+    // 添加轮次分析数据到后端
+    async addRoundAnalysisToBackend(gameId, roundId, playerAErrorTypes, playerAAnalysis, playerBErrorTypes, playerBAnalysis) {
+        try {
+            console.log(`📊 Adding round analysis to backend for game ${gameId}, round ${roundId}`);
+            
+            const response = await fetch(CONFIG.API_URLS.ANALYSIS_ROUND_NEW, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gid: gameId,
+                    rid: roundId,
+                    A_type: playerAErrorTypes,
+                    A_analysis: playerAAnalysis,
+                    B_type: playerBErrorTypes,
+                    B_analysis: playerBAnalysis
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.status === 'success') {
+                    console.log(`✅ Round analysis added to backend successfully for round ${roundId}`);
+                    return true;
+                } else {
+                    console.error(`❌ Failed to save round analysis: ${result.message}`);
+                    return false;
+                }
+            } else {
+                const errorData = await response.json();
+                console.error(`❌ Failed to save round analysis: ${errorData.message}`);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error adding round analysis to backend:', error);
+            return false;
         }
     }
     
@@ -435,12 +561,23 @@ class AnalysisManager {
         const playerAName = this.getPlayerName(this.currentGame, 'playerA');
         const playerBName = this.getPlayerName(this.currentGame, 'playerB');
         
+        // 检查是否有轮次级别的分析数据
+        const roundAnalysisStats = this.getRoundAnalysisStats();
+        
         return `
             <div class="ai-analysis-section">
                 <h4>🤖 AI Analysis Results</h4>
                 <div class="analysis-timestamp">
                     <small>Analysis Time: ${new Date(analysis.playerA.timestamp).toLocaleString()}</small>
                 </div>
+                ${roundAnalysisStats.totalRounds > 0 ? `
+                    <div class="round-analysis-summary">
+                        <div class="round-analysis-header">
+                            <span class="round-icon">🎯</span>
+                            <span class="round-text">Round Analysis: ${roundAnalysisStats.analyzedRounds}/${roundAnalysisStats.totalRounds} rounds analyzed</span>
+                        </div>
+                    </div>
+                ` : ''}
                 <div class="players-analysis">
                     <div class="player-analysis player-a-analysis">
                         <div class="player-header">
@@ -463,6 +600,18 @@ class AnalysisManager {
                 </div>
             </div>
         `;
+    }
+    
+    // 获取轮次分析统计信息
+    getRoundAnalysisStats() {
+        if (!this.currentGame || !this.currentGame.rounds) {
+            return { totalRounds: 0, analyzedRounds: 0 };
+        }
+        
+        const totalRounds = this.currentGame.rounds.length;
+        const analyzedRounds = this.currentGame.rounds.filter(round => round.backendAnalysis).length;
+        
+        return { totalRounds, analyzedRounds };
     }
     
     // 格式化单个玩家的分析结果
@@ -798,6 +947,9 @@ class AnalysisManager {
             // 强制刷新统计数据
             this.forceRefreshStats();
             
+            // 测试轮次分析
+            this.testRoundAnalysis();
+            
             // 如果有report页面，测试AI建议
             if (window.reportManager) {
                 console.log('🔄 Testing report page AI suggestions...');
@@ -808,6 +960,102 @@ class AnalysisManager {
             
             console.log('✅ Complete backend integration test finished');
         }, 200);
+    }
+    
+    // 测试轮次分析功能
+    testRoundAnalysis() {
+        console.log('🧪 Testing Round Analysis...');
+        
+        if (!this.currentGame || !this.currentGame.rounds) {
+            console.log('❌ No current game or rounds available for testing');
+            return;
+        }
+        
+        // 创建测试轮次分析数据
+        const testRoundAnalyses = [
+            {
+                rid: 1,
+                A_type: ['slow_reaction'],
+                A_analysis: ['Try to react more quickly to incoming plays.'],
+                B_type: ['weak_defense'],
+                B_analysis: ['Improve your defense to prevent goals when under threat.']
+            },
+            {
+                rid: 2,
+                A_type: ['low_activity'],
+                A_analysis: ['Move more actively to stay engaged in the game.'],
+                B_type: ['poor_alignment'],
+                B_analysis: ['Align your movement better with the direction of the ball.']
+            },
+            {
+                rid: 3,
+                A_type: ['coverage_gap'],
+                A_analysis: ['Increase your coverage area to better influence the game.'],
+                B_type: ['slow_reaction', 'weak_defense'],
+                B_analysis: ['Try to react more quickly to incoming plays.', 'Improve your defense to prevent goals when under threat.']
+            }
+        ];
+        
+        // 应用测试数据
+        this.integrateRoundAnalysis(testRoundAnalyses);
+        
+        // 验证轮次分析数据
+        let roundsWithAnalysis = 0;
+        this.currentGame.rounds.forEach(round => {
+            if (round.backendAnalysis) {
+                roundsWithAnalysis++;
+                console.log(`✅ Round ${round.id} has analysis data:`, {
+                    playerA: round.backendAnalysis.playerA.errorTypes,
+                    playerB: round.backendAnalysis.playerB.errorTypes
+                });
+            }
+        });
+        
+        console.log(`📊 ${roundsWithAnalysis} rounds have analysis data`);
+        
+        // 刷新显示
+        this.displayGameAnalysis();
+        
+        console.log('✅ Round analysis test completed');
+    }
+    
+    // 测试轮次分析添加功能
+    async testAddRoundAnalysis() {
+        console.log('🧪 Testing Add Round Analysis...');
+        
+        if (!this.currentGame || !this.currentGame.databaseGameId) {
+            console.log('❌ No current game with database ID available for testing');
+            return;
+        }
+        
+        // 测试添加轮次分析
+        const testGameId = this.currentGame.databaseGameId;
+        const testRoundId = 1;
+        const testPlayerAErrorTypes = ['slow_reaction', 'low_activity'];
+        const testPlayerAAnalysis = ['Try to react more quickly to incoming plays.', 'Move more actively to stay engaged in the game.'];
+        const testPlayerBErrorTypes = ['weak_defense'];
+        const testPlayerBAnalysis = ['Improve your defense to prevent goals when under threat.'];
+        
+        const success = await this.addRoundAnalysisToBackend(
+            testGameId,
+            testRoundId,
+            testPlayerAErrorTypes,
+            testPlayerAAnalysis,
+            testPlayerBErrorTypes,
+            testPlayerBAnalysis
+        );
+        
+        if (success) {
+            console.log('✅ Round analysis added successfully');
+            
+            // 重新加载轮次分析数据
+            await this.loadRoundAnalysis(testGameId);
+            
+            // 刷新显示
+            this.displayGameAnalysis();
+        } else {
+            console.log('❌ Failed to add round analysis');
+        }
     }
     
     // 强制刷新所有统计数据
@@ -1033,6 +1281,26 @@ class AnalysisManager {
     
     // 获取特定回合的后端错误信息
     getBackendErrorsForRound(round) {
+        // 首先检查是否有轮次级别的分析数据
+        if (round.backendAnalysis) {
+            const loser = round.winner === 'playerA' ? 'playerB' : 'playerA';
+            const playerData = round.backendAnalysis[loser];
+            
+            if (playerData && playerData.errorTypes && playerData.errorTypes.length > 0) {
+                const errorBadges = playerData.errorTypes.map(errorType => 
+                    `<span class="round-ai-error">${this.translateErrorType(errorType)}</span>`
+                ).join('');
+                
+                return `
+                    <div class="round-ai-analysis">
+                        <div class="round-ai-label">🤖 Round AI Detected:</div>
+                        <div class="round-ai-errors">${errorBadges}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        // 回退到游戏级别的分析数据
         if (!this.currentGame || !this.currentGame.backendAnalysis) {
             return '';
         }
@@ -4079,4 +4347,64 @@ class AnalysisManager {
 // Initialize analysis manager
 document.addEventListener('DOMContentLoaded', () => {
     window.analysisManager = new AnalysisManager();
-}); 
+});
+
+// 全局测试函数，用于在浏览器控制台中测试轮次分析功能
+window.testRoundAnalysisIntegration = function() {
+    console.log('🧪 Testing Round Analysis Integration...');
+    
+    if (!window.analysisManager) {
+        console.log('❌ Analysis manager not found');
+        return;
+    }
+    
+    if (!window.analysisManager.currentGame) {
+        console.log('❌ No current game selected. Please select a game first.');
+        return;
+    }
+    
+    // 测试轮次分析数据
+    window.analysisManager.testRoundAnalysis();
+    
+    console.log('✅ Round analysis integration test completed');
+};
+
+// 全局测试函数，用于测试添加轮次分析到后端
+window.testAddRoundAnalysisToBackend = async function() {
+    console.log('🧪 Testing Add Round Analysis to Backend...');
+    
+    if (!window.analysisManager) {
+        console.log('❌ Analysis manager not found');
+        return;
+    }
+    
+    if (!window.analysisManager.currentGame) {
+        console.log('❌ No current game selected. Please select a game first.');
+        return;
+    }
+    
+    // 测试添加轮次分析
+    await window.analysisManager.testAddRoundAnalysis();
+    
+    console.log('✅ Add round analysis test completed');
+};
+
+// 全局测试函数，用于测试完整的后端集成
+window.testCompleteIntegration = function() {
+    console.log('🧪 Testing Complete Backend Integration...');
+    
+    if (!window.analysisManager) {
+        console.log('❌ Analysis manager not found');
+        return;
+    }
+    
+    if (!window.analysisManager.currentGame) {
+        console.log('❌ No current game selected. Please select a game first.');
+        return;
+    }
+    
+    // 测试完整的后端集成
+    window.analysisManager.testCompleteBackendIntegration();
+    
+    console.log('✅ Complete integration test completed');
+};

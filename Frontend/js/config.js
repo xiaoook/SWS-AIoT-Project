@@ -34,6 +34,8 @@ const CONFIG = {
         // 分析相关
         ANALYSIS_GAME: '/analysis/game',
         ANALYSIS_GAME_NEW: '/analysis/game/new',
+        ANALYSIS_ROUND: '/analysis/round/{gid}',
+        ANALYSIS_ROUND_NEW: '/analysis/round/new',
         
         // 其他
         ROOT: '/'
@@ -47,6 +49,11 @@ const CONFIG = {
     // 获取轮次数据的URL生成器
     getRoundsUrl(gid) {
         return this.getApiUrl(this.API_ENDPOINTS.ROUNDS.replace('{gid}', gid));
+    },
+    
+    // 获取轮次分析的URL生成器
+    getRoundAnalysisUrl(gid) {
+        return this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_ROUND.replace('{gid}', gid));
     },
     
     // 常用的完整URL
@@ -63,6 +70,7 @@ const CONFIG = {
             PLAYER_CREATE: this.getApiUrl(this.API_ENDPOINTS.PLAYER_CREATE),
             ANALYSIS_GAME: this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_GAME),
             ANALYSIS_GAME_NEW: this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_GAME_NEW),
+            ANALYSIS_ROUND_NEW: this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_ROUND_NEW),
             ROOT: this.getApiUrl(this.API_ENDPOINTS.ROOT)
         };
     }
