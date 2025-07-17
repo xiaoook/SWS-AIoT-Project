@@ -118,31 +118,31 @@ class AnalysisManager {
     }
     
     async refreshAnalysis() {
-        try {
-            console.log('🔄 Refreshing analysis data...');
-            
-            const gamesFromDB = await this.loadGamesFromDatabase();
-            
-            if (gamesFromDB && gamesFromDB.length > 0) {
-                this.games = gamesFromDB;
+            try {
+                console.log('🔄 Refreshing analysis data...');
+                
+                const gamesFromDB = await this.loadGamesFromDatabase();
+                
+                if (gamesFromDB && gamesFromDB.length > 0) {
+                    this.games = gamesFromDB;
                 console.log(`✅ Analysis refreshed with ${gamesFromDB.length} games`);
-            } else {
-                this.games = [];
+                                 } else {
+                     this.games = [];
                 console.log('💾 No games available');
-            }
-            
-            this.populateGameSelector();
-            
+                 }
+                
+                this.populateGameSelector();
+                
             if (this.currentGame) {
                 this.displayGameAnalysis();
-            } else {
+                } else {
                 this.displayNoGameMessage();
-            }
-            
-        } catch (error) {
+                }
+                
+            } catch (error) {
             console.error('❌ Error refreshing analysis:', error);
-            this.games = [];
-            this.populateGameSelector();
+                this.games = [];
+                this.populateGameSelector();
             this.displayNoGameMessage();
         }
     }
@@ -246,10 +246,10 @@ class AnalysisManager {
                         }
                         
                         return {
-                            id: round.roundInGame,
+                        id: round.roundInGame,
                             timestamp: new Date().toISOString(),
                             winner: winner,
-                            playerAScore: round.pointA,
+                        playerAScore: round.pointA,
                             playerBScore: round.pointB
                         };
                     });
@@ -538,10 +538,10 @@ class AnalysisManager {
                         <div class="summary-item">
                             <span class="summary-label">Game Analysis:</span>
                             <span class="summary-value">${this.currentGame.backendAnalysis ? 'Available' : 'Not Available'}</span>
+                    </div>
                         </div>
                     </div>
-                </div>
-                
+                    
                 ${this.createGameLevelAnalysisSection()}
                 ${this.createPlayerAnalysisSection(playerAName, playerBName, rounds)}
                 ${this.createRoundByRoundAnalysisSection(rounds)}
@@ -567,20 +567,20 @@ class AnalysisManager {
                         <div class="player-header">
                             <span class="player-icon">🔵</span>
                             <span class="player-name">${playerAName}</span>
-                        </div>
+                    </div>
                         <div class="player-analysis-content">
                             ${this.formatPlayerAnalysis(analysis.playerA)}
                         </div>
-                    </div>
+                        </div>
                     <div class="game-level-player">
                         <div class="player-header">
                             <span class="player-icon">🔴</span>
                             <span class="player-name">${playerBName}</span>
-                        </div>
+                    </div>
                         <div class="player-analysis-content">
                             ${this.formatPlayerAnalysis(analysis.playerB)}
-                        </div>
-                    </div>
+                </div>
+            </div>
                 </div>
             </div>
         `;
@@ -594,7 +594,7 @@ class AnalysisManager {
         // 收集每个玩家的所有错误类型
         const playerAErrors = this.collectPlayerErrors('playerA', rounds);
         const playerBErrors = this.collectPlayerErrors('playerB', rounds);
-        
+
         return `
             <div class="player-analysis-section">
                 <h4>👥 Player Performance Summary</h4>
@@ -605,15 +605,15 @@ class AnalysisManager {
                             <span class="player-name">${playerAName}</span>
                         </div>
                         <div class="player-stats">
-                            <div class="stat-item">
+                                <div class="stat-item">
                                 <span class="stat-label">Wins:</span>
                                 <span class="stat-value">${playerAWins}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Win Rate:</span>
+                                </div>
+                                <div class="stat-item">
+                                                                <span class="stat-label">Win Rate:</span>
                                 <span class="stat-value">${rounds.length > 0 ? Math.round((playerAWins / rounds.length) * 100) : 0}%</span>
-                            </div>
-                            <div class="stat-item">
+                                </div>
+                                <div class="stat-item">
                                 <span class="stat-label">Common Issues:</span>
                                 <div class="stat-value">
                                     ${playerAErrors.length > 0 ? 
@@ -623,8 +623,8 @@ class AnalysisManager {
                                         '<span class="no-issues">None identified</span>'
                                     }
                                 </div>
+                                </div>
                             </div>
-                        </div>
                     </div>
                     
                     <div class="player-summary">
@@ -633,15 +633,15 @@ class AnalysisManager {
                             <span class="player-name">${playerBName}</span>
                         </div>
                         <div class="player-stats">
-                            <div class="stat-item">
+                                <div class="stat-item">
                                 <span class="stat-label">Wins:</span>
                                 <span class="stat-value">${playerBWins}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Win Rate:</span>
+                                </div>
+                                <div class="stat-item">
+                                                                <span class="stat-label">Win Rate:</span>
                                 <span class="stat-value">${rounds.length > 0 ? Math.round((playerBWins / rounds.length) * 100) : 0}%</span>
-                            </div>
-                            <div class="stat-item">
+                                </div>
+                                <div class="stat-item">
                                 <span class="stat-label">Common Issues:</span>
                                 <div class="stat-value">
                                     ${playerBErrors.length > 0 ? 
@@ -651,29 +651,29 @@ class AnalysisManager {
                                         '<span class="no-issues">None identified</span>'
                                     }
                                 </div>
-                            </div>
-                        </div>
+                                </div>
+                                </div>
                     </div>
                 </div>
             </div>
         `;
     }
-    
+
     // 创建逐轮分析区域
     createRoundByRoundAnalysisSection(rounds) {
         const roundsWithAnalysis = rounds.filter(round => round.backendAnalysis);
         
         if (roundsWithAnalysis.length === 0) {
-            return `
+        return `
                 <div class="round-analysis-section">
                     <h4>🎯 Round-by-Round Analysis</h4>
                     <div class="no-round-analysis">
                         <p>No round-level analysis data available.</p>
-                    </div>
                 </div>
-            `;
-        }
-        
+            </div>
+        `;
+    }
+
         return `
             <div class="round-analysis-section">
                 <h4>🎯 Round-by-Round Analysis</h4>
@@ -683,7 +683,7 @@ class AnalysisManager {
             </div>
         `;
     }
-    
+
     // 创建轮次分析卡片
     createRoundAnalysisCard(round) {
         const winnerName = this.getPlayerName(this.currentGame, round.winner);
@@ -711,9 +711,9 @@ class AnalysisManager {
                     <div class="round-player-analysis">
                         <div class="round-player">
                             <div class="round-player-header">
-                                <span class="player-icon">🔵</span>
-                                <span class="player-name">${this.getPlayerName(this.currentGame, 'playerA')}</span>
-                            </div>
+                            <span class="player-icon">🔵</span>
+                            <span class="player-name">${this.getPlayerName(this.currentGame, 'playerA')}</span>
+                        </div>
                             <div class="round-player-errors">
                                 ${playerAErrors.length > 0 ? 
                                     playerAErrors.map(error => 
@@ -721,14 +721,14 @@ class AnalysisManager {
                                     ).join('') :
                                     '<span class="no-errors">No issues</span>'
                                 }
-                            </div>
                         </div>
-                        
+                    </div>
+                    
                         <div class="round-player">
                             <div class="round-player-header">
-                                <span class="player-icon">🔴</span>
-                                <span class="player-name">${this.getPlayerName(this.currentGame, 'playerB')}</span>
-                            </div>
+                            <span class="player-icon">🔴</span>
+                            <span class="player-name">${this.getPlayerName(this.currentGame, 'playerB')}</span>
+                        </div>
                             <div class="round-player-errors">
                                 ${playerBErrors.length > 0 ? 
                                     playerBErrors.map(error => 
@@ -736,14 +736,14 @@ class AnalysisManager {
                                     ).join('') :
                                     '<span class="no-errors">No issues</span>'
                                 }
-                            </div>
-                        </div>
-                    </div>
+                </div>
+                </div>
+            </div>
                 </div>
             </div>
         `;
     }
-    
+
     // 收集玩家的所有错误类型
     collectPlayerErrors(playerKey, rounds) {
         const errorTypes = new Set();
@@ -805,10 +805,10 @@ class AnalysisManager {
                             `<li>${this.translateAnalysisSuggestion(suggestion)}</li>`
                         ).join('')}
                     </ul>
-                </div>
-            `;
-        }
-        
+            </div>
+        `;
+    }
+
         if (!content) {
             content = '<div class="no-issues">✅ No major issues identified</div>';
         }
