@@ -491,15 +491,28 @@ class ReportManager {
     }
     
     generateReport() {
-        if (this.gameData) {
+        console.log('🔄 Starting report generation...');
+        console.log('🔍 Current game data:', this.currentGame);
+        console.log('🔍 Game data:', this.gameData);
+        
+        if (this.currentGame && this.gameData) {
+            console.log('📊 Using current game data with backend analysis');
+            this.updateFinalScore();
+            this.generateErrorChart();
+            this.generateAISuggestions();
+        } else if (this.gameData) {
+            console.log('📊 Using game data without backend analysis');
             this.updateFinalScore();
             this.generateErrorChart();
             this.generateAISuggestions();
         } else if (window.smartCourtApp && window.smartCourtApp.gameState) {
+            console.log('📊 Using SmartCourtApp game state');
             this.gameData = window.smartCourtApp.getGameState();
             this.updateFinalScore();
             this.generateErrorChart();
             this.generateAISuggestions();
+        } else {
+            console.log('❌ No game data available for report generation');
         }
     }
     
@@ -562,41 +575,60 @@ class ReportManager {
     calculateErrorStats() {
         const errors = {};
         
+        console.log('📊 Calculating error stats...');
+        console.log('🔍 currentGame:', this.currentGame);
+        console.log('🔍 gameData:', this.gameData);
+        
+        // 安全处理后端分析数据
+        const safeProcessErrorTypes = (errorTypes, source) => {
+            if (!errorTypes) return;
+            
+            if (Array.isArray(errorTypes)) {
+                errorTypes.forEach(errorType => {
+                    const translatedError = this.translateErrorType(errorType);
+                    errors[translatedError] = (errors[translatedError] || 0) + 1;
+                    console.log(`📈 Found error: ${translatedError} from ${source}`);
+                });
+            } else {
+                console.warn('⚠️ errorTypes is not an array:', errorTypes, 'from', source);
+            }
+        };
+        
         // 优先使用后端分析数据
         if (this.currentGame && this.currentGame.rounds) {
-            this.currentGame.rounds.forEach(round => {
+            console.log('📊 Using currentGame rounds data');
+            this.currentGame.rounds.forEach((round, index) => {
                 if (round.backendAnalysis) {
+                    console.log(`📊 Round ${index + 1} has backend analysis`);
                     // 收集playerA的错误类型
                     if (round.backendAnalysis.playerA && round.backendAnalysis.playerA.errorTypes) {
-                        round.backendAnalysis.playerA.errorTypes.forEach(errorType => {
-                            const translatedError = this.translateErrorType(errorType);
-                            errors[translatedError] = (errors[translatedError] || 0) + 1;
-                        });
+                        safeProcessErrorTypes(round.backendAnalysis.playerA.errorTypes, `Round ${index + 1} PlayerA`);
                     }
                     
                     // 收集playerB的错误类型
                     if (round.backendAnalysis.playerB && round.backendAnalysis.playerB.errorTypes) {
-                        round.backendAnalysis.playerB.errorTypes.forEach(errorType => {
-                            const translatedError = this.translateErrorType(errorType);
-                            errors[translatedError] = (errors[translatedError] || 0) + 1;
-                        });
+                        safeProcessErrorTypes(round.backendAnalysis.playerB.errorTypes, `Round ${index + 1} PlayerB`);
                     }
                 }
                 // 如果没有后端分析数据，使用原有的逻辑
                 else if (round.analysis && round.analysis.errorType) {
                     errors[round.analysis.errorType] = (errors[round.analysis.errorType] || 0) + 1;
+                    console.log(`📈 Found legacy error: ${round.analysis.errorType} from Round ${index + 1}`);
                 }
             });
         }
         // 如果没有currentGame，使用gameData（兼容性）
         else if (this.gameData && this.gameData.rounds) {
-            this.gameData.rounds.forEach(round => {
+            console.log('📊 Using gameData rounds data');
+            this.gameData.rounds.forEach((round, index) => {
                 if (round.analysis && round.analysis.errorType) {
                     errors[round.analysis.errorType] = (errors[round.analysis.errorType] || 0) + 1;
+                    console.log(`📈 Found gameData error: ${round.analysis.errorType} from Round ${index + 1}`);
                 }
             });
         }
         
+        console.log('📊 Final error stats:', errors);
         return errors;
     }
     
@@ -767,6 +799,10 @@ class ReportManager {
         const suggestionsContainer = document.getElementById('aiSuggestions');
         if (!suggestionsContainer) return;
         
+        console.log('📊 Generating AI suggestions...');
+        console.log('🔍 currentGame backend analysis:', this.currentGame?.backendAnalysis);
+        console.log('🔍 gameData:', this.gameData);
+        
         if (!this.gameData || !this.gameData.rounds || this.gameData.rounds.length === 0) {
             suggestionsContainer.innerHTML = '<div class="suggestion-item">Complete a match to see AI analysis suggestions</div>';
             return;
@@ -776,6 +812,16 @@ class ReportManager {
         if (this.currentGame && this.currentGame.backendAnalysis) {
             console.log('📊 Using backend AI analysis for report');
             this.generateBackendAIAnalysis();
+            return;
+        }
+        
+        // 检查是否有轮次级别的后端分析
+        const hasRoundBackendAnalysis = this.currentGame && this.currentGame.rounds && 
+            this.currentGame.rounds.some(round => round.backendAnalysis);
+        
+        if (hasRoundBackendAnalysis) {
+            console.log('📊 Using round-level backend analysis for report');
+            this.generateRoundBackendAnalysis();
             return;
         }
         
@@ -872,6 +918,120 @@ class ReportManager {
                                 <h5>💡 Improvement Suggestions</h5>
                                 <div class="ai-suggestions-list">
                                     ${analysis.playerB.analysis.map(suggestion => `
+                                        <div class="ai-suggestion-item">
+                                            <span class="suggestion-icon">💡</span>
+                                            <span class="suggestion-text">${this.translateAnalysisSuggestion(suggestion)}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        suggestionsContainer.innerHTML = analysisHTML;
+    }
+    
+    generateRoundBackendAnalysis() {
+        const suggestionsContainer = document.getElementById('aiSuggestions');
+        if (!suggestionsContainer) return;
+        
+        const playerAName = this.getPlayerName('playerA');
+        const playerBName = this.getPlayerName('playerB');
+        
+        // 收集所有轮次的分析数据
+        const playerAErrors = new Set();
+        const playerBErrors = new Set();
+        const playerASuggestions = new Set();
+        const playerBSuggestions = new Set();
+        
+        this.currentGame.rounds.forEach(round => {
+            if (round.backendAnalysis) {
+                // 收集playerA的数据
+                if (round.backendAnalysis.playerA) {
+                    if (Array.isArray(round.backendAnalysis.playerA.errorTypes)) {
+                        round.backendAnalysis.playerA.errorTypes.forEach(error => playerAErrors.add(error));
+                    }
+                    if (Array.isArray(round.backendAnalysis.playerA.analysis)) {
+                        round.backendAnalysis.playerA.analysis.forEach(suggestion => playerASuggestions.add(suggestion));
+                    }
+                }
+                
+                // 收集playerB的数据
+                if (round.backendAnalysis.playerB) {
+                    if (Array.isArray(round.backendAnalysis.playerB.errorTypes)) {
+                        round.backendAnalysis.playerB.errorTypes.forEach(error => playerBErrors.add(error));
+                    }
+                    if (Array.isArray(round.backendAnalysis.playerB.analysis)) {
+                        round.backendAnalysis.playerB.analysis.forEach(suggestion => playerBSuggestions.add(suggestion));
+                    }
+                }
+            }
+        });
+        
+        const analysisHTML = `
+            <div class="backend-ai-analysis">
+                <div class="ai-analysis-header">
+                    <div class="ai-icon">🤖</div>
+                    <h4>AI Analysis Results (Round-based)</h4>
+                    <div class="ai-timestamp">
+                        Analysis Time: ${new Date().toLocaleString()}
+                    </div>
+                </div>
+                
+                <div class="ai-players-analysis">
+                    ${playerAErrors.size > 0 ? `
+                        <div class="ai-player-analysis">
+                            <div class="ai-player-header">
+                                <span class="player-icon">🔵</span>
+                                <span class="player-name">${playerAName}</span>
+                            </div>
+                            
+                            <div class="ai-identified-issues">
+                                <h5>🎯 Identified Issues</h5>
+                                <div class="ai-error-badges">
+                                    ${Array.from(playerAErrors).map(errorType => 
+                                        `<span class="ai-error-badge">${this.translateErrorType(errorType)}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="ai-improvement-suggestions">
+                                <h5>💡 Improvement Suggestions</h5>
+                                <div class="ai-suggestions-list">
+                                    ${Array.from(playerASuggestions).map(suggestion => `
+                                        <div class="ai-suggestion-item">
+                                            <span class="suggestion-icon">💡</span>
+                                            <span class="suggestion-text">${this.translateAnalysisSuggestion(suggestion)}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${playerBErrors.size > 0 ? `
+                        <div class="ai-player-analysis">
+                            <div class="ai-player-header">
+                                <span class="player-icon">🔴</span>
+                                <span class="player-name">${playerBName}</span>
+                            </div>
+                            
+                            <div class="ai-identified-issues">
+                                <h5>🎯 Identified Issues</h5>
+                                <div class="ai-error-badges">
+                                    ${Array.from(playerBErrors).map(errorType => 
+                                        `<span class="ai-error-badge">${this.translateErrorType(errorType)}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="ai-improvement-suggestions">
+                                <h5>💡 Improvement Suggestions</h5>
+                                <div class="ai-suggestions-list">
+                                    ${Array.from(playerBSuggestions).map(suggestion => `
                                         <div class="ai-suggestion-item">
                                             <span class="suggestion-icon">💡</span>
                                             <span class="suggestion-text">${this.translateAnalysisSuggestion(suggestion)}</span>
