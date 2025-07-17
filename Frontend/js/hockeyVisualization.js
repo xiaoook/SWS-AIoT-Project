@@ -336,8 +336,8 @@ class HockeyVisualization {
         // Check basic collision detection for visual feedback
         this.checkObjectCollisions();
         
-        // Check goal scoring
-        this.checkGoalScoring();
+        // Goal scoring removed - now handled completely by backend WebSocket messages
+        // this.checkGoalScoring(); // Removed: no longer depend on frontend position detection
     }
 
     // Collision simulation removed - Data comes from MQTT sensors only
@@ -457,8 +457,15 @@ class HockeyVisualization {
             // Objects are colliding
             console.log(`⚡ Collision detected: ${obj1Name} ↔ ${obj2Name} (distance: ${distance.toFixed(2)}cm, min: ${minDistance.toFixed(2)}cm)`);
             
-            // Add visual feedback
-            this.addCollisionEffect(obj1Name, obj2Name);
+            // Check if this is a pusher-puck collision for special effect
+            if ((obj1Name === 'puck' && (obj2Name === 'pusherA' || obj2Name === 'pusherB')) ||
+                (obj2Name === 'puck' && (obj1Name === 'pusherA' || obj1Name === 'pusherB'))) {
+                // Pusher-puck collision - add enhanced effect
+                this.addPusherPuckCollisionEffect(obj1Name, obj2Name, pos1, pos2);
+            } else {
+                // Regular collision - add standard effect
+                this.addCollisionEffect(obj1Name, obj2Name);
+            }
             
             // Separate objects to prevent overlap (simple separation)
             const separationDistance = (minDistance - distance) / 2;
@@ -477,7 +484,104 @@ class HockeyVisualization {
         }
     }
     
-    // Add visual collision effect
+    // Add enhanced pusher-puck collision effect
+    addPusherPuckCollisionEffect(obj1Name, obj2Name, pos1, pos2) {
+        const puckElement = this.puck;
+        const pusherElement = obj1Name === 'puck' ? this[obj2Name] : this[obj1Name];
+        const puckPos = obj1Name === 'puck' ? pos1 : pos2;
+        const pusherPos = obj1Name === 'puck' ? pos2 : pos1;
+        
+        // Add collision effect to both objects
+        if (puckElement) {
+            puckElement.classList.add('puck-collision');
+            setTimeout(() => {
+                puckElement.classList.remove('puck-collision');
+            }, 400);
+        }
+        
+        if (pusherElement) {
+            pusherElement.classList.add('pusher-collision');
+            setTimeout(() => {
+                pusherElement.classList.remove('pusher-collision');
+            }, 400);
+        }
+        
+        // Create collision spark effect at impact point
+        this.createCollisionSparkEffect(puckPos, pusherPos);
+        
+        // Add screen shake effect for more dramatic feedback
+        this.addScreenShakeEffect();
+        
+        console.log(`🏒 Pusher-Puck collision effect triggered!`);
+    }
+    
+    // Create collision spark effect at impact point
+    createCollisionSparkEffect(puckPos, pusherPos) {
+        // Calculate impact point (between puck and pusher)
+        const impactX = (puckPos.x + pusherPos.x) / 2;
+        const impactY = (puckPos.y + pusherPos.y) / 2;
+        
+        // Convert to display coordinates
+        const displayPos = this.realToDisplayCoordinates(impactX, impactY);
+        
+        // Create spark container
+        const sparkContainer = document.createElement('div');
+        sparkContainer.className = 'collision-sparks';
+        sparkContainer.style.position = 'absolute';
+        sparkContainer.style.left = displayPos.x + 'px';
+        sparkContainer.style.top = displayPos.y + 'px';
+        sparkContainer.style.pointerEvents = 'none';
+        sparkContainer.style.zIndex = '20';
+        
+        // Create multiple sparks
+        for (let i = 0; i < 8; i++) {
+            const spark = document.createElement('div');
+            spark.className = 'collision-spark';
+            spark.style.position = 'absolute';
+            spark.style.width = '3px';
+            spark.style.height = '3px';
+            spark.style.backgroundColor = '#FFD700';
+            spark.style.borderRadius = '50%';
+            spark.style.boxShadow = '0 0 6px #FFD700';
+            
+            // Random direction for spark
+            const angle = (i * 45) * Math.PI / 180;
+            const distance = 20 + Math.random() * 15;
+            const endX = Math.cos(angle) * distance;
+            const endY = Math.sin(angle) * distance;
+            
+            spark.style.animation = `collisionSparkFly 0.6s ease-out forwards`;
+            spark.style.setProperty('--endX', `${endX}px`);
+            spark.style.setProperty('--endY', `${endY}px`);
+            
+            sparkContainer.appendChild(spark);
+        }
+        
+        // Add to table surface
+        if (this.tableSurface) {
+            this.tableSurface.appendChild(sparkContainer);
+        }
+        
+        // Remove spark container after animation
+        setTimeout(() => {
+            if (sparkContainer && sparkContainer.parentNode) {
+                sparkContainer.parentNode.removeChild(sparkContainer);
+            }
+        }, 600);
+    }
+    
+    // Add screen shake effect
+    addScreenShakeEffect() {
+        const hockeyTable = document.getElementById('hockeyTable');
+        if (hockeyTable) {
+            hockeyTable.classList.add('screen-shake');
+            setTimeout(() => {
+                hockeyTable.classList.remove('screen-shake');
+            }, 300);
+        }
+    }
+    
+    // Add visual collision effect (for non-pusher-puck collisions)
     addCollisionEffect(obj1Name, obj2Name) {
         const obj1Element = this[obj1Name];
         const obj2Element = this[obj2Name];
@@ -577,11 +681,15 @@ class HockeyVisualization {
     isPusherInCorrectHalf(pusherName, position) {
         const centerX = this.halfCourt.centerX;
         
+        // After 180-degree rotation, the half-court logic needs to be adjusted
+        // to match the backend detection logic
         if (pusherName === 'pusherA') {
-            // PusherA (paddle 0) should be in left half (x < centerX)
+            // PusherA (paddle 0) should be in left half after rotation
+            // Since coordinates are rotated, we still check x < centerX 
             return position.x < centerX;
         } else if (pusherName === 'pusherB') {
-            // PusherB (paddle 1) should be in right half (x >= centerX)
+            // PusherB (paddle 1) should be in right half after rotation
+            // Since coordinates are rotated, we still check x >= centerX
             return position.x >= centerX;
         }
         
@@ -1309,10 +1417,18 @@ class HockeyVisualization {
             console.warn(`⚠️ MQTT coordinates clamped: (${mqttX}, ${mqttY}) → (${clampedX}, ${clampedY})`);
         }
         
-        // Convert to real-world coordinates
+        // Convert to real-world coordinates with 180-degree rotation
         // Backend uses 810x420 coordinate system, convert to 43x26cm real dimensions
-        const realX = (clampedX / 810) * this.realDimensions.tableLength;
-        const realY = (clampedY / 420) * this.realDimensions.tableWidth;
+        // Apply 180-degree rotation: x' = max_x - x, y' = max_y - y
+        const normalizedX = clampedX / 810;
+        const normalizedY = clampedY / 420;
+        
+        // 180-degree rotation: flip both x and y coordinates
+        const rotatedX = 1 - normalizedX;
+        const rotatedY = 1 - normalizedY;
+        
+        const realX = rotatedX * this.realDimensions.tableLength;
+        const realY = rotatedY * this.realDimensions.tableWidth;
         
         // Ensure the resulting coordinates are within table bounds
         const boundedX = Math.max(0, Math.min(this.realDimensions.tableLength, realX));
@@ -1646,6 +1762,165 @@ class HockeyVisualization {
         this.velocities.puck = { x: 0, y: 0 }; // Reset velocity when puck is updated
         this.updateVisualPositions(); // Update visual position immediately
     }
+     // Test 180-degree rotation
+     test180DegreeRotation() {
+         console.log('🧪 Testing 180-degree rotation...');
+         
+         // Test corner positions to verify rotation
+         const testMQTTPositions = [
+             { mqtt: { x: 0, y: 0 }, expected: { x: 43, y: 26 }, description: 'Top-left corner' },
+             { mqtt: { x: 810, y: 0 }, expected: { x: 0, y: 26 }, description: 'Top-right corner' },
+             { mqtt: { x: 0, y: 420 }, expected: { x: 43, y: 0 }, description: 'Bottom-left corner' },
+             { mqtt: { x: 810, y: 420 }, expected: { x: 0, y: 0 }, description: 'Bottom-right corner' },
+             { mqtt: { x: 405, y: 210 }, expected: { x: 21.5, y: 13 }, description: 'Center' }
+         ];
+         
+         testMQTTPositions.forEach(test => {
+             const result = this.mqttToRealCoordinates(test.mqtt.x, test.mqtt.y);
+             console.log(`📍 ${test.description}: MQTT(${test.mqtt.x}, ${test.mqtt.y}) → Real(${result.x.toFixed(1)}, ${result.y.toFixed(1)}) [Expected: (${test.expected.x}, ${test.expected.y})]`);
+         });
+     }
+     
+     // Test backend-based goal events
+     testBackendGoalEvents() {
+         console.log('🧪 Testing backend-based goal events...');
+         
+         // Test left goal
+         setTimeout(() => {
+             console.log('⚽ Simulating left goal from backend...');
+             this.handleGoalEvent({ side: 'left' });
+         }, 1000);
+         
+         // Test right goal
+         setTimeout(() => {
+             console.log('⚽ Simulating right goal from backend...');
+             this.handleGoalEvent({ side: 'right' });
+         }, 4000);
+     }
+     
+     // Test coordinate system consistency
+     testCoordinateSystemConsistency() {
+         console.log('🧪 Testing coordinate system consistency...');
+         
+         // Test pusher positions after rotation
+         const testPusherPositions = [
+             { mqtt: { x: 200, y: 210 }, pusher: 'pusherA', description: 'PusherA test position' },
+             { mqtt: { x: 600, y: 210 }, pusher: 'pusherB', description: 'PusherB test position' }
+         ];
+         
+         testPusherPositions.forEach(test => {
+             const realPos = this.mqttToRealCoordinates(test.mqtt.x, test.mqtt.y);
+             const isInCorrectHalf = this.isPusherInCorrectHalf(test.pusher, realPos);
+             console.log(`📍 ${test.description}: MQTT(${test.mqtt.x}, ${test.mqtt.y}) → Real(${realPos.x.toFixed(1)}, ${realPos.y.toFixed(1)}) - In correct half: ${isInCorrectHalf}`);
+         });
+     }
+     
+     // Comprehensive test of rotation and backend integration
+     testRotationAndBackendIntegration() {
+         console.log('🧪 Starting comprehensive test of rotation and backend integration...');
+         
+         // Test 180-degree rotation
+         this.test180DegreeRotation();
+         
+         // Test coordinate system consistency
+         setTimeout(() => {
+             this.testCoordinateSystemConsistency();
+         }, 2000);
+         
+         // Test backend goal events
+         setTimeout(() => {
+             this.testBackendGoalEvents();
+         }, 4000);
+         
+         // Test all features
+         setTimeout(() => {
+             this.testAllNewFeatures();
+         }, 10000);
+         
+         console.log('✅ All rotation and backend integration tests scheduled');
+     }
+     
+     // Test pusher-puck collision effects
+     testPusherPuckCollision() {
+         console.log('🧪 Testing pusher-puck collision effects...');
+         
+         // Test collision between pusherA and puck
+         setTimeout(() => {
+             console.log('⚡ Testing pusherA-puck collision...');
+             // Move pusherA close to puck
+             this.currentPositions.pusherA = { x: 20, y: 13 };
+             this.currentPositions.puck = { x: 22, y: 13 };
+             this.updateVisualPositions();
+             
+             // Force collision check
+             this.checkObjectCollisions();
+         }, 1000);
+         
+         // Test collision between pusherB and puck
+         setTimeout(() => {
+             console.log('⚡ Testing pusherB-puck collision...');
+             // Move pusherB close to puck
+             this.currentPositions.pusherB = { x: 24, y: 13 };
+             this.currentPositions.puck = { x: 22, y: 13 };
+             this.updateVisualPositions();
+             
+             // Force collision check
+             this.checkObjectCollisions();
+         }, 3000);
+         
+         // Reset positions
+         setTimeout(() => {
+             console.log('🔄 Resetting positions...');
+             this.setInitialPositions();
+             this.updateVisualPositions();
+         }, 5000);
+     }
+     
+     // Test all collision effects
+     testAllCollisionEffects() {
+         console.log('🧪 Testing all collision effects...');
+         
+         // Test pusher-puck collisions
+         this.testPusherPuckCollision();
+         
+         // Test pusher-pusher collision
+         setTimeout(() => {
+             console.log('⚡ Testing pusher-pusher collision...');
+             this.currentPositions.pusherA = { x: 20, y: 13 };
+             this.currentPositions.pusherB = { x: 22, y: 13 };
+             this.updateVisualPositions();
+             this.checkObjectCollisions();
+         }, 7000);
+         
+         // Reset after all tests
+         setTimeout(() => {
+             console.log('✅ All collision tests completed - resetting positions');
+             this.setInitialPositions();
+             this.updateVisualPositions();
+         }, 9000);
+     }
+     
+     // Simulate collision for testing
+     simulatePusherPuckCollision(pusherName) {
+         console.log(`🧪 Simulating ${pusherName}-puck collision...`);
+         
+         const pusherPos = this.currentPositions[pusherName];
+         const puckPos = this.currentPositions.puck;
+         
+         // Trigger collision effect directly
+         this.addPusherPuckCollisionEffect(pusherName, 'puck', pusherPos, puckPos);
+     }
+     
+     // Get collision statistics
+     getCollisionStats() {
+         return {
+             pusherRadius: this.display.pusherRadius,
+             puckRadius: this.display.puckRadius,
+             collisionDistance: this.display.pusherRadius + this.display.puckRadius,
+             currentPositions: this.currentPositions,
+             collisionEffectsEnabled: true
+         };
+     }
 }
 
         // Initialize when DOM is loaded
