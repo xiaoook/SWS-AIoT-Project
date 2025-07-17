@@ -29,9 +29,9 @@ def new_game_analysis():
     data = request.get_json()
     logger.debug(f"New game analysis request: {data}")
     gid = data.get('gid')
-    error_type_a = data.get('A_type').capitalize()
+    error_type_a = data.get('A_type')
     analysis_a = data.get('A_analysis')
-    error_type_b = data.get('B_type').capitalize()
+    error_type_b = data.get('B_type')
     analysis_b = data.get('B_analysis')
     if gid is None:
         return jsonify({
