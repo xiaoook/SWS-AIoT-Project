@@ -310,30 +310,47 @@ class ReportManager {
                         rounds: formattedRounds
                     };
                     
-                    // 转换为报告格式
-                    this.gameData = this.convertGameToReportFormat(this.currentGame);
-                    
-                    console.log(`🎯 Report data prepared for ${gameId} with ${formattedRounds.length} rounds`);
-                } else {
-                    console.warn('No rounds data received from backend, using local data');
-                    this.currentGame = game;
-                    this.gameData = this.convertGameToReportFormat(game);
-                }
+                                // 转换为报告格式
+            this.gameData = this.convertGameToReportFormat(this.currentGame);
+            
+            // 加载后端分析数据
+            await this.loadBackendAnalysis(databaseGameId);
+            
+            console.log(`🎯 Report data prepared for ${gameId} with ${formattedRounds.length} rounds`);
+                            } else {
+                console.warn('No rounds data received from backend, using local data');
+                this.currentGame = game;
+                this.gameData = this.convertGameToReportFormat(game);
+                // 仍然尝试加载分析数据
+                await this.loadBackendAnalysis(databaseGameId);
+            }
             } else if (roundsResponse.status === 404) {
                 // 404错误 - 轮次数据不存在，这是正常情况
                 console.log(`ℹ️ No rounds found for report ${gameId} (Database ID: ${databaseGameId}) - 404`);
                 this.currentGame = game;
                 this.gameData = this.convertGameToReportFormat(game);
+                // 仍然尝试加载分析数据
+                await this.loadBackendAnalysis(databaseGameId);
             } else {
                 console.error(`Failed to load rounds from backend: HTTP ${roundsResponse.status}, using local data`);
                 this.currentGame = game;
                 this.gameData = this.convertGameToReportFormat(game);
+                // 仍然尝试加载分析数据
+                await this.loadBackendAnalysis(databaseGameId);
             }
             
         } catch (error) {
             console.error('Error loading game report:', error);
             this.currentGame = game;
             this.gameData = this.convertGameToReportFormat(game);
+            // 即使出错也尝试加载分析数据
+            if (databaseGameId) {
+                try {
+                    await this.loadBackendAnalysis(databaseGameId);
+                } catch (analysisError) {
+                    console.warn('Failed to load analysis data after error:', analysisError);
+                }
+            }
         } finally {
             // 恢复按钮状态
             if (generateBtn) {
@@ -343,6 +360,120 @@ class ReportManager {
         }
         
         this.generateReport();
+    }
+    
+    async loadBackendAnalysis(databaseGameId) {
+        try {
+            console.log(`📊 Loading backend analysis for report game ${databaseGameId}`);
+            
+            // 加载游戏级别分析
+            await this.loadGameAnalysis_Backend(databaseGameId);
+            
+            // 加载轮次级别分析
+            await this.loadRoundAnalysis_Backend(databaseGameId);
+            
+        } catch (error) {
+            console.warn('⚠️ Failed to load backend analysis for report:', error);
+        }
+    }
+    
+    async loadGameAnalysis_Backend(databaseGameId) {
+        try {
+            const response = await fetch(`${CONFIG.API_URLS.ANALYSIS_GAME}?gid=${databaseGameId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success' && data.analysis) {
+                    console.log(`✅ Loaded game analysis for report game ${databaseGameId}`);
+                    
+                    this.currentGame.backendAnalysis = {
+                        playerA: {
+                            errorTypes: data.analysis.A_type || [],
+                            analysis: data.analysis.A_analysis || [],
+                            timestamp: new Date().toISOString()
+                        },
+                        playerB: {
+                            errorTypes: data.analysis.B_type || [],
+                            analysis: data.analysis.B_analysis || [],
+                            timestamp: new Date().toISOString()
+                        }
+                    };
+                } else {
+                    console.log(`ℹ️ No game analysis data for report: ${data.message || 'Unknown error'}`);
+                }
+            } else if (response.status === 404) {
+                console.log(`ℹ️ No game analysis found for report (404)`);
+            } else {
+                console.log(`⚠️ Game analysis request failed for report: HTTP ${response.status}`);
+            }
+            
+        } catch (error) {
+            console.warn('⚠️ Failed to load game analysis for report:', error);
+        }
+    }
+    
+    async loadRoundAnalysis_Backend(databaseGameId) {
+        try {
+            const response = await fetch(CONFIG.getRoundAnalysisUrl(databaseGameId), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success' && data.analyses) {
+                    console.log(`✅ Loaded ${data.analyses.length} round analyses for report`);
+                    
+                    if (this.currentGame && this.currentGame.rounds) {
+                        data.analyses.forEach(analysis => {
+                            const roundId = analysis.rid;
+                            const gameRound = this.currentGame.rounds.find(round => round.id === roundId);
+                            
+                            if (gameRound) {
+                                gameRound.backendAnalysis = {
+                                    playerA: {
+                                        errorTypes: analysis.A_type || [],
+                                        analysis: analysis.A_analysis || [],
+                                        timestamp: new Date().toISOString()
+                                    },
+                                    playerB: {
+                                        errorTypes: analysis.B_type || [],
+                                        analysis: analysis.B_analysis || [],
+                                        timestamp: new Date().toISOString()
+                                    }
+                                };
+                                
+                                // 更新round的analysis对象以包含错误类型信息
+                                if (analysis.A_type && analysis.A_type.length > 0) {
+                                    gameRound.analysis.errorType = analysis.A_type[0]; // 使用第一个错误类型
+                                }
+                                if (analysis.B_type && analysis.B_type.length > 0) {
+                                    if (!gameRound.analysis.errorType) {
+                                        gameRound.analysis.errorType = analysis.B_type[0];
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    console.log(`ℹ️ No round analysis data for report: ${data.message || 'Unknown error'}`);
+                }
+            } else if (response.status === 404) {
+                console.log(`ℹ️ No round analysis found for report (404)`);
+            } else {
+                console.log(`⚠️ Round analysis request failed for report: HTTP ${response.status}`);
+            }
+            
+        } catch (error) {
+            console.warn('⚠️ Failed to load round analysis for report:', error);
+        }
     }
     
     convertGameToReportFormat(game) {
@@ -431,11 +562,40 @@ class ReportManager {
     calculateErrorStats() {
         const errors = {};
         
-        this.gameData.rounds.forEach(round => {
-            if (round.analysis && round.analysis.errorType) {
-                errors[round.analysis.errorType] = (errors[round.analysis.errorType] || 0) + 1;
-            }
-        });
+        // 优先使用后端分析数据
+        if (this.currentGame && this.currentGame.rounds) {
+            this.currentGame.rounds.forEach(round => {
+                if (round.backendAnalysis) {
+                    // 收集playerA的错误类型
+                    if (round.backendAnalysis.playerA && round.backendAnalysis.playerA.errorTypes) {
+                        round.backendAnalysis.playerA.errorTypes.forEach(errorType => {
+                            const translatedError = this.translateErrorType(errorType);
+                            errors[translatedError] = (errors[translatedError] || 0) + 1;
+                        });
+                    }
+                    
+                    // 收集playerB的错误类型
+                    if (round.backendAnalysis.playerB && round.backendAnalysis.playerB.errorTypes) {
+                        round.backendAnalysis.playerB.errorTypes.forEach(errorType => {
+                            const translatedError = this.translateErrorType(errorType);
+                            errors[translatedError] = (errors[translatedError] || 0) + 1;
+                        });
+                    }
+                }
+                // 如果没有后端分析数据，使用原有的逻辑
+                else if (round.analysis && round.analysis.errorType) {
+                    errors[round.analysis.errorType] = (errors[round.analysis.errorType] || 0) + 1;
+                }
+            });
+        }
+        // 如果没有currentGame，使用gameData（兼容性）
+        else if (this.gameData && this.gameData.rounds) {
+            this.gameData.rounds.forEach(round => {
+                if (round.analysis && round.analysis.errorType) {
+                    errors[round.analysis.errorType] = (errors[round.analysis.errorType] || 0) + 1;
+                }
+            });
+        }
         
         return errors;
     }
@@ -614,6 +774,7 @@ class ReportManager {
         
         // 优先显示后端AI分析结果
         if (this.currentGame && this.currentGame.backendAnalysis) {
+            console.log('📊 Using backend AI analysis for report');
             this.generateBackendAIAnalysis();
             return;
         }
@@ -730,6 +891,13 @@ class ReportManager {
     // 翻译错误类型 - 后端分析器的5种错误类型
     translateErrorType(errorType) {
         const errorTypeMap = {
+            'Slow Reaction': 'Slow Reaction',
+            'Low Activity': 'Low Activity',
+            'Weak Defense': 'Weak Defense',
+            'Poor Alignment': 'Poor Alignment',
+            'Coverage Gap': 'Coverage Gap',
+            
+            // 兼容下划线格式
             'slow_reaction': 'Slow Reaction',
             'low_activity': 'Low Activity',
             'weak_defense': 'Weak Defense',
@@ -737,7 +905,16 @@ class ReportManager {
             'coverage_gap': 'Coverage Gap'
         };
         
-        return errorTypeMap[errorType] || errorType;
+        return errorTypeMap[errorType] || this.formatErrorTypeName(errorType);
+    }
+    
+    formatErrorTypeName(errorType) {
+        if (typeof errorType !== 'string') return 'Unknown';
+        
+        return errorType.replace(/_/g, ' ')
+                        .split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                        .join(' ');
     }
     
     // 翻译分析建议 - 后端分析器的5种建议
@@ -750,7 +927,13 @@ class ReportManager {
             'Increase your coverage area to better influence the game.': 'Increase your coverage area to better influence the game'
         };
         
-        return suggestionMap[suggestion] || suggestion;
+        return suggestionMap[suggestion] || this.formatSuggestionText(suggestion);
+    }
+    
+    formatSuggestionText(suggestion) {
+        if (typeof suggestion !== 'string') return 'Continue practicing';
+        
+        return suggestion.charAt(0).toUpperCase() + suggestion.slice(1);
     }
     
     // 获取玩家名称

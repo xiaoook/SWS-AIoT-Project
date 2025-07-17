@@ -4693,10 +4693,11 @@ body {
 }
 
 .analysis-header {
-    background: linear-gradient(135deg, #495057, #343a40);
-    color: white;
+    background: linear-gradient(135deg, #f8f9fa, #e3f2fd);
+    color: #495057;
     padding: 1.5rem 2rem;
     border-radius: 15px 15px 0 0;
+    border: 1px solid #dee2e6;
 }
 
 .analysis-header h4 {
@@ -7233,17 +7234,26 @@ body {
 }
 
 .error-type-badge {
-    background: var(--apple-red);
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
     color: white;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
     font-weight: 500;
+    display: inline-block;
+    margin: 3px 6px 3px 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
 }
 
 .no-errors {
-    color: var(--apple-green);
+    color: #28a745;
     font-weight: 500;
+    font-style: italic;
+    padding: 4px 8px;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-radius: 8px;
+    border: 1px solid #b8dacc;
 }
 
 .analysis-timestamp {
@@ -7522,12 +7532,15 @@ body {
 }
 
 .no-issues {
-    text-align: center;
-    color: var(--apple-green);
+    color: #28a745;
     font-weight: 500;
-    padding: 20px;
-    background: linear-gradient(135deg, #f0fff0 0%, #e6ffe6 100%);
+    font-style: italic;
+    padding: 4px 8px;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
     border-radius: 8px;
+    border: 1px solid #b8dacc;
+    display: inline-block;
+    margin: 3px 6px 3px 0;
     border: 1px solid #b3ffb3;
 }
 
@@ -8327,5 +8340,440 @@ body {
     .round-error-badge {
         font-size: 11px;
         padding: 4px 8px;
+    }
+}
+
+/* Integrated Analysis View Styles */
+.integrated-analysis-view {
+    background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    padding: 28px;
+    margin-bottom: 24px;
+    border: 1px solid #e8f0fe;
+}
+
+.analysis-header {
+    background: linear-gradient(135deg, #f8f9fa, #e8f4f8);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.analysis-header h3 {
+    margin: 0 0 16px 0;
+    color: #333;
+    font-size: 24px;
+}
+
+.analysis-summary {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.summary-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #ffffff, #f8f9fa);
+    border-radius: 10px;
+    border: 1px solid #e3f2fd;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.summary-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.summary-value {
+    font-weight: 700;
+    color: #4a90e2;
+}
+
+/* Game Level Analysis Section */
+.game-level-section {
+    margin-bottom: 32px;
+    padding: 24px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 12px;
+    border: 1px solid #e3f2fd;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.game-level-section h4 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.game-level-players {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.game-level-player {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.game-level-player .player-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-weight: 600;
+    color: #495057;
+    font-size: 16px;
+}
+
+.game-level-player .player-analysis-content {
+    font-size: 14px;
+}
+
+/* Player Analysis Section */
+.player-analysis-section {
+    margin-bottom: 32px;
+    padding: 24px;
+    background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
+    border-radius: 12px;
+    border: 1px solid #e3f2fd;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.player-analysis-section h4 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.player-summaries {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.player-summary {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid #e3f2fd;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.player-summary:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.player-summary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #4a90e2, #357abd);
+}
+
+.player-summary .player-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    font-weight: 700;
+    color: #333;
+    font-size: 18px;
+    text-align: center;
+    padding: 12px 0;
+    border-bottom: 2px solid #e3f2fd;
+}
+
+.player-summary .player-header .player-icon {
+    font-size: 24px;
+    padding: 8px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.player-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.player-stats .stat-item:last-child {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 16px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+}
+
+.player-stats .stat-item:last-child .stat-label {
+    margin-bottom: 12px;
+}
+
+.player-stats .stat-item:last-child .stat-value {
+    font-size: 1rem;
+    font-weight: 500;
+    min-height: auto;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.stat-label {
+    font-weight: 500;
+    color: #6c757d;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    font-weight: 700;
+    color: #4a90e2;
+    font-size: 1.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    min-height: 36px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Round Analysis Section */
+.round-analysis-section {
+    margin-bottom: 32px;
+}
+
+.round-analysis-section h4 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.rounds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.round-analysis-card {
+    background: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.round-analysis-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.round-card-header {
+    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+    color: white;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+}
+
+.round-number {
+    font-size: 14px;
+}
+
+.round-score {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.round-winner {
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.round-card-content {
+    padding: 16px;
+}
+
+.round-player-analysis {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.round-player {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 12px;
+    border: 1px solid #e9ecef;
+}
+
+.round-player-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #495057;
+    font-size: 14px;
+}
+
+.round-player-errors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    min-height: 32px;
+}
+
+.round-error-badge {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: inline-block;
+    margin: 2px 4px 2px 0;
+    white-space: nowrap;
+}
+
+.no-errors {
+    color: #28a745;
+    font-weight: 500;
+    font-size: 12px;
+}
+
+.no-round-analysis {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+/* Responsive design for integrated view */
+@media (max-width: 768px) {
+    .integrated-analysis-view {
+        padding: 16px;
+    }
+    
+    .analysis-header {
+        padding: 20px;
+    }
+    
+    .analysis-summary {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .summary-item {
+        padding: 10px 16px;
+    }
+    
+    .game-level-players,
+    .player-summaries {
+        grid-template-columns: 1fr;
+    }
+    
+    .player-summary {
+        padding: 16px;
+        border-radius: 12px;
+    }
+    
+    .player-summary .player-header {
+        font-size: 16px;
+        margin-bottom: 16px;
+        padding: 8px 0;
+    }
+    
+    .player-summary .player-header .player-icon {
+        font-size: 20px;
+        padding: 6px;
+    }
+    
+    .player-stats {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .stat-item {
+        padding: 12px;
+        margin-bottom: 8px;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+        margin-bottom: 6px;
+    }
+    
+    .stat-value {
+        font-size: 1.4rem;
+        min-height: 28px;
+    }
+    
+    .player-stats .stat-item:last-child {
+        padding: 12px;
+    }
+    
+    .player-stats .stat-item:last-child .stat-label {
+        margin-bottom: 8px;
+    }
+    
+    .error-type-badge {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+        margin: 2px 4px 2px 0;
+    }
+    
+    .rounds-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .round-card-header {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+    }
+    
+    .round-player-analysis {
+        gap: 12px;
     }
 }
