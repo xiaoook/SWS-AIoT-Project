@@ -2,7 +2,7 @@ from pathlib import Path
 
 # For app.run
 BACKEND_URL = '0.0.0.0'
-BACKEND_PORT = 45678
+BACKEND_PORT = 3000
 
 # For MQTT
 BROKER_URL = '0.0.0.0'

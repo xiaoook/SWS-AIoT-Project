@@ -503,7 +503,7 @@ class HockeyVisualization {
             this.puckState.isDetected = false;
             this.puckState.lastDetectedTime = Date.now();
             
-            // Use a timeout to avoid flickering when puck briefly disappears
+            // Use a shorter timeout to make disappearance more responsive
             if (this.puckState.disappearanceTimeout) {
                 clearTimeout(this.puckState.disappearanceTimeout);
             }
@@ -511,7 +511,8 @@ class HockeyVisualization {
             this.puckState.disappearanceTimeout = setTimeout(() => {
                 this.puckState.isVisible = false;
                 this.updatePuckVisibility();
-            }, 500); // 500ms delay before hiding
+                console.log('🫥 Puck hidden after timeout');
+            }, 200); // Shorter delay for more responsive hiding
         }
     }
 
@@ -530,6 +531,14 @@ class HockeyVisualization {
             // Show puck immediately
             this.puckState.isVisible = true;
             this.updatePuckVisibility();
+            
+            console.log('👁️ Puck detected - showing immediately');
+        } else if (!this.puckState.isVisible) {
+            // Puck was detected but hidden - show it immediately
+            this.puckState.isVisible = true;
+            this.updatePuckVisibility();
+            
+            console.log('👁️ Puck was hidden but detected - showing immediately');
         }
     }
 
@@ -650,36 +659,142 @@ class HockeyVisualization {
         };
     }
     
-
+    // Test enhanced goal effects
+    testGoalEffects() {
+        console.log('🧪 Testing enhanced goal effects...');
+        
+        // Test left goal
+        setTimeout(() => {
+            console.log('⚽ Testing left goal effect...');
+            this.handleGoalScored('left', this.currentPositions.puck);
+        }, 1000);
+        
+        // Test right goal
+        setTimeout(() => {
+            console.log('⚽ Testing right goal effect...');
+            this.handleGoalScored('right', this.currentPositions.puck);
+        }, 5000);
+    }
     
+    // Test puck immediate position updates
+    testPuckPositionUpdates() {
+        console.log('🧪 Testing puck immediate position updates...');
+        
+        // Test immediate position update
+        const testPositions = [
+            { x: 10, y: 10 },
+            { x: 30, y: 15 },
+            { x: 21.5, y: 13 },
+            { x: 15, y: 20 }
+        ];
+        
+        testPositions.forEach((pos, index) => {
+            setTimeout(() => {
+                console.log(`📍 Testing position ${index + 1}: (${pos.x}, ${pos.y})`);
+                this.updatePuckPositionImmediate(pos);
+            }, index * 1000);
+        });
+    }
+    
+    // Test puck visibility control
+    testPuckVisibility() {
+        console.log('🧪 Testing puck visibility control...');
+        
+        // Test disappearance
+        setTimeout(() => {
+            console.log('🫥 Testing puck disappearance...');
+            this.handlePuckDisappearance();
+        }, 1000);
+        
+        // Test reappearance
+        setTimeout(() => {
+            console.log('👁️ Testing puck reappearance...');
+            this.handlePuckAppearance();
+        }, 3000);
+    }
+    
+    // Comprehensive test of all new features
+    testAllNewFeatures() {
+        console.log('🧪 Starting comprehensive test of all new features...');
+        
+        // Test half-court control
+        this.testHalfCourtControl();
+        
+        // Test goal effects after half-court test
+        setTimeout(() => {
+            this.testGoalEffects();
+        }, 8000);
+        
+        // Test puck position updates
+        setTimeout(() => {
+            this.testPuckPositionUpdates();
+        }, 15000);
+        
+        // Test puck visibility
+        setTimeout(() => {
+            this.testPuckVisibility();
+        }, 20000);
+        
+        console.log('✅ All tests scheduled - check console for results');
+    }
+    
+    // Get current system status
+    getSystemStatus() {
+        return {
+            puckState: this.puckState,
+            pusherState: this.pusherState,
+            currentPositions: this.currentPositions,
+            gameState: this.gameState,
+            halfCourtStatus: this.getHalfCourtStatus(),
+            isWebSocketConnected: this.isWebSocketConnected,
+            isInitialized: this.isInitialized,
+            isPaused: this.isPaused
+        };
+    }
+
     // Handle goal scored with realistic animation
     handleGoalScored(goalSide, goalPosition) {
         console.log(`🥅 Goal scored! Side: ${goalSide}, Position:`, goalPosition);
         
-        // Create goal effect animation
-        this.createGoalEffect(goalSide, goalPosition);
+        // Create enhanced goal effect animation
+        this.createEnhancedGoalEffect(goalSide, goalPosition);
         
-        // Hide puck after goal
-        setTimeout(() => {
-            this.puckState.isVisible = false;
-            this.updatePuckVisibility();
-            console.log('🏒 Puck hidden after goal');
-        }, 1000); // Hide after 1 second animation
-        
-        // Reset puck position to center (for when it reappears)
-        setTimeout(() => {
-            this.resetPuckToCenter();
-        }, 2000);
+        // Don't hide puck immediately - let backend control puck visibility
+        // The backend will send null for puck position when it's not detected
+        console.log('🏒 Goal scored - waiting for backend to control puck visibility');
     }
     
-    // Create visual goal effect
-    createGoalEffect(goalSide, goalPosition) {
+    // Create enhanced visual goal effect
+    createEnhancedGoalEffect(goalSide, goalPosition) {
         if (!this.puck) return;
         
-        // Add goal effect class for animation
-        this.puck.classList.add('goal-effect');
+        console.log(`✨ Creating enhanced goal effect for ${goalSide} side`);
         
-        // Animate puck towards goal
+        // Add enhanced goal effect class for animation
+        this.puck.classList.add('puck-goal', 'goal-effect');
+        
+        // Create goal celebration container
+        const celebrationContainer = document.createElement('div');
+        celebrationContainer.className = 'goal-celebration';
+        celebrationContainer.style.position = 'absolute';
+        celebrationContainer.style.left = '50%';
+        celebrationContainer.style.top = '50%';
+        celebrationContainer.style.transform = 'translate(-50%, -50%)';
+        celebrationContainer.style.pointerEvents = 'none';
+        celebrationContainer.style.zIndex = '30';
+        celebrationContainer.style.fontSize = '24px';
+        celebrationContainer.style.fontWeight = 'bold';
+        celebrationContainer.style.color = 'gold';
+        celebrationContainer.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
+        celebrationContainer.style.animation = 'goalText 2s ease-out forwards';
+        celebrationContainer.textContent = 'GOAL!';
+        
+        // Add celebration to table surface
+        if (this.tableSurface) {
+            this.tableSurface.appendChild(celebrationContainer);
+        }
+        
+        // Animate puck towards goal with enhanced effect
         const goalElement = goalSide === 'left' ? this.goalLeft : this.goalRight;
         if (goalElement) {
             const goalRect = goalElement.getBoundingClientRect();
@@ -689,77 +804,109 @@ class HockeyVisualization {
             const goalX = goalRect.left - tableRect.left + goalRect.width / 2;
             const goalY = goalRect.top - tableRect.top + goalRect.height / 2;
             
-            // Animate puck to goal
-            this.puck.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            // Enhanced puck animation to goal
+            this.puck.style.transition = 'all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
             this.puck.style.left = goalX + 'px';
             this.puck.style.top = goalY + 'px';
-            this.puck.style.transform = 'scale(0.8)';
+            this.puck.style.transform = 'scale(1.2)';
+            this.puck.style.filter = 'brightness(1.8) drop-shadow(0 0 15px gold)';
         }
         
-        // Create spark effect
-        this.createSparkEffect(goalSide);
+        // Create enhanced spark effect
+        this.createEnhancedSparkEffect(goalSide);
         
-        // Remove effect after animation
+        // Create screen flash effect
+        this.createScreenFlashEffect();
+        
+        // Remove effects after animation
         setTimeout(() => {
             if (this.puck) {
-                this.puck.classList.remove('goal-effect');
+                this.puck.classList.remove('puck-goal', 'goal-effect');
                 this.puck.style.transition = '';
+                this.puck.style.transform = '';
+                this.puck.style.filter = '';
             }
-        }, 1000);
+            
+            // Remove celebration text
+            if (celebrationContainer && celebrationContainer.parentNode) {
+                celebrationContainer.parentNode.removeChild(celebrationContainer);
+            }
+        }, 2000);
     }
     
-    // Create spark effect for goal
-    createSparkEffect(goalSide) {
+    // Create enhanced spark effect for goal
+    createEnhancedSparkEffect(goalSide) {
         const goalElement = goalSide === 'left' ? this.goalLeft : this.goalRight;
         if (!goalElement) return;
         
-        // Create spark container
-        const sparkContainer = document.createElement('div');
-        sparkContainer.className = 'goal-sparks';
-        sparkContainer.style.position = 'absolute';
-        sparkContainer.style.left = '50%';
-        sparkContainer.style.top = '50%';
-        sparkContainer.style.transform = 'translate(-50%, -50%)';
-        sparkContainer.style.pointerEvents = 'none';
-        sparkContainer.style.zIndex = '20';
-        
-        // Add sparks
-        for (let i = 0; i < 8; i++) {
-            const spark = document.createElement('div');
-            spark.className = 'goal-spark';
-            spark.style.position = 'absolute';
-            spark.style.width = '4px';
-            spark.style.height = '4px';
-            spark.style.background = '#ffd700';
-            spark.style.borderRadius = '50%';
-            spark.style.boxShadow = '0 0 6px #ffd700';
+        // Create multiple spark containers for layered effect
+        for (let layer = 0; layer < 3; layer++) {
+            const sparkContainer = document.createElement('div');
+            sparkContainer.className = 'goal-sparks';
+            sparkContainer.style.position = 'absolute';
+            sparkContainer.style.left = '50%';
+            sparkContainer.style.top = '50%';
+            sparkContainer.style.transform = 'translate(-50%, -50%)';
+            sparkContainer.style.pointerEvents = 'none';
+            sparkContainer.style.zIndex = '25';
             
-            const angle = (i / 8) * 2 * Math.PI;
-            const distance = 30 + Math.random() * 20;
-            const x = Math.cos(angle) * distance;
-            const y = Math.sin(angle) * distance;
-            
-            spark.style.transform = `translate(${x}px, ${y}px)`;
-            spark.style.opacity = '1';
-            spark.style.transition = 'all 0.6s ease-out';
-            
-            sparkContainer.appendChild(spark);
-            
-            // Animate spark
-            setTimeout(() => {
-                spark.style.transform = `translate(${x * 2}px, ${y * 2}px)`;
-                spark.style.opacity = '0';
-            }, 50);
-        }
-        
-        goalElement.appendChild(sparkContainer);
-        
-        // Remove sparks after animation
-        setTimeout(() => {
-            if (sparkContainer.parentNode) {
-                sparkContainer.parentNode.removeChild(sparkContainer);
+            // Add more sparks for enhanced effect
+            for (let i = 0; i < 12; i++) {
+                const spark = document.createElement('div');
+                spark.className = 'goal-spark';
+                spark.style.position = 'absolute';
+                spark.style.width = '4px';
+                spark.style.height = '4px';
+                spark.style.backgroundColor = layer === 0 ? 'gold' : layer === 1 ? 'orange' : 'yellow';
+                spark.style.borderRadius = '50%';
+                spark.style.boxShadow = `0 0 10px ${spark.style.backgroundColor}`;
+                
+                // Random direction and distance
+                const angle = (i * 30 + layer * 10) * Math.PI / 180;
+                const distance = 50 + Math.random() * 30;
+                const endX = Math.cos(angle) * distance;
+                const endY = Math.sin(angle) * distance;
+                
+                spark.style.animation = `sparkFly${layer} 1.5s ease-out forwards`;
+                spark.style.setProperty('--endX', `${endX}px`);
+                spark.style.setProperty('--endY', `${endY}px`);
+                
+                sparkContainer.appendChild(spark);
             }
-        }, 800);
+            
+            goalElement.appendChild(sparkContainer);
+            
+            // Remove spark container after animation
+            setTimeout(() => {
+                if (sparkContainer && sparkContainer.parentNode) {
+                    sparkContainer.parentNode.removeChild(sparkContainer);
+                }
+            }, 1500);
+        }
+    }
+    
+    // Create screen flash effect
+    createScreenFlashEffect() {
+        const flashOverlay = document.createElement('div');
+        flashOverlay.className = 'goal-flash';
+        flashOverlay.style.position = 'fixed';
+        flashOverlay.style.top = '0';
+        flashOverlay.style.left = '0';
+        flashOverlay.style.width = '100vw';
+        flashOverlay.style.height = '100vh';
+        flashOverlay.style.backgroundColor = 'rgba(255, 215, 0, 0.3)';
+        flashOverlay.style.pointerEvents = 'none';
+        flashOverlay.style.zIndex = '9999';
+        flashOverlay.style.animation = 'goalFlash 0.5s ease-out forwards';
+        
+        document.body.appendChild(flashOverlay);
+        
+        // Remove flash after animation
+        setTimeout(() => {
+            if (flashOverlay && flashOverlay.parentNode) {
+                flashOverlay.parentNode.removeChild(flashOverlay);
+            }
+        }, 500);
     }
     
     // Reset puck to center position
@@ -1057,17 +1204,12 @@ class HockeyVisualization {
                 
                 // Double-check that conversion was successful
                 if (realPos) {
-                    // Puck is detected and valid - show it
+                    // Puck is detected and valid - show it immediately
                     this.handlePuckAppearance();
                     
-                    // Calculate velocity based on position change
-                    this.calculateVelocity('puck', realPos);
+                    // Update position immediately without any delay
+                    this.updatePuckPositionImmediate(realPos);
                     
-                    // Update previous position for next calculation
-                    this.previousPositions.puck = { ...this.currentPositions.puck };
-                    
-                    // Update current position
-                    this.currentPositions.puck = realPos;
                     updateSuccess = true;
                     
                     if (this.updateCount % 60 === 0) { // Log every 60 updates
@@ -1495,6 +1637,14 @@ class HockeyVisualization {
         if (mouseDisplayElement) {
             mouseDisplayElement.textContent = `Display: (${displayX.toFixed(0)}px, ${displayY.toFixed(0)}px)`;
         }
+    }
+
+    // Update puck position immediately
+    updatePuckPositionImmediate(realPos) {
+        this.currentPositions.puck = realPos;
+        this.previousPositions.puck = { ...this.currentPositions.puck };
+        this.velocities.puck = { x: 0, y: 0 }; // Reset velocity when puck is updated
+        this.updateVisualPositions(); // Update visual position immediately
     }
 }
 
