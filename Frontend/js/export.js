@@ -223,11 +223,11 @@ class ExportManager {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         
-        // Show first 10 rounds
-        const maxRounds = Math.min(10, gameData.rounds.length);
+        // Show all rounds instead of limiting to 10
+        const allRounds = gameData.rounds;
         
-        for (let i = 0; i < maxRounds; i++) {
-            const round = gameData.rounds[i];
+        for (let i = 0; i < allRounds.length; i++) {
+            const round = allRounds[i];
             
             // Check if page break needed
             if (y > 250) {
@@ -241,10 +241,6 @@ class ExportManager {
             
             doc.text(`Round ${round.id}: ${winner} scored (${round.playerAScore} - ${round.playerBScore})`, margin, y);
             y += 6;
-        }
-        
-        if (gameData.rounds.length > maxRounds) {
-            doc.text(`... and ${gameData.rounds.length - maxRounds} more rounds`, margin, y);
         }
         
         return y + 15;
