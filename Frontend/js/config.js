@@ -1,12 +1,12 @@
 // 前端配置文件 - 统一管理所有服务器端口和URL配置
 const CONFIG = {
     // 服务器端口配置
-    BACKEND_PORT: 3000,
+    BACKEND_PORT: 45678,
     FRONTEND_PORT: 8080,
     
     // 服务器URL配置
     get BACKEND_URL() {
-        return `http://localhost:${this.BACKEND_PORT}`;
+        return `http://172.20.10.2:${this.BACKEND_PORT}`;
     },
     
     get FRONTEND_URL() {
