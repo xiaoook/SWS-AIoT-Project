@@ -49,3 +49,41 @@ def new_game_analysis():
     return jsonify({
         'status': 'success',
     }), 200
+
+@analysis_bp.route('/analysis/round/<gid>', methods=['GET'])
+def round_analysis(gid=None):
+    analyses = get_round_analysis(gid)
+    if analyses is None:
+        logger.error("Round analysis not found")
+        return jsonify({
+            'status': 'error',
+            'message': 'Game analysis not found'
+        }), 404
+
+    return jsonify({
+        'status': 'success',
+        'analyses': analyses
+    }), 200
+
+@analysis_bp.route('/analysis/round/new', methods=['POST'])
+def new_round_analysis(gid=None):
+    data = request.get_json()
+    gid = data.get('gid')
+    rid = data.get('rid')
+    error_type_a = data.get('A_type')
+    error_type_b = data.get('B_type')
+    analysis_a = data.get('A_analysis')
+    analysis_b = data.get('B_analysis')
+
+    if gid is None:
+        logger.error("Invalid parameter")
+        return jsonify({
+            'status': 'error',
+            'message': 'Invalid parameter'
+        }), 400
+
+    insert_round_analysis(gid, rid, error_type_a, analysis_a, error_type_b, analysis_b)
+
+    return jsonify({
+        'status': 'success'
+    }), 200
