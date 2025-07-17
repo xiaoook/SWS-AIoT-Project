@@ -704,7 +704,7 @@ class AnalysisManager {
                 <div class="round-card-header">
                     <div class="round-number">Round ${round.id}</div>
                     <div class="round-score">${round.playerAScore} - ${round.playerBScore}</div>
-                    <div class="round-winner">🏆 ${winnerName}</div>
+                    <div class="round-winner">${winnerName}</div>
                 </div>
                 
                 <div class="round-card-content">
