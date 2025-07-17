@@ -5039,6 +5039,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 1rem;
 }
 
@@ -7958,4 +7959,224 @@ body {
         padding: 1px 4px;
         font-size: 0.65rem;
     }
+}
+
+/* Enhanced Simplified Round Analysis Styles */
+.simplified-round-item {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+}
+
+.simplified-round-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
+}
+
+.simplified-round-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #4a90e2, #357abd, #2c5282);
+    border-radius: 16px 16px 0 0;
+}
+
+.simplified-round-item .round-header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #3c5a73 100%);
+    color: white;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+.simplified-round-item .round-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+    pointer-events: none;
+}
+
+.simplified-round-item .round-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 1;
+    position: relative;
+}
+
+.simplified-round-item .round-number-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 25px;
+    font-weight: 700;
+    font-size: 15px;
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.simplified-round-item .badge-icon {
+    font-size: 16px;
+    filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.8));
+}
+
+.simplified-round-item .round-time {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.simplified-round-item .round-score-display {
+    font-size: 28px;
+    font-weight: 900;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    letter-spacing: 2px;
+    z-index: 1;
+    position: relative;
+}
+
+.simplified-round-item .round-result {
+    display: flex;
+    align-items: center;
+    z-index: 1;
+    position: relative;
+}
+
+.simplified-round-item .winner-announcement {
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.simplified-round-item .round-error-info {
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #fff8e1 0%, #fff3c4 100%);
+    border-top: 1px solid rgba(255, 193, 7, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+}
+
+.simplified-round-item .round-error-info::before {
+    content: '⚠️';
+    font-size: 20px;
+    margin-right: 8px;
+}
+
+.simplified-round-item .error-type-label {
+    font-weight: 700;
+    color: #8b5a2b;
+    font-size: 15px;
+    min-width: 90px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.simplified-round-item .error-type-value {
+    color: #d32f2f;
+    font-weight: 600;
+    font-size: 15px;
+    background: linear-gradient(135deg, #fff 0%, #ffe0e0 100%);
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: 2px solid rgba(220, 53, 69, 0.2);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.1);
+    flex: 1;
+}
+
+/* Special effects and animations */
+.simplified-round-item .round-number-badge:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(74, 144, 226, 0.6);
+}
+
+.simplified-round-item .winner-announcement:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
+}
+
+.simplified-round-item .error-type-value:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+}
+
+/* Loading animation for error types */
+.simplified-round-item .error-type-value.loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .simplified-round-item .round-header {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+    }
+    
+    .simplified-round-item .round-info {
+        justify-content: center;
+    }
+    
+    .simplified-round-item .round-score-display {
+        font-size: 24px;
+    }
+    
+    .simplified-round-item .round-error-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .simplified-round-item .error-type-label {
+        min-width: auto;
+    }
+}
+
+/* Hide old detailed analysis styles when simplified view is active */
+.simplified-round-item .dual-analysis-content,
+.simplified-round-item .players-analysis,
+.simplified-round-item .player-analysis,
+.simplified-round-item .vs-separator {
+    display: none;
 }

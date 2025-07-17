@@ -90,12 +90,16 @@ class HockeyVisualization {
             goalCooldown: false
         };
         
+        // Goal processing state
+        this.goalProcessing = false;
+        
         // Puck visibility state
         this.puckState = {
             isVisible: true,
             isDetected: true,
             lastDetectedTime: Date.now(),
-            disappearanceTimeout: null
+            disappearanceTimeout: null,
+            isInGoalSequence: false // New flag for goal sequence
         };
         
         // Pusher visibility state for half-court control
@@ -342,37 +346,7 @@ class HockeyVisualization {
 
     // Collision simulation removed - Data comes from MQTT sensors only
 
-    // Check if puck scored in goals
-    checkGoalScoring() {
-        if (this.gameState.goalCooldown) return;
-        
-        const puckPos = this.currentPositions.puck;
-        const puckRadius = this.display.puckRadius;
-        
-        // Use exact real dimensions without any buffer - consistent with boundary detection
-        const minX = 0;
-        const maxX = this.realDimensions.tableLength;
-        
-        // Check left goal
-        if (puckPos.x - puckRadius <= minX) {
-            if (puckPos.y >= this.goals.left.y && puckPos.y <= this.goals.left.y + this.goals.left.height) {
-                this.onGoalScored('right'); // Right player scored
-                this.handleGoalScored('left', puckPos); // Handle goal animation
-                console.log(`🥅 LEFT GOAL! Puck at (${puckPos.x.toFixed(2)}, ${puckPos.y.toFixed(2)})`);
-                return;
-            }
-        }
-        
-        // Check right goal
-        if (puckPos.x + puckRadius >= maxX) {
-            if (puckPos.y >= this.goals.right.y && puckPos.y <= this.goals.right.y + this.goals.right.height) {
-                this.onGoalScored('left'); // Left player scored
-                this.handleGoalScored('right', puckPos); // Handle goal animation
-                console.log(`🥅 RIGHT GOAL! Puck at (${puckPos.x.toFixed(2)}, ${puckPos.y.toFixed(2)})`);
-                return;
-            }
-        }
-    }
+    // Frontend goal detection completely removed - now handled by backend WebSocket only
 
     // Handle goal scoring
     onGoalScored(scoringSide) {
@@ -695,10 +669,20 @@ class HockeyVisualization {
 
     // Handle goal scored with realistic animation
     handleGoalScored(goalSide, goalPosition) {
+        // Prevent duplicate goal processing
+        if (this.goalProcessing) {
+            console.log('🚫 Goal already being processed, ignoring duplicate');
+            return;
+        }
+        
+        this.goalProcessing = true;
         console.log(`🥅 Goal scored! Side: ${goalSide}, Position:`, goalPosition);
         
         // Create enhanced goal effect animation
         this.createEnhancedGoalEffect(goalSide, goalPosition);
+        
+        // Set puck to special "goal sequence" mode to avoid MQTT interference
+        this.puckState.isInGoalSequence = true;
         
         // Hide puck after goal effect completes
         setTimeout(() => {
@@ -711,16 +695,20 @@ class HockeyVisualization {
                 // Reset puck to center position
                 this.resetPuckToCenter();
                 
-                // Make puck visible again
+                // Make puck visible again and exit goal sequence mode
                 this.puckState.isVisible = true;
                 this.puckState.isDetected = true;
                 this.puckState.lastDetectedTime = Date.now();
+                this.puckState.isInGoalSequence = false;
                 this.updatePuckVisibility();
                 
                 // Update visual position to center
                 this.updateVisualPositions();
                 
-                console.log('🏒 Puck reappeared at center position');
+                // Reset goal processing flag
+                this.goalProcessing = false;
+                
+                console.log('🏒 Puck reappeared at center position - goal sequence complete');
             }, 5000); // 5 seconds delay
             
         }, 1500); // Hide after 1.5 seconds to let the effect complete
@@ -1159,23 +1147,33 @@ class HockeyVisualization {
         // Handle puck data - including null/missing detection
         if (data.puck !== undefined) {
             if (data.puck === null) {
-                // Puck not detected - handle disappearance
-                this.handlePuckDisappearance();
+                // Puck not detected - handle disappearance only if not in goal sequence
+                if (!this.puckState.isInGoalSequence) {
+                    this.handlePuckDisappearance();
+                }
             } else if (this.isValidPositionData(data.puck)) {
                 const realPos = this.mqttToRealCoordinates(data.puck.x, data.puck.y);
                 
                 // Double-check that conversion was successful
                 if (realPos) {
-                    // Puck is detected and valid - show it immediately
-                    this.handlePuckAppearance();
-                    
-                    // Update position immediately without any delay
-                    this.updatePuckPositionImmediate(realPos);
-                    
-                    updateSuccess = true;
-                    
-                    if (this.updateCount % 60 === 0) { // Log every 60 updates
-                        console.log(`📍 Puck updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)}) [MQTT: ${data.puck.x}, ${data.puck.y}]`);
+                    // Only update puck position if not in goal sequence
+                    if (!this.puckState.isInGoalSequence) {
+                        // Puck is detected and valid - show it immediately
+                        this.handlePuckAppearance();
+                        
+                        // Update position immediately without any delay
+                        this.updatePuckPositionImmediate(realPos);
+                        
+                        updateSuccess = true;
+                        
+                        if (this.updateCount % 60 === 0) { // Log every 60 updates
+                            console.log(`📍 Puck updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)}) [MQTT: ${data.puck.x}, ${data.puck.y}]`);
+                        }
+                    } else {
+                        // During goal sequence, ignore MQTT puck data but log it
+                        if (this.updateCount % 60 === 0) {
+                            console.log(`🚫 Ignoring MQTT puck data during goal sequence: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                        }
                     }
                 } else {
                     console.warn(`⚠️ Failed to convert puck coordinates: (${data.puck.x}, ${data.puck.y})`);
@@ -1782,11 +1780,76 @@ class HockeyVisualization {
              isDetected: this.puckState.isDetected,
              position: this.currentPositions.puck,
              lastDetectedTime: this.puckState.lastDetectedTime,
+             isInGoalSequence: this.puckState.isInGoalSequence,
+             goalProcessing: this.goalProcessing,
              centerPosition: {
                  x: this.realDimensions.tableLength / 2,
                  y: this.realDimensions.tableWidth / 2
              }
          };
+     }
+     
+     // Test fixed goal puck logic
+     testFixedGoalPuckLogic() {
+         console.log('🧪 Testing fixed goal puck logic...');
+         
+         // Ensure puck is visible and not in goal sequence
+         this.puckState.isVisible = true;
+         this.puckState.isInGoalSequence = false;
+         this.goalProcessing = false;
+         this.updatePuckVisibility();
+         
+         console.log('📍 Initial puck status:', this.getPuckStatus());
+         
+         // Simulate a goal event
+         setTimeout(() => {
+             console.log('⚽ Triggering goal event...');
+             this.handleGoalEvent({ side: 'left' });
+             
+             // Check status during goal sequence
+             setTimeout(() => {
+                 console.log('⏰ Status after 2s (during goal sequence):', this.getPuckStatus());
+             }, 2000);
+             
+             // Check status when puck should be hidden
+             setTimeout(() => {
+                 console.log('⏰ Status after 3s (puck should be hidden):', this.getPuckStatus());
+             }, 3000);
+             
+             // Check status when puck should reappear
+             setTimeout(() => {
+                 console.log('⏰ Status after 8s (puck should reappear at center):', this.getPuckStatus());
+             }, 8000);
+             
+         }, 1000);
+     }
+     
+     // Test MQTT interference protection
+     testMQTTInterferenceProtection() {
+         console.log('🧪 Testing MQTT interference protection...');
+         
+         // Start a goal sequence
+         this.goalProcessing = true;
+         this.puckState.isInGoalSequence = true;
+         
+         console.log('🎯 Goal sequence started - testing MQTT interference...');
+         
+         // Simulate MQTT data during goal sequence
+         const testMQTTData = {
+             puck: { x: 400, y: 200 } // Some random position
+         };
+         
+                   console.log('📡 Simulating MQTT puck data during goal sequence...');
+          this.updatePositions(testMQTTData);
+         
+         setTimeout(() => {
+             console.log('📊 Puck status after MQTT simulation:', this.getPuckStatus());
+             
+             // Reset states
+             this.goalProcessing = false;
+             this.puckState.isInGoalSequence = false;
+             console.log('✅ Test completed - states reset');
+         }, 1000);
      }
 }
 

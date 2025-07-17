@@ -1741,16 +1741,20 @@ class AnalysisManager {
     }
     
     createRoundHTML(round) {
-        const isExpanded = this.expandedRounds.has(round.id);
         const winnerText = this.getPlayerName(this.currentGame, round.winner);
-        const loserText = this.getPlayerName(this.currentGame, round.winner === 'playerA' ? 'playerB' : 'playerA');
         const timeStr = this.formatTime(round.timestamp);
         const playerAWon = round.winner === 'playerA';
         const playerBWon = round.winner === 'playerB';
         
+        // Get error types for this round
+        const errorTypes = this.getRoundErrorTypes(round);
+        const errorTypeText = errorTypes.length > 0 ? 
+            errorTypes.map(type => this.translateErrorType(type)).join(', ') : 
+            'No specific errors';
+        
         return `
-            <div class="dual-analysis-item ${isExpanded ? 'expanded' : ''}" data-round-id="${round.id}">
-                <div class="round-timeline-header">
+            <div class="simplified-round-item" data-round-id="${round.id}">
+                <div class="round-header">
                     <div class="round-info">
                         <div class="round-number-badge">
                             <span class="badge-icon">⚡</span>
@@ -1764,53 +1768,35 @@ class AnalysisManager {
                     </div>
                 </div>
                 
-                <div class="dual-analysis-content expanded">
-                    <div class="players-analysis">
-                        <!-- Player A Analysis -->
-                        <div class="player-analysis player-a ${playerAWon ? 'winner' : 'loser'}">
-                            <div class="player-header">
-                                <span class="player-icon">🔵</span>
-                                <span class="player-name">${this.getPlayerName(this.currentGame, 'playerA')}</span>
-                                <span class="player-result ${playerAWon ? 'won' : 'lost'}">
-                                    ${playerAWon ? '✅ Won Point' : '❌ Lost Point'}
-                                </span>
-                            </div>
-                            <div class="player-analysis-content">
-                                ${playerAWon ? 
-                                    this.createWinAnalysisHTML(round, 'A') : 
-                                    this.createLossAnalysisHTML(round.analysis, this.getPlayerName(this.currentGame, 'playerA'))
-                                }
-                            </div>
-                </div>
-                
-                        <!-- VS Separator -->
-                        <div class="vs-separator">
-                            <div class="vs-icon">VS</div>
-                            <div class="winner-arrow ${playerAWon ? 'left' : 'right'}">
-                                ${playerAWon ? '←' : '→'}
-                            </div>
-                </div>
-                
-                        <!-- Player B Analysis -->
-                        <div class="player-analysis player-b ${playerBWon ? 'winner' : 'loser'}">
-                            <div class="player-header">
-                                <span class="player-icon">🔴</span>
-                                <span class="player-name">${this.getPlayerName(this.currentGame, 'playerB')}</span>
-                                <span class="player-result ${playerBWon ? 'won' : 'lost'}">
-                                    ${playerBWon ? '✅ Won Point' : '❌ Lost Point'}
-                                </span>
-                            </div>
-                            <div class="player-analysis-content">
-                                ${playerBWon ? 
-                                    this.createWinAnalysisHTML(round, 'B') : 
-                                    this.createLossAnalysisHTML(round.analysis, this.getPlayerName(this.currentGame, 'playerB'))
-                                }
-                            </div>
-                        </div>
-                    </div>
+                <div class="round-error-info">
+                    <div class="error-type-label">Error Type:</div>
+                    <div class="error-type-value">${errorTypeText}</div>
                 </div>
             </div>
         `;
+    }
+    
+    // Get error types for a round
+    getRoundErrorTypes(round) {
+        const errorTypes = [];
+        
+        // Check if there's a general error type assigned to the round
+        if (round.analysis && round.analysis.errorType) {
+            errorTypes.push(round.analysis.errorType);
+        }
+        
+        // Check player-specific error types
+        if (round.analysis) {
+            if (round.analysis.A_type && Array.isArray(round.analysis.A_type)) {
+                errorTypes.push(...round.analysis.A_type);
+            }
+            if (round.analysis.B_type && Array.isArray(round.analysis.B_type)) {
+                errorTypes.push(...round.analysis.B_type);
+            }
+        }
+        
+        // Remove duplicates and return
+        return [...new Set(errorTypes)];
     }
     
     // 新增：创建获胜方分析
@@ -4324,6 +4310,119 @@ class AnalysisManager {
         
         summary += `</div>`;
         return summary;
+    }
+
+    // Test simplified round analysis display
+    testSimplifiedRoundAnalysis() {
+        console.log('�� Testing simplified round analysis with error types...');
+        
+        // First, add some test data with error types
+        this.testBackendErrorTypes();
+        
+        // Wait a moment for the data to be processed
+        setTimeout(() => {
+            // Display rounds with simplified format
+            this.displayRounds();
+            
+            // Log the error types for each round
+            console.log('📊 Error types for each round:');
+            this.currentGame.rounds.forEach(round => {
+                const errorTypes = this.getRoundErrorTypes(round);
+                const translatedTypes = errorTypes.map(type => this.translateErrorType(type));
+                console.log(`  Round ${round.id}: ${translatedTypes.join(', ') || 'No specific errors'}`);
+            });
+            
+            console.log('✅ Simplified round analysis display tested');
+        }, 1000);
+    }
+    
+    // Test error type functionality
+    testErrorTypeFunctionality() {
+        console.log('🧪 Testing error type functionality...');
+        
+        // Test error type translation
+        const testErrorTypes = ['slow_reaction', 'low_activity', 'weak_defense', 'poor_alignment', 'coverage_gap'];
+        
+        console.log('🔄 Testing error type translations:');
+        testErrorTypes.forEach(errorType => {
+            const translated = this.translateErrorType(errorType);
+            console.log(`  ${errorType} → ${translated}`);
+        });
+        
+        // Test getRoundErrorTypes function
+        console.log('🔄 Testing getRoundErrorTypes function:');
+        
+        // Create a test round with different error type scenarios
+        const testRound1 = {
+            id: 999,
+            analysis: {
+                errorType: 'slow_reaction',
+                A_type: ['weak_defense'],
+                B_type: ['poor_alignment', 'coverage_gap']
+            }
+        };
+        
+        const testRound2 = {
+            id: 998,
+            analysis: {
+                A_type: ['low_activity'],
+                B_type: []
+            }
+        };
+        
+        const testRound3 = {
+            id: 997,
+            analysis: null
+        };
+        
+        const errorTypes1 = this.getRoundErrorTypes(testRound1);
+        const errorTypes2 = this.getRoundErrorTypes(testRound2);
+        const errorTypes3 = this.getRoundErrorTypes(testRound3);
+        
+        console.log('  Test Round 1 errors:', errorTypes1.map(type => this.translateErrorType(type)));
+        console.log('  Test Round 2 errors:', errorTypes2.map(type => this.translateErrorType(type)));
+        console.log('  Test Round 3 errors:', errorTypes3.length === 0 ? 'No errors' : errorTypes3);
+        
+        console.log('✅ Error type functionality tested');
+    }
+    
+    // Comprehensive test of simplified analysis
+    testSimplifiedAnalysisComplete() {
+        console.log('🧪 Starting comprehensive test of simplified analysis...');
+        
+        // Test error type functionality first
+        this.testErrorTypeFunctionality();
+        
+        // Test simplified round analysis
+        setTimeout(() => {
+            this.testSimplifiedRoundAnalysis();
+        }, 2000);
+        
+        // Test the display refresh
+        setTimeout(() => {
+            console.log('🔄 Refreshing display...');
+            this.displayRounds();
+            console.log('✅ Comprehensive simplified analysis test completed');
+        }, 4000);
+    }
+    
+    // Quick test for enhanced styles
+    testEnhancedStyles() {
+        console.log('🎨 Testing enhanced simplified round analysis styles...');
+        
+        // Add some demo data with various error types
+        this.testBackendErrorTypes();
+        
+        // Display the rounds
+        setTimeout(() => {
+            this.displayRounds();
+            console.log('✨ Enhanced styles applied! Check the beautiful new design:');
+            console.log('  🎯 Gradient backgrounds');
+            console.log('  🌟 Hover effects');
+            console.log('  💎 Professional styling');
+            console.log('  📱 Responsive design');
+            console.log('  ⚡ Smooth animations');
+        }, 1000);
     }
 }
 
