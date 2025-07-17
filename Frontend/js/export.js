@@ -25,7 +25,7 @@ class ExportManager {
             });
         }
     }
-
+    
     async exportToPDF() {
         if (!window.jspdf) {
             window.smartCourtApp.showMessage('PDF export feature loading, please try again later', 'error');
@@ -56,7 +56,7 @@ class ExportManager {
             window.smartCourtApp.showMessage('PDF export failed', 'error');
         }
     }
-
+    
     createProfessionalPDF(doc, gameData) {
         // Page setup
         const pageWidth = doc.internal.pageSize.width;
@@ -369,7 +369,7 @@ class ExportManager {
             return `${secs}s`;
         }
     }
-
+    
     // Export raw JSON data
     exportRawData() {
         const gameData = this.getGameData();

@@ -90,6 +90,35 @@ class HockeyVisualization {
             goalCooldown: false
         };
         
+        // Puck visibility state
+        this.puckState = {
+            isVisible: true,
+            isDetected: true,
+            lastDetectedTime: Date.now(),
+            disappearanceTimeout: null
+        };
+        
+        // Pusher visibility state for half-court control
+        this.pusherState = {
+            pusherA: {
+                isVisible: true,
+                isInCorrectHalf: true,
+                lastValidTime: Date.now()
+            },
+            pusherB: {
+                isVisible: true,
+                isInCorrectHalf: true,
+                lastValidTime: Date.now()
+            }
+        };
+        
+        // Half-court boundaries (in real coordinates)
+        this.halfCourt = {
+            centerX: this.realDimensions.tableLength / 2,  // 21.5cm - center line
+            leftSide: { min: 0, max: this.realDimensions.tableLength / 2 },     // 0-21.5cm
+            rightSide: { min: this.realDimensions.tableLength / 2, max: this.realDimensions.tableLength } // 21.5-43cm
+        };
+        
         // Position history (for trails)
         this.positionHistory = {
             pusherA: [],
@@ -328,6 +357,7 @@ class HockeyVisualization {
         if (puckPos.x - puckRadius <= minX) {
             if (puckPos.y >= this.goals.left.y && puckPos.y <= this.goals.left.y + this.goals.left.height) {
                 this.onGoalScored('right'); // Right player scored
+                this.handleGoalScored('left', puckPos); // Handle goal animation
                 console.log(`🥅 LEFT GOAL! Puck at (${puckPos.x.toFixed(2)}, ${puckPos.y.toFixed(2)})`);
                 return;
             }
@@ -337,6 +367,7 @@ class HockeyVisualization {
         if (puckPos.x + puckRadius >= maxX) {
             if (puckPos.y >= this.goals.right.y && puckPos.y <= this.goals.right.y + this.goals.right.height) {
                 this.onGoalScored('left'); // Left player scored
+                this.handleGoalScored('right', puckPos); // Handle goal animation
                 console.log(`🥅 RIGHT GOAL! Puck at (${puckPos.x.toFixed(2)}, ${puckPos.y.toFixed(2)})`);
                 return;
             }
@@ -464,6 +495,283 @@ class HockeyVisualization {
                 obj2Element.classList.remove('boundary-collision');
             }, 200);
         }
+    }
+    
+    // Handle puck disappearance when not detected
+    handlePuckDisappearance() {
+        if (this.puckState.isDetected) {
+            this.puckState.isDetected = false;
+            this.puckState.lastDetectedTime = Date.now();
+            
+            // Use a timeout to avoid flickering when puck briefly disappears
+            if (this.puckState.disappearanceTimeout) {
+                clearTimeout(this.puckState.disappearanceTimeout);
+            }
+            
+            this.puckState.disappearanceTimeout = setTimeout(() => {
+                this.puckState.isVisible = false;
+                this.updatePuckVisibility();
+            }, 500); // 500ms delay before hiding
+        }
+    }
+
+    // Handle puck appearance when detected
+    handlePuckAppearance() {
+        if (!this.puckState.isDetected) {
+            this.puckState.isDetected = true;
+            this.puckState.lastDetectedTime = Date.now();
+            
+            // Clear any pending disappearance timeout
+            if (this.puckState.disappearanceTimeout) {
+                clearTimeout(this.puckState.disappearanceTimeout);
+                this.puckState.disappearanceTimeout = null;
+            }
+            
+            // Show puck immediately
+            this.puckState.isVisible = true;
+            this.updatePuckVisibility();
+        }
+    }
+
+    // Update puck visibility
+    updatePuckVisibility() {
+        if (this.puck) {
+            this.puck.style.opacity = this.puckState.isVisible ? '1' : '0';
+            this.puck.style.pointerEvents = this.puckState.isVisible ? 'auto' : 'none';
+        }
+    }
+    
+    // Check if pusher is in correct half-court (matching backend logic)
+    checkPusherHalfCourt(pusherName, position) {
+        const isInCorrectHalf = this.isPusherInCorrectHalf(pusherName, position);
+        const currentState = this.pusherState[pusherName];
+        
+        if (isInCorrectHalf !== currentState.isInCorrectHalf) {
+            currentState.isInCorrectHalf = isInCorrectHalf;
+            
+            if (isInCorrectHalf) {
+                // Pusher returned to correct half - make visible
+                currentState.isVisible = true;
+                currentState.lastValidTime = Date.now();
+                console.log(`✅ ${pusherName} returned to correct half-court`);
+            } else {
+                // Pusher crossed to wrong half - hide it
+                currentState.isVisible = false;
+                console.log(`❌ ${pusherName} crossed to wrong half-court - hiding pusher`);
+            }
+            
+            this.updatePusherVisibility(pusherName);
+        }
+    }
+    
+    // Check if pusher is in correct half based on backend logic
+    isPusherInCorrectHalf(pusherName, position) {
+        const centerX = this.halfCourt.centerX;
+        
+        if (pusherName === 'pusherA') {
+            // PusherA (paddle 0) should be in left half (x < centerX)
+            return position.x < centerX;
+        } else if (pusherName === 'pusherB') {
+            // PusherB (paddle 1) should be in right half (x >= centerX)
+            return position.x >= centerX;
+        }
+        
+        return true; // Default to visible for unknown pushers
+    }
+    
+    // Update pusher visibility
+    updatePusherVisibility(pusherName) {
+        const element = this[pusherName];
+        const state = this.pusherState[pusherName];
+        
+        if (element && state) {
+            if (state.isVisible) {
+                element.style.opacity = '1';
+                element.style.pointerEvents = 'auto';
+                element.style.transform = 'scale(1)';
+            } else {
+                element.style.opacity = '0.2';
+                element.style.pointerEvents = 'none';
+                element.style.transform = 'scale(0.8)';
+            }
+        }
+    }
+    
+    // Initialize pusher visibility states
+    initializePusherStates() {
+        Object.keys(this.pusherState).forEach(pusherName => {
+            this.updatePusherVisibility(pusherName);
+        });
+    }
+    
+    // Test half-court control functionality
+    testHalfCourtControl() {
+        console.log('🧪 Testing half-court control functionality...');
+        
+        // Test pusherA crossing to right side (should become invisible)
+        console.log('📍 Testing pusherA crossing to right side...');
+        this.currentPositions.pusherA = { x: 30, y: 13 }; // Right side
+        this.checkPusherHalfCourt('pusherA', this.currentPositions.pusherA);
+        
+        // Test pusherB crossing to left side (should become invisible)
+        console.log('📍 Testing pusherB crossing to left side...');
+        this.currentPositions.pusherB = { x: 10, y: 13 }; // Left side
+        this.checkPusherHalfCourt('pusherB', this.currentPositions.pusherB);
+        
+        // Wait 2 seconds then restore to correct sides
+        setTimeout(() => {
+            console.log('📍 Restoring pushers to correct sides...');
+            this.currentPositions.pusherA = { x: 8, y: 13 }; // Left side
+            this.currentPositions.pusherB = { x: 35, y: 13 }; // Right side
+            this.checkPusherHalfCourt('pusherA', this.currentPositions.pusherA);
+            this.checkPusherHalfCourt('pusherB', this.currentPositions.pusherB);
+            this.updateVisualPositions();
+        }, 2000);
+        
+        this.updateVisualPositions();
+    }
+    
+    // Get current half-court status
+    getHalfCourtStatus() {
+        return {
+            pusherA: {
+                position: this.currentPositions.pusherA,
+                isVisible: this.pusherState.pusherA.isVisible,
+                isInCorrectHalf: this.pusherState.pusherA.isInCorrectHalf,
+                correctHalf: 'left'
+            },
+            pusherB: {
+                position: this.currentPositions.pusherB,
+                isVisible: this.pusherState.pusherB.isVisible,
+                isInCorrectHalf: this.pusherState.pusherB.isInCorrectHalf,
+                correctHalf: 'right'
+            },
+            halfCourtCenter: this.halfCourt.centerX
+        };
+    }
+    
+
+    
+    // Handle goal scored with realistic animation
+    handleGoalScored(goalSide, goalPosition) {
+        console.log(`🥅 Goal scored! Side: ${goalSide}, Position:`, goalPosition);
+        
+        // Create goal effect animation
+        this.createGoalEffect(goalSide, goalPosition);
+        
+        // Hide puck after goal
+        setTimeout(() => {
+            this.puckState.isVisible = false;
+            this.updatePuckVisibility();
+            console.log('🏒 Puck hidden after goal');
+        }, 1000); // Hide after 1 second animation
+        
+        // Reset puck position to center (for when it reappears)
+        setTimeout(() => {
+            this.resetPuckToCenter();
+        }, 2000);
+    }
+    
+    // Create visual goal effect
+    createGoalEffect(goalSide, goalPosition) {
+        if (!this.puck) return;
+        
+        // Add goal effect class for animation
+        this.puck.classList.add('goal-effect');
+        
+        // Animate puck towards goal
+        const goalElement = goalSide === 'left' ? this.goalLeft : this.goalRight;
+        if (goalElement) {
+            const goalRect = goalElement.getBoundingClientRect();
+            const tableRect = this.tableSurface.getBoundingClientRect();
+            
+            // Calculate goal position relative to table
+            const goalX = goalRect.left - tableRect.left + goalRect.width / 2;
+            const goalY = goalRect.top - tableRect.top + goalRect.height / 2;
+            
+            // Animate puck to goal
+            this.puck.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            this.puck.style.left = goalX + 'px';
+            this.puck.style.top = goalY + 'px';
+            this.puck.style.transform = 'scale(0.8)';
+        }
+        
+        // Create spark effect
+        this.createSparkEffect(goalSide);
+        
+        // Remove effect after animation
+        setTimeout(() => {
+            if (this.puck) {
+                this.puck.classList.remove('goal-effect');
+                this.puck.style.transition = '';
+            }
+        }, 1000);
+    }
+    
+    // Create spark effect for goal
+    createSparkEffect(goalSide) {
+        const goalElement = goalSide === 'left' ? this.goalLeft : this.goalRight;
+        if (!goalElement) return;
+        
+        // Create spark container
+        const sparkContainer = document.createElement('div');
+        sparkContainer.className = 'goal-sparks';
+        sparkContainer.style.position = 'absolute';
+        sparkContainer.style.left = '50%';
+        sparkContainer.style.top = '50%';
+        sparkContainer.style.transform = 'translate(-50%, -50%)';
+        sparkContainer.style.pointerEvents = 'none';
+        sparkContainer.style.zIndex = '20';
+        
+        // Add sparks
+        for (let i = 0; i < 8; i++) {
+            const spark = document.createElement('div');
+            spark.className = 'goal-spark';
+            spark.style.position = 'absolute';
+            spark.style.width = '4px';
+            spark.style.height = '4px';
+            spark.style.background = '#ffd700';
+            spark.style.borderRadius = '50%';
+            spark.style.boxShadow = '0 0 6px #ffd700';
+            
+            const angle = (i / 8) * 2 * Math.PI;
+            const distance = 30 + Math.random() * 20;
+            const x = Math.cos(angle) * distance;
+            const y = Math.sin(angle) * distance;
+            
+            spark.style.transform = `translate(${x}px, ${y}px)`;
+            spark.style.opacity = '1';
+            spark.style.transition = 'all 0.6s ease-out';
+            
+            sparkContainer.appendChild(spark);
+            
+            // Animate spark
+            setTimeout(() => {
+                spark.style.transform = `translate(${x * 2}px, ${y * 2}px)`;
+                spark.style.opacity = '0';
+            }, 50);
+        }
+        
+        goalElement.appendChild(sparkContainer);
+        
+        // Remove sparks after animation
+        setTimeout(() => {
+            if (sparkContainer.parentNode) {
+                sparkContainer.parentNode.removeChild(sparkContainer);
+            }
+        }, 800);
+    }
+    
+    // Reset puck to center position
+    resetPuckToCenter() {
+        this.currentPositions.puck = { 
+            x: this.realDimensions.tableLength / 2, 
+            y: this.realDimensions.tableWidth / 2 
+        };
+        this.previousPositions.puck = { ...this.currentPositions.puck };
+        this.velocities.puck = { x: 0, y: 0 };
+        
+        console.log('🎯 Puck position reset to center');
     }
 
     // Check object boundaries (prevent objects from going out of bounds)
@@ -626,6 +934,17 @@ class HockeyVisualization {
         
         Object.keys(this.currentPositions).forEach(objectName => {
             const realPos = this.currentPositions[objectName];
+            
+            // Skip updating puck position if it's not visible
+            if (objectName === 'puck' && !this.puckState.isVisible) {
+                return;
+            }
+            
+            // Skip updating pusher position if it's not visible due to half-court control
+            if ((objectName === 'pusherA' || objectName === 'pusherB') && !this.pusherState[objectName].isVisible) {
+                return;
+            }
+            
             const displayPos = this.realToDisplayCoordinates(realPos.x, realPos.y);
             
             const element = this[objectName];
@@ -638,7 +957,7 @@ class HockeyVisualization {
                 element.style.top = (displayPos.y - elementHeight / 2) + 'px';
             }
             
-            // Update position display
+            // Update position display (always update, even when object is hidden)
             this.updatePositionDisplay(objectName, realPos.x, realPos.y);
         });
     }
@@ -679,6 +998,10 @@ class HockeyVisualization {
                     
                     // Update current position
                     this.currentPositions.pusherA = realPos;
+                    
+                    // Check half-court control for pusherA
+                    this.checkPusherHalfCourt('pusherA', realPos);
+                    
                     updateSuccess = true;
                     
                     if (this.updateCount % 60 === 0) { // Log every 60 updates
@@ -707,6 +1030,10 @@ class HockeyVisualization {
                     
                     // Update current position
                     this.currentPositions.pusherB = realPos;
+                    
+                    // Check half-court control for pusherB
+                    this.checkPusherHalfCourt('pusherB', realPos);
+                    
                     updateSuccess = true;
                     
                     if (this.updateCount % 60 === 0) { // Log every 60 updates
@@ -720,13 +1047,19 @@ class HockeyVisualization {
             }
         }
         
-        if (data.puck) {
-            // Check if puck data is valid before processing
-            if (this.isValidPositionData(data.puck)) {
+        // Handle puck data - including null/missing detection
+        if (data.puck !== undefined) {
+            if (data.puck === null) {
+                // Puck not detected - handle disappearance
+                this.handlePuckDisappearance();
+            } else if (this.isValidPositionData(data.puck)) {
                 const realPos = this.mqttToRealCoordinates(data.puck.x, data.puck.y);
                 
                 // Double-check that conversion was successful
                 if (realPos) {
+                    // Puck is detected and valid - show it
+                    this.handlePuckAppearance();
+                    
                     // Calculate velocity based on position change
                     this.calculateVelocity('puck', realPos);
                     
@@ -1040,6 +1373,16 @@ class HockeyVisualization {
                 this.handlePositionUpdate(data);
             });
             
+            // Listen for goal events
+            window.websocketManager.on('goal_scored', (goalData) => {
+                this.handleGoalEvent(goalData);
+            });
+            
+            // Listen for game reset events
+            window.websocketManager.on('game_reset', () => {
+                this.handleGameReset();
+            });
+            
             // Listen for connection status changes
             window.websocketManager.on('connect', () => {
                 this.updateConnectionStatus(true);
@@ -1049,10 +1392,43 @@ class HockeyVisualization {
                 this.updateConnectionStatus(false);
             });
             
-            console.log('🔌 WebSocket connection listeners set up');
+            console.log('🔌 WebSocket connection listeners set up for positions, goals, and game events');
         } else {
             console.warn('⚠️ WebSocket manager not available');
         }
+    }
+    
+    // Handle goal event from WebSocket
+    handleGoalEvent(goalData) {
+        console.log('🥅 Goal event received:', goalData);
+        
+        if (goalData && goalData.side) {
+            // Trigger goal animation with current puck position
+            this.handleGoalScored(goalData.side, this.currentPositions.puck);
+        }
+    }
+    
+    // Handle game reset
+    handleGameReset() {
+        console.log('🔄 Game reset received');
+        
+        // Reset puck state
+        this.puckState.isVisible = true;
+        this.puckState.isDetected = true;
+        this.puckState.lastDetectedTime = Date.now();
+        
+        if (this.puckState.disappearanceTimeout) {
+            clearTimeout(this.puckState.disappearanceTimeout);
+            this.puckState.disappearanceTimeout = null;
+        }
+        
+        // Reset positions
+        this.setInitialPositions();
+        
+        // Show puck and initialize pusher states
+        this.puckState.isVisible = true;
+        this.updatePuckVisibility();
+        this.initializePusherStates();
     }
 
     // Update connection status

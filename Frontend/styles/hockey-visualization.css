@@ -800,6 +800,77 @@
     100% { filter: brightness(1); }
 }
 
+/* 球的隐藏和显示效果 */
+.puck {
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+.puck-hidden {
+    opacity: 0 !important;
+    transform: scale(0.5) !important;
+    pointer-events: none;
+}
+
+/* 进球效果 */
+.goal-effect {
+    animation: goalGlow 0.8s ease-out;
+    z-index: 25 !important;
+}
+
+@keyframes goalGlow {
+    0% {
+        box-shadow: 0 0 5px #ffd700;
+        filter: brightness(1);
+    }
+    50% {
+        box-shadow: 0 0 20px #ffd700, 0 0 30px #ffd700;
+        filter: brightness(1.5);
+        transform: scale(1.2);
+    }
+    100% {
+        box-shadow: 0 0 10px #ffd700;
+        filter: brightness(1);
+        transform: scale(0.8);
+    }
+}
+
+/* 火花效果 */
+.goal-sparks {
+    position: absolute;
+    pointer-events: none;
+    z-index: 30;
+}
+
+.goal-spark {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #ffd700;
+    border-radius: 50%;
+    box-shadow: 0 0 6px #ffd700;
+    transition: all 0.6s ease-out;
+}
+
+/* 球出现效果 */
+.puck:not(.puck-hidden) {
+    animation: puckAppear 0.4s ease-out;
+}
+
+@keyframes puckAppear {
+    0% {
+        opacity: 0;
+        transform: scale(0.3);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
 /* 鼠标坐标显示 - 在信息面板中 */
 #mouseCoordinatesSection {
     background: #fff8e1 !important;
@@ -1387,4 +1458,95 @@
         width: 95px;
         height: 95px;
     }
+} 
+
+/* Additional animations for enhanced effects */
+.puck-goal {
+    transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    filter: brightness(1.5) drop-shadow(0 0 10px gold);
+}
+
+.puck-goal::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    right: -5px;
+    bottom: -5px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,215,0,0.3) 0%, transparent 70%);
+    animation: goalGlow 0.8s ease-out;
+}
+
+.puck-goal::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 30px;
+    height: 30px;
+    background: radial-gradient(circle, rgba(255,215,0,0.8) 0%, transparent 70%);
+    border-radius: 50%;
+    animation: goalSpark 0.8s ease-out;
+}
+
+@keyframes goalGlow {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0;
+    }
+}
+
+@keyframes goalSpark {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 1;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0.8;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(3);
+        opacity: 0;
+    }
+}
+
+/* Half-court control styles */
+.pusher {
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.pusher.out-of-bounds {
+    opacity: 0.2;
+    transform: scale(0.8);
+    pointer-events: none;
+}
+
+.pusher.returning {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+/* Half-court line indicator */
+.half-court-line {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 2px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateX(-50%);
+    z-index: 1;
+    pointer-events: none;
 } 
