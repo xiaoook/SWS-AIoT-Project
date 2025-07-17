@@ -731,17 +731,23 @@ class AnalysisManager {
         
         // 游戏级别错误
         if (this.currentGame && this.currentGame.backendAnalysis && this.currentGame.backendAnalysis[playerKey]) {
-            this.currentGame.backendAnalysis[playerKey].errorTypes.forEach(type => 
-                errorTypes.add(this.translateErrorType(type))
-            );
+            const gameErrorTypes = this.currentGame.backendAnalysis[playerKey].errorTypes;
+            if (Array.isArray(gameErrorTypes)) {
+                gameErrorTypes.forEach(type => 
+                    errorTypes.add(this.translateErrorType(type))
+                );
+            }
         }
         
         // 轮次级别错误
         rounds.forEach(round => {
             if (round.backendAnalysis && round.backendAnalysis[playerKey]) {
-                round.backendAnalysis[playerKey].errorTypes.forEach(type => 
-                    errorTypes.add(this.translateErrorType(type))
-                );
+                const roundErrorTypes = round.backendAnalysis[playerKey].errorTypes;
+                if (Array.isArray(roundErrorTypes)) {
+                    roundErrorTypes.forEach(type => 
+                        errorTypes.add(this.translateErrorType(type))
+                    );
+                }
             }
         });
         
