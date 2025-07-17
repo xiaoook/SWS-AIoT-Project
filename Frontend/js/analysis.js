@@ -279,18 +279,42 @@ class AnalysisManager {
                     console.log(`✅ Loaded ${roundsData.rounds.length} rounds for game ${gameId}`);
                     
                     // 转换后端轮次数据格式到前端格式
-                    const formattedRounds = roundsData.rounds.map((round, index) => ({
-                        id: round.roundInGame,
-                        timestamp: new Date().toISOString(), // 使用当前时间作为默认值
-                        winner: round.pointA > round.pointB ? 'playerA' : 'playerB', // 判断谁得分了
-                        playerAScore: round.pointA,
-                        playerBScore: round.pointB,
-                        analysis: {
-                            feedback: 'Round completed successfully',
-                            suggestions: ['Continue maintaining good performance'],
-                            errorType: null
+                    const formattedRounds = roundsData.rounds.map((round, index) => {
+                        // 正确判断在这个回合中谁得分了
+                        let winner = 'playerA'; // 默认值
+                        
+                        if (index === 0) {
+                            // 第一回合，直接比较得分
+                            winner = round.pointA > round.pointB ? 'playerA' : 'playerB';
+                        } else {
+                            // 不是第一回合，比较与前一回合的得分差异
+                            const prevRound = roundsData.rounds[index - 1];
+                            const playerAScoreIncrease = round.pointA - prevRound.pointA;
+                            const playerBScoreIncrease = round.pointB - prevRound.pointB;
+                            
+                            if (playerAScoreIncrease > playerBScoreIncrease) {
+                                winner = 'playerA';
+                            } else if (playerBScoreIncrease > playerAScoreIncrease) {
+                                winner = 'playerB';
+                            } else {
+                                // 如果两者得分增加相同（通常不会发生），使用累积得分判断
+                                winner = round.pointA > round.pointB ? 'playerA' : 'playerB';
+                            }
                         }
-                    }));
+                        
+                        return {
+                            id: round.roundInGame,
+                            timestamp: new Date().toISOString(),
+                            winner: winner,
+                            playerAScore: round.pointA,
+                            playerBScore: round.pointB,
+                            analysis: {
+                                feedback: 'Round completed successfully',
+                                suggestions: ['Continue maintaining good performance'],
+                                errorType: null
+                            }
+                        };
+                    });
                     
                     // 更新当前游戏的轮次数据
                     this.currentGame = {
@@ -2037,7 +2061,7 @@ class AnalysisManager {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `analysis_${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `Air_Hockey_Assistant_Analysis_${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
         
@@ -3227,8 +3251,8 @@ class AnalysisManager {
                             <div class="win-segment player-b-wins" style="width: ${playerBPercentage}%"></div>
                 </div>
                         <div class="distribution-labels">
-                            <span class="label-left">${this.getPlayerName(this.currentGame, 'playerA')}: ${playerAWins} wins</span>
-                            <span class="label-right">${this.getPlayerName(this.currentGame, 'playerB')}: ${playerBWins} wins</span>
+                            <span class="label-left">${this.getPlayerName(this.currentGame, 'playerA')}: ${playerAWins} rounds won</span>
+                            <span class="label-right">${this.getPlayerName(this.currentGame, 'playerB')}: ${playerBWins} rounds won</span>
                         </div>
                     </div>
                 </div>
@@ -4035,7 +4059,7 @@ class AnalysisManager {
             
             summary += `<span class="summary-item">Focus: ${playerName}${resultText}</span>`;
         } else {
-            summary += `<span class="summary-item">🔵 ${this.getPlayerName(this.currentGame, 'playerA')}: ${playerAWins} wins | 🔴 ${this.getPlayerName(this.currentGame, 'playerB')}: ${playerBWins} wins</span>`;
+            summary += `<span class="summary-item">🔵 ${this.getPlayerName(this.currentGame, 'playerA')}: ${playerAWins} rounds won | 🔴 ${this.getPlayerName(this.currentGame, 'playerB')}: ${playerBWins} rounds won</span>`;
         }
         
         if (this.roundFilters.result !== 'all' && this.roundFilters.player === 'all') {

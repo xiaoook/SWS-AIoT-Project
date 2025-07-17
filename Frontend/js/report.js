@@ -267,18 +267,42 @@ class ReportManager {
                     console.log(`✅ Loaded ${roundsData.rounds.length} rounds for report ${gameId}`);
                     
                     // 转换后端轮次数据格式到前端格式
-                    const formattedRounds = roundsData.rounds.map((round, index) => ({
-                        id: round.roundInGame,
-                        timestamp: new Date().toISOString(),
-                        winner: round.pointA > round.pointB ? 'playerA' : 'playerB',
-                        playerAScore: round.pointA,
-                        playerBScore: round.pointB,
-                        analysis: {
-                            feedback: 'Round completed successfully',
-                            suggestions: ['Continue maintaining good performance'],
-                            errorType: null
+                    const formattedRounds = roundsData.rounds.map((round, index) => {
+                        // 正确判断在这个回合中谁得分了
+                        let winner = 'playerA'; // 默认值
+                        
+                        if (index === 0) {
+                            // 第一回合，直接比较得分
+                            winner = round.pointA > round.pointB ? 'playerA' : 'playerB';
+                        } else {
+                            // 不是第一回合，比较与前一回合的得分差异
+                            const prevRound = roundsData.rounds[index - 1];
+                            const playerAScoreIncrease = round.pointA - prevRound.pointA;
+                            const playerBScoreIncrease = round.pointB - prevRound.pointB;
+                            
+                            if (playerAScoreIncrease > playerBScoreIncrease) {
+                                winner = 'playerA';
+                            } else if (playerBScoreIncrease > playerAScoreIncrease) {
+                                winner = 'playerB';
+                            } else {
+                                // 如果两者得分增加相同（通常不会发生），使用累积得分判断
+                                winner = round.pointA > round.pointB ? 'playerA' : 'playerB';
+                            }
                         }
-                    }));
+                        
+                        return {
+                            id: round.roundInGame,
+                            timestamp: new Date().toISOString(),
+                            winner: winner,
+                            playerAScore: round.pointA,
+                            playerBScore: round.pointB,
+                            analysis: {
+                                feedback: 'Round completed successfully',
+                                suggestions: ['Continue maintaining good performance'],
+                                errorType: null
+                            }
+                        };
+                    });
                     
                     // 更新当前游戏的轮次数据
                     this.currentGame = {
