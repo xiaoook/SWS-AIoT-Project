@@ -705,6 +705,24 @@ class HockeyVisualization {
             this.puckState.isVisible = false;
             this.updatePuckVisibility();
             console.log('🏒 Puck hidden after goal effect');
+            
+            // Show puck again after 5 seconds at center position
+            setTimeout(() => {
+                // Reset puck to center position
+                this.resetPuckToCenter();
+                
+                // Make puck visible again
+                this.puckState.isVisible = true;
+                this.puckState.isDetected = true;
+                this.puckState.lastDetectedTime = Date.now();
+                this.updatePuckVisibility();
+                
+                // Update visual position to center
+                this.updateVisualPositions();
+                
+                console.log('🏒 Puck reappeared at center position');
+            }, 5000); // 5 seconds delay
+            
         }, 1500); // Hide after 1.5 seconds to let the effect complete
     }
     
@@ -1634,6 +1652,63 @@ class HockeyVisualization {
          }, 4000);
      }
      
+     // Test goal sequence with puck reappearance
+     testGoalSequenceWithPuckReappearance() {
+         console.log('🧪 Testing goal sequence with puck reappearance...');
+         
+         // Set puck to a visible position first
+         this.currentPositions.puck = { x: 20, y: 13 };
+         this.puckState.isVisible = true;
+         this.updatePuckVisibility();
+         this.updateVisualPositions();
+         
+         console.log('📍 Puck positioned at (20, 13) and visible');
+         
+         // Simulate goal after 2 seconds
+         setTimeout(() => {
+             console.log('⚽ Simulating goal - puck should disappear and reappear at center in 5 seconds...');
+             this.handleGoalEvent({ side: 'left' });
+             
+             // Log status at different intervals
+             setTimeout(() => {
+                 console.log('⏰ 3 seconds: Puck should still be hidden');
+                 console.log('Puck visible:', this.puckState.isVisible);
+             }, 3000);
+             
+             setTimeout(() => {
+                 console.log('⏰ 7 seconds: Puck should now be visible at center');
+                 console.log('Puck visible:', this.puckState.isVisible);
+                 console.log('Puck position:', this.currentPositions.puck);
+             }, 7000);
+             
+         }, 2000);
+     }
+     
+     // Test multiple goal sequence
+     testMultipleGoalsSequence() {
+         console.log('🧪 Testing multiple goals sequence...');
+         
+         // First goal
+         setTimeout(() => {
+             console.log('⚽ First goal (left)');
+             this.handleGoalEvent({ side: 'left' });
+         }, 1000);
+         
+         // Second goal (should happen after first puck reappears)
+         setTimeout(() => {
+             console.log('⚽ Second goal (right)');
+             this.handleGoalEvent({ side: 'right' });
+         }, 8000);
+         
+         // Third goal
+         setTimeout(() => {
+             console.log('⚽ Third goal (left)');
+             this.handleGoalEvent({ side: 'left' });
+         }, 15000);
+         
+         console.log('📅 Goals scheduled at 1s, 8s, and 15s intervals');
+     }
+     
      // Test coordinate system consistency
      testCoordinateSystemConsistency() {
          console.log('🧪 Testing coordinate system consistency...');
@@ -1663,20 +1738,56 @@ class HockeyVisualization {
              this.testCoordinateSystemConsistency();
          }, 2000);
          
-         // Test backend goal events
+         // Test backend goal events with puck reappearance
          setTimeout(() => {
-             this.testBackendGoalEvents();
+             this.testGoalSequenceWithPuckReappearance();
          }, 4000);
          
-         // Test all features
+         // Test multiple goals sequence
+         setTimeout(() => {
+             this.testMultipleGoalsSequence();
+         }, 12000);
+         
+         // Test all other features
          setTimeout(() => {
              this.testAllNewFeatures();
-         }, 10000);
+         }, 25000);
          
-         console.log('✅ All rotation and backend integration tests scheduled');
+         console.log('✅ All rotation and backend integration tests scheduled (including goal reappearance)');
      }
      
      // Collision testing functionality removed
+     
+     // Quick test for goal and puck reappearance
+     testQuickGoalReappearance() {
+         console.log('🧪 Quick test: Goal → Puck disappears → Puck reappears at center');
+         
+         // Ensure puck is visible first
+         this.puckState.isVisible = true;
+         this.updatePuckVisibility();
+         console.log('📍 Puck made visible');
+         
+         // Trigger goal immediately
+         setTimeout(() => {
+             console.log('⚽ Goal triggered!');
+             this.handleGoalEvent({ side: 'left' });
+             console.log('⏰ Timeline: Goal effect (1.5s) → Hide puck (5s) → Show at center');
+         }, 500);
+     }
+     
+     // Get current puck status
+     getPuckStatus() {
+         return {
+             isVisible: this.puckState.isVisible,
+             isDetected: this.puckState.isDetected,
+             position: this.currentPositions.puck,
+             lastDetectedTime: this.puckState.lastDetectedTime,
+             centerPosition: {
+                 x: this.realDimensions.tableLength / 2,
+                 y: this.realDimensions.tableWidth / 2
+             }
+         };
+     }
 }
 
         // Initialize when DOM is loaded
