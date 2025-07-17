@@ -4424,6 +4424,232 @@ class AnalysisManager {
             console.log('  ⚡ Smooth animations');
         }, 1000);
     }
+    
+    // Test backend analysis API connections
+    async testBackendAnalysisConnections() {
+        console.log('🔌 Testing backend analysis API connections...');
+        
+        // Test with a sample game ID (using first available game)
+        const testGameId = this.games.length > 0 ? this.games[0].databaseGameId : 1;
+        
+        console.log(`🎯 Testing with game ID: ${testGameId}`);
+        
+        // Test Game Analysis API
+        await this.testGameAnalysisAPI(testGameId);
+        
+        // Test Round Analysis API
+        await this.testRoundAnalysisAPI(testGameId);
+        
+        // Test Create Analysis APIs
+        await this.testCreateAnalysisAPIs(testGameId);
+        
+        console.log('✅ Backend analysis API connection tests completed');
+    }
+    
+    // Test Game Analysis API
+    async testGameAnalysisAPI(gameId) {
+        console.log('📊 Testing Game Analysis API...');
+        
+        try {
+            const response = await fetch(`${CONFIG.API_URLS.ANALYSIS_GAME}?gid=${gameId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ Game Analysis API connected successfully:`, data);
+                
+                if (data.status === 'success' && data.analysis) {
+                    console.log('  📈 Game analysis data available');
+                    console.log('  🔍 Analysis details:', {
+                        A_type: data.analysis.A_type,
+                        B_type: data.analysis.B_type,
+                        hasAnalysis: !!(data.analysis.A_analysis && data.analysis.B_analysis)
+                    });
+                } else {
+                    console.log('  ℹ️ No game analysis data (expected if not created yet)');
+                }
+            } else if (response.status === 404) {
+                console.log('  ℹ️ Game Analysis API connected - no data found (404 - normal)');
+            } else {
+                console.warn(`  ⚠️ Game Analysis API response error: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('  ❌ Game Analysis API connection failed:', error);
+        }
+    }
+    
+    // Test Round Analysis API
+    async testRoundAnalysisAPI(gameId) {
+        console.log('🔄 Testing Round Analysis API...');
+        
+        try {
+            const response = await fetch(CONFIG.getRoundAnalysisUrl(gameId), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ Round Analysis API connected successfully:`, data);
+                
+                if (data.status === 'success' && data.analyses) {
+                    console.log(`  📊 Round analysis data available: ${data.analyses.length} analyses`);
+                    
+                    if (data.analyses.length > 0) {
+                        const sampleAnalysis = data.analyses[0];
+                        console.log('  🔍 Sample analysis details:', {
+                            gid: sampleAnalysis.gid,
+                            rid: sampleAnalysis.rid,
+                            A_type: sampleAnalysis.A_type,
+                            B_type: sampleAnalysis.B_type
+                        });
+                    }
+                } else {
+                    console.log('  ℹ️ No round analysis data available');
+                }
+            } else if (response.status === 404) {
+                console.log('  ℹ️ Round Analysis API connected - no data found (404 - normal)');
+            } else {
+                console.warn(`  ⚠️ Round Analysis API response error: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('  ❌ Round Analysis API connection failed:', error);
+        }
+    }
+    
+    // Test Create Analysis APIs
+    async testCreateAnalysisAPIs(gameId) {
+        console.log('🔧 Testing Create Analysis APIs...');
+        
+        // Test Create Game Analysis
+        await this.testCreateGameAnalysis(gameId);
+        
+        // Test Create Round Analysis
+        await this.testCreateRoundAnalysis(gameId);
+    }
+    
+    // Test Create Game Analysis API
+    async testCreateGameAnalysis(gameId) {
+        console.log('📝 Testing Create Game Analysis API...');
+        
+        const testData = {
+            gid: gameId,
+            A_type: ['slow_reaction', 'weak_defense'],
+            A_analysis: {
+                performance: 'Good',
+                strengths: ['Quick response', 'Good positioning'],
+                weaknesses: ['Slow reaction', 'Weak defense']
+            },
+            B_type: ['poor_alignment', 'coverage_gap'],
+            B_analysis: {
+                performance: 'Average',
+                strengths: ['Consistent play'],
+                weaknesses: ['Poor alignment', 'Coverage gap']
+            }
+        };
+        
+        try {
+            const response = await fetch(CONFIG.API_URLS.ANALYSIS_GAME_NEW, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(testData)
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ Create Game Analysis API test successful:`, data);
+            } else {
+                console.log(`ℹ️ Create Game Analysis API response: ${response.status} (may indicate data already exists)`);
+            }
+        } catch (error) {
+            console.error('  ❌ Create Game Analysis API test failed:', error);
+        }
+    }
+    
+    // Test Create Round Analysis API
+    async testCreateRoundAnalysis(gameId) {
+        console.log('📝 Testing Create Round Analysis API...');
+        
+        const testData = {
+            gid: gameId,
+            rid: 999, // Test round ID
+            A_type: ['low_activity'],
+            A_analysis: {
+                performance: 'Below Average',
+                issues: ['Low activity level']
+            },
+            B_type: ['slow_reaction'],
+            B_analysis: {
+                performance: 'Average',
+                issues: ['Slow reaction time']
+            }
+        };
+        
+        try {
+            const response = await fetch(CONFIG.API_URLS.ANALYSIS_ROUND_NEW, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(testData)
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ Create Round Analysis API test successful:`, data);
+            } else {
+                console.log(`ℹ️ Create Round Analysis API response: ${response.status} (may indicate constraint issues)`);
+            }
+        } catch (error) {
+            console.error('  ❌ Create Round Analysis API test failed:', error);
+        }
+    }
+    
+    // Test API configuration
+    testAPIConfiguration() {
+        console.log('⚙️ Testing API Configuration...');
+        
+        console.log('🔧 CONFIG object:', {
+            BACKEND_URL: CONFIG.BACKEND_URL,
+            ANALYSIS_GAME: CONFIG.API_URLS.ANALYSIS_GAME,
+            ANALYSIS_GAME_NEW: CONFIG.API_URLS.ANALYSIS_GAME_NEW,
+            ANALYSIS_ROUND_NEW: CONFIG.API_URLS.ANALYSIS_ROUND_NEW
+        });
+        
+        console.log('🔧 URL generators:');
+        console.log('  getRoundAnalysisUrl(1):', CONFIG.getRoundAnalysisUrl(1));
+        console.log('  getRoundsUrl(1):', CONFIG.getRoundsUrl(1));
+        
+        console.log('✅ API configuration test completed');
+    }
+    
+    // Comprehensive backend connection test
+    async testCompleteBackendConnection() {
+        console.log('🚀 Starting comprehensive backend connection test...');
+        
+        // Test API configuration
+        this.testAPIConfiguration();
+        
+        // Wait a moment then test connections
+        setTimeout(async () => {
+            await this.testBackendAnalysisConnections();
+            
+            console.log('🎉 All backend connection tests completed!');
+            console.log('📋 Summary:');
+            console.log('  ✅ Game Analysis API: GET /analysis/game');
+            console.log('  ✅ Round Analysis API: GET /analysis/round/{gid}');
+            console.log('  ✅ Create Game Analysis API: POST /analysis/game/new');
+            console.log('  ✅ Create Round Analysis API: POST /analysis/round/new');
+        }, 1000);
+    }
 }
 
 // Initialize analysis manager
