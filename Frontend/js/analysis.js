@@ -307,15 +307,22 @@ class AnalysisManager {
                 if (data.status === 'success' && data.analysis) {
                     console.log(`✅ Loaded game analysis for game ${databaseGameId}`);
                     
+                    // 调试信息：显示后端返回的数据结构
+                    console.log('🔍 Backend game analysis raw data:', data.analysis);
+                    console.log('🔍 A_type:', data.analysis.A_type, typeof data.analysis.A_type);
+                    console.log('🔍 A_analysis:', data.analysis.A_analysis, typeof data.analysis.A_analysis);
+                    console.log('🔍 B_type:', data.analysis.B_type, typeof data.analysis.B_type);
+                    console.log('🔍 B_analysis:', data.analysis.B_analysis, typeof data.analysis.B_analysis);
+                    
                     this.currentGame.backendAnalysis = {
                         playerA: {
-                            errorTypes: data.analysis.A_type || [],
-                            analysis: data.analysis.A_analysis || [],
+                            errorTypes: this.safeParseBackendData(data.analysis.A_type, []),
+                            analysis: this.safeParseBackendData(data.analysis.A_analysis, []),
                             timestamp: new Date().toISOString()
                         },
                         playerB: {
-                            errorTypes: data.analysis.B_type || [],
-                            analysis: data.analysis.B_analysis || [],
+                            errorTypes: this.safeParseBackendData(data.analysis.B_type, []),
+                            analysis: this.safeParseBackendData(data.analysis.B_analysis, []),
                             timestamp: new Date().toISOString()
                         }
                     };
@@ -353,15 +360,22 @@ class AnalysisManager {
                             const gameRound = this.currentGame.rounds.find(round => round.id === roundId);
                             
                             if (gameRound) {
+                                // 调试信息：显示轮次分析的数据结构
+                                console.log(`🔍 Round ${roundId} backend analysis raw data:`, analysis);
+                                console.log(`🔍 Round ${roundId} A_type:`, analysis.A_type, typeof analysis.A_type);
+                                console.log(`🔍 Round ${roundId} A_analysis:`, analysis.A_analysis, typeof analysis.A_analysis);
+                                console.log(`🔍 Round ${roundId} B_type:`, analysis.B_type, typeof analysis.B_type);
+                                console.log(`🔍 Round ${roundId} B_analysis:`, analysis.B_analysis, typeof analysis.B_analysis);
+                                
                                 gameRound.backendAnalysis = {
                                     playerA: {
-                                        errorTypes: analysis.A_type || [],
-                                        analysis: analysis.A_analysis || [],
+                                        errorTypes: this.safeParseBackendData(analysis.A_type, []),
+                                        analysis: this.safeParseBackendData(analysis.A_analysis, []),
                                         timestamp: new Date().toISOString()
                                     },
                                     playerB: {
-                                        errorTypes: analysis.B_type || [],
-                                        analysis: analysis.B_analysis || [],
+                                        errorTypes: this.safeParseBackendData(analysis.B_type, []),
+                                        analysis: this.safeParseBackendData(analysis.B_analysis, []),
                                         timestamp: new Date().toISOString()
                                     }
                                 };
@@ -676,9 +690,14 @@ class AnalysisManager {
         const loserKey = round.winner === 'playerA' ? 'playerB' : 'playerA';
         const loserName = this.getPlayerName(this.currentGame, loserKey);
         
-        const analysis = round.backendAnalysis;
-        const playerAErrors = analysis.playerA.errorTypes || [];
-        const playerBErrors = analysis.playerB.errorTypes || [];
+        // 安全地获取分析数据
+        const analysis = round.backendAnalysis || {};
+        const playerAData = analysis.playerA || {};
+        const playerBData = analysis.playerB || {};
+        
+        // 使用安全的数据处理函数
+        const playerAErrors = this.safeParseBackendData(playerAData.errorTypes, []);
+        const playerBErrors = this.safeParseBackendData(playerBData.errorTypes, []);
         
         return `
             <div class="round-analysis-card">
@@ -729,25 +748,25 @@ class AnalysisManager {
     collectPlayerErrors(playerKey, rounds) {
         const errorTypes = new Set();
         
+        // 安全地处理错误类型数据
+        const safeProcessErrorTypes = (errorTypesData) => {
+            const processedTypes = this.safeParseBackendData(errorTypesData, []);
+            processedTypes.forEach(type => 
+                errorTypes.add(this.translateErrorType(type))
+            );
+        };
+        
         // 游戏级别错误
         if (this.currentGame && this.currentGame.backendAnalysis && this.currentGame.backendAnalysis[playerKey]) {
             const gameErrorTypes = this.currentGame.backendAnalysis[playerKey].errorTypes;
-            if (Array.isArray(gameErrorTypes)) {
-                gameErrorTypes.forEach(type => 
-                    errorTypes.add(this.translateErrorType(type))
-                );
-            }
+            safeProcessErrorTypes(gameErrorTypes);
         }
         
         // 轮次级别错误
         rounds.forEach(round => {
             if (round.backendAnalysis && round.backendAnalysis[playerKey]) {
                 const roundErrorTypes = round.backendAnalysis[playerKey].errorTypes;
-                if (Array.isArray(roundErrorTypes)) {
-                    roundErrorTypes.forEach(type => 
-                        errorTypes.add(this.translateErrorType(type))
-                    );
-                }
+                safeProcessErrorTypes(roundErrorTypes);
             }
         });
         
@@ -755,8 +774,12 @@ class AnalysisManager {
     }
     
     formatPlayerAnalysis(playerData) {
-        const errorTypes = playerData.errorTypes || [];
-        const analysis = playerData.analysis || [];
+        // 确保playerData存在并且errorTypes和analysis是数组
+        const safePlayerData = playerData || {};
+        
+        // 使用安全的数据处理函数
+        const errorTypes = this.safeParseBackendData(safePlayerData.errorTypes, []);
+        const analysis = this.safeParseBackendData(safePlayerData.analysis, []);
         
         let content = '';
         
@@ -811,6 +834,30 @@ class AnalysisManager {
         }
         
         return `Player ${playerType.slice(-1)}`;
+    }
+    
+    // 安全地处理后端返回的数据，确保始终返回数组
+    safeParseBackendData(data, defaultValue = []) {
+        if (!data) return defaultValue;
+        
+        // 如果已经是数组，直接返回
+        if (Array.isArray(data)) {
+            return data;
+        }
+        
+        // 如果是字符串，尝试解析JSON
+        if (typeof data === 'string') {
+            try {
+                const parsed = JSON.parse(data);
+                return Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+                console.warn('Failed to parse backend data as JSON:', data);
+                return data ? [data] : defaultValue;
+            }
+        }
+        
+        // 其他情况，尝试转换为数组
+        return data ? [data] : defaultValue;
     }
     
     getWinnerName() {
