@@ -1761,14 +1761,10 @@ class AnalysisManager {
                     <div class="round-score-display">${round.playerAScore} - ${round.playerBScore}</div>
                     <div class="round-result">
                         <span class="winner-announcement">🏆 ${winnerText} wins this round!</span>
-                        <button class="expand-toggle ${isExpanded ? 'expanded' : ''}" data-round-id="${round.id}" type="button">
-                            <span class="toggle-icon">${isExpanded ? '▼' : '▶'}</span>
-                            <span class="toggle-text">${isExpanded ? 'Hide Analysis' : 'View Analysis'}</span>
-                        </button>
                     </div>
                 </div>
                 
-                <div class="dual-analysis-content ${isExpanded ? 'expanded' : ''}">
+                <div class="dual-analysis-content expanded">
                     <div class="players-analysis">
                         <!-- Player A Analysis -->
                         <div class="player-analysis player-a ${playerAWon ? 'winner' : 'loser'}">
@@ -2141,22 +2137,7 @@ class AnalysisManager {
     }
     
     addRoundClickEvents() {
-        // 为新的dual-analysis-item添加事件监听器
-        document.querySelectorAll('.expand-toggle').forEach(button => {
-            if (button.hasAttribute('data-event-bound')) return;
-            
-            button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                
-                const roundId = parseInt(button.dataset.roundId);
-                if (!isNaN(roundId)) {
-                    console.log('expand-toggle clicked, roundId:', roundId);
-                    this.toggleDetailedRound(roundId);
-                }
-            });
-            
-            button.setAttribute('data-event-bound', 'true');
-        });
+        // Expand/collapse functionality removed
         
         // 为旧的point-item添加事件监听器（兼容性）
         document.querySelectorAll('.point-item').forEach(item => {
@@ -3706,21 +3687,7 @@ class AnalysisManager {
             });
         });
 
-            // Expand/Collapse toggle buttons for round analysis - 修复"View Analysis"按钮
-            document.querySelectorAll('.expand-toggle').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    try {
-                        e.stopPropagation();
-                        const roundId = parseInt(e.currentTarget.dataset.roundId);
-                        if (roundId && !isNaN(roundId)) {
-                            console.log('Expand toggle clicked, roundId:', roundId);
-                            this.toggleDetailedRound(roundId);
-                        }
-                    } catch (error) {
-                        console.error('Error in expand toggle handler:', error);
-                    }
-                });
-            });
+            // Expand/collapse functionality removed
 
             // Detailed view events - 新增
             document.querySelectorAll('.detailed-card-header[data-clickable="header"]').forEach(header => {
