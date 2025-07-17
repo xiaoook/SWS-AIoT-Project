@@ -1761,7 +1761,7 @@ class AnalysisManager {
                     <div class="round-score-display">${round.playerAScore} - ${round.playerBScore}</div>
                     <div class="round-result">
                         <span class="winner-announcement">🏆 ${winnerText} wins this round!</span>
-                        <button class="expand-toggle ${isExpanded ? 'expanded' : ''}" data-round-id="${round.id}">
+                        <button class="expand-toggle ${isExpanded ? 'expanded' : ''}" data-round-id="${round.id}" type="button">
                             <span class="toggle-icon">${isExpanded ? '▼' : '▶'}</span>
                             <span class="toggle-text">${isExpanded ? 'Hide Analysis' : 'View Analysis'}</span>
                         </button>
@@ -3705,6 +3705,22 @@ class AnalysisManager {
                 }
             });
         });
+
+            // Expand/Collapse toggle buttons for round analysis - 修复"View Analysis"按钮
+            document.querySelectorAll('.expand-toggle').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    try {
+                        e.stopPropagation();
+                        const roundId = parseInt(e.currentTarget.dataset.roundId);
+                        if (roundId && !isNaN(roundId)) {
+                            console.log('Expand toggle clicked, roundId:', roundId);
+                            this.toggleDetailedRound(roundId);
+                        }
+                    } catch (error) {
+                        console.error('Error in expand toggle handler:', error);
+                    }
+                });
+            });
 
             // Detailed view events - 新增
             document.querySelectorAll('.detailed-card-header[data-clickable="header"]').forEach(header => {

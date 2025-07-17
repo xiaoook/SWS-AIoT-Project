@@ -304,6 +304,9 @@ class HockeyVisualization {
         // Check boundary constraints (prevent objects from going out of bounds)
         this.checkBoundaryConstraints();
         
+        // Check basic collision detection for visual feedback
+        this.checkObjectCollisions();
+        
         // Check goal scoring
         this.checkGoalScoring();
     }
@@ -395,6 +398,73 @@ class HockeyVisualization {
         this.checkObjectBoundaries('pusherA', this.display.pusherRadius);
         this.checkObjectBoundaries('pusherB', this.display.pusherRadius);
     }
+    
+    // Check object collisions for visual feedback (not physics simulation)
+    checkObjectCollisions() {
+        const puckPos = this.currentPositions.puck;
+        const pusherAPos = this.currentPositions.pusherA;
+        const pusherBPos = this.currentPositions.pusherB;
+        
+        // Check puck-pusher collisions
+        this.checkCollision('puck', puckPos, this.display.puckRadius, 'pusherA', pusherAPos, this.display.pusherRadius);
+        this.checkCollision('puck', puckPos, this.display.puckRadius, 'pusherB', pusherBPos, this.display.pusherRadius);
+        
+        // Check pusher-pusher collision
+        this.checkCollision('pusherA', pusherAPos, this.display.pusherRadius, 'pusherB', pusherBPos, this.display.pusherRadius);
+    }
+    
+    // Check collision between two objects
+    checkCollision(obj1Name, pos1, radius1, obj2Name, pos2, radius2) {
+        // Calculate distance between centers
+        const dx = pos2.x - pos1.x;
+        const dy = pos2.y - pos1.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if collision occurred
+        const minDistance = radius1 + radius2;
+        if (distance < minDistance && distance > 0) {
+            // Objects are colliding
+            console.log(`⚡ Collision detected: ${obj1Name} ↔ ${obj2Name} (distance: ${distance.toFixed(2)}cm, min: ${minDistance.toFixed(2)}cm)`);
+            
+            // Add visual feedback
+            this.addCollisionEffect(obj1Name, obj2Name);
+            
+            // Separate objects to prevent overlap (simple separation)
+            const separationDistance = (minDistance - distance) / 2;
+            const separationX = (dx / distance) * separationDistance;
+            const separationY = (dy / distance) * separationDistance;
+            
+            // Move objects apart
+            pos1.x -= separationX;
+            pos1.y -= separationY;
+            pos2.x += separationX;
+            pos2.y += separationY;
+            
+            // Re-check boundaries after separation
+            this.checkObjectBoundaries(obj1Name, radius1);
+            this.checkObjectBoundaries(obj2Name, radius2);
+        }
+    }
+    
+    // Add visual collision effect
+    addCollisionEffect(obj1Name, obj2Name) {
+        const obj1Element = this[obj1Name];
+        const obj2Element = this[obj2Name];
+        
+        if (obj1Element) {
+            obj1Element.classList.add('boundary-collision');
+            setTimeout(() => {
+                obj1Element.classList.remove('boundary-collision');
+            }, 200);
+        }
+        
+        if (obj2Element) {
+            obj2Element.classList.add('boundary-collision');
+            setTimeout(() => {
+                obj2Element.classList.remove('boundary-collision');
+            }, 200);
+        }
+    }
 
     // Check object boundaries (prevent objects from going out of bounds)
     checkObjectBoundaries(objectName, radius) {
@@ -405,6 +475,10 @@ class HockeyVisualization {
         const maxX = this.realDimensions.tableLength;
         const minY = 0;
         const maxY = this.realDimensions.tableWidth;
+        
+        // Store original position for logging
+        const originalPos = { x: pos.x, y: pos.y };
+        let positionClamped = false;
         
         // Constrain position to boundaries (no bouncing physics)
         // Special handling for puck near goals
@@ -418,6 +492,7 @@ class HockeyVisualization {
                 } else {
                     // Constrain to boundary
                     pos.x = minX + radius;
+                    positionClamped = true;
                 }
             }
             
@@ -430,6 +505,7 @@ class HockeyVisualization {
                 } else {
                     // Constrain to boundary
                     pos.x = maxX - radius;
+                    positionClamped = true;
                 }
             }
         } else {
@@ -437,22 +513,31 @@ class HockeyVisualization {
             // Check left boundary
             if (pos.x - radius <= minX) {
                 pos.x = minX + radius;
+                positionClamped = true;
             }
             
             // Check right boundary
             if (pos.x + radius >= maxX) {
                 pos.x = maxX - radius;
+                positionClamped = true;
             }
         }
         
         // Check top boundary (all objects)
         if (pos.y - radius <= minY) {
             pos.y = minY + radius;
+            positionClamped = true;
         }
         
         // Check bottom boundary (all objects)
         if (pos.y + radius >= maxY) {
             pos.y = maxY - radius;
+            positionClamped = true;
+        }
+        
+        // Log position clamping for debugging
+        if (positionClamped) {
+            console.log(`🔒 ${objectName} position clamped: (${originalPos.x.toFixed(2)}, ${originalPos.y.toFixed(2)}) → (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)})`);
         }
     }
 
@@ -568,11 +653,16 @@ class HockeyVisualization {
             return;
         }
         
-        // Log data reception for debugging
-        console.log('📡 Position data received:', data);
+        // Log data reception for debugging (less verbose)
+        if (this.updateCount % 30 === 0) { // Log every 30 updates to reduce spam
+            console.log('📡 Position data received:', data);
+        }
+        
+        // Track update success
+        let updateSuccess = false;
         
         // Convert MQTT data to real-world coordinates
-        // Assuming MQTT sends data in the format: { pusher1: {x, y}, pusher2: {x, y}, puck: {x, y} }
+        // Backend sends data in format: { pusher1: {x, y}, pusher2: {x, y}, puck: {x, y} }
         
         if (data.pusher1) {
             // Check if pusher1 data is valid before processing
@@ -589,13 +679,16 @@ class HockeyVisualization {
                     
                     // Update current position
                     this.currentPositions.pusherA = realPos;
+                    updateSuccess = true;
                     
-                    console.log(`📍 Pusher A updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                    if (this.updateCount % 60 === 0) { // Log every 60 updates
+                        console.log(`📍 Pusher A updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)}) [MQTT: ${data.pusher1.x}, ${data.pusher1.y}]`);
+                    }
                 } else {
-                    console.log(`⚠️ Failed to convert pusher1 coordinates, keeping current position: (${this.currentPositions.pusherA.x.toFixed(2)}, ${this.currentPositions.pusherA.y.toFixed(2)})`);
+                    console.warn(`⚠️ Failed to convert pusher1 coordinates: (${data.pusher1.x}, ${data.pusher1.y})`);
                 }
             } else {
-                console.log(`⚠️ Invalid pusher1 data received, keeping current position: (${this.currentPositions.pusherA.x.toFixed(2)}, ${this.currentPositions.pusherA.y.toFixed(2)})`);
+                console.warn(`⚠️ Invalid pusher1 data: x=${data.pusher1.x}, y=${data.pusher1.y}`);
             }
         }
         
@@ -614,13 +707,16 @@ class HockeyVisualization {
                     
                     // Update current position
                     this.currentPositions.pusherB = realPos;
+                    updateSuccess = true;
                     
-                    console.log(`📍 Pusher B updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                    if (this.updateCount % 60 === 0) { // Log every 60 updates
+                        console.log(`📍 Pusher B updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)}) [MQTT: ${data.pusher2.x}, ${data.pusher2.y}]`);
+                    }
                 } else {
-                    console.log(`⚠️ Failed to convert pusher2 coordinates, keeping current position: (${this.currentPositions.pusherB.x.toFixed(2)}, ${this.currentPositions.pusherB.y.toFixed(2)})`);
+                    console.warn(`⚠️ Failed to convert pusher2 coordinates: (${data.pusher2.x}, ${data.pusher2.y})`);
                 }
             } else {
-                console.log(`⚠️ Invalid pusher2 data received, keeping current position: (${this.currentPositions.pusherB.x.toFixed(2)}, ${this.currentPositions.pusherB.y.toFixed(2)})`);
+                console.warn(`⚠️ Invalid pusher2 data: x=${data.pusher2.x}, y=${data.pusher2.y}`);
             }
         }
         
@@ -639,18 +735,26 @@ class HockeyVisualization {
                     
                     // Update current position
                     this.currentPositions.puck = realPos;
+                    updateSuccess = true;
                     
-                    console.log(`📍 Puck updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                    if (this.updateCount % 60 === 0) { // Log every 60 updates
+                        console.log(`📍 Puck updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)}) [MQTT: ${data.puck.x}, ${data.puck.y}]`);
+                    }
                 } else {
-                    console.log(`⚠️ Failed to convert puck coordinates, keeping current position: (${this.currentPositions.puck.x.toFixed(2)}, ${this.currentPositions.puck.y.toFixed(2)})`);
+                    console.warn(`⚠️ Failed to convert puck coordinates: (${data.puck.x}, ${data.puck.y})`);
                 }
             } else {
-                console.log(`⚠️ Invalid puck data received, keeping current position: (${this.currentPositions.puck.x.toFixed(2)}, ${this.currentPositions.puck.y.toFixed(2)})`);
+                console.warn(`⚠️ Invalid puck data: x=${data.puck.x}, y=${data.puck.y}`);
             }
         }
         
         // Update performance metrics
         this.updatePerformanceMetrics();
+        
+        // Log successful update rate
+        if (updateSuccess && this.updateCount % 120 === 0) {
+            console.log(`✅ Position update successful (${this.updateCount} updates processed)`);
+        }
     }
 
     // Calculate velocity based on position change
@@ -702,9 +806,10 @@ class HockeyVisualization {
             return false;
         }
         
-        // Check if values are within reasonable bounds (0-800 for x, 0-400 for y in MQTT coordinates)
-        if (x < 0 || x > 800 || y < 0 || y > 400) {
-            console.warn(`⚠️ Position data out of bounds: x=${x}, y=${y}`);
+        // Check if values are within reasonable bounds (0-810 for x, 0-420 for y in MQTT coordinates)
+        // Updated to match backend coordinate system (810x420)
+        if (x < 0 || x > 810 || y < 0 || y > 420) {
+            console.warn(`⚠️ Position data out of bounds: x=${x}, y=${y} (expected 0-810, 0-420)`);
             return false;
         }
         
@@ -720,8 +825,9 @@ class HockeyVisualization {
         }
         
         // Clamp values to expected MQTT range to prevent out-of-bounds positions
-        const clampedX = Math.max(0, Math.min(800, mqttX));
-        const clampedY = Math.max(0, Math.min(400, mqttY));
+        // Updated to match backend coordinate system (810x420)
+        const clampedX = Math.max(0, Math.min(810, mqttX));
+        const clampedY = Math.max(0, Math.min(420, mqttY));
         
         // Log if values were clamped
         if (clampedX !== mqttX || clampedY !== mqttY) {
@@ -729,9 +835,9 @@ class HockeyVisualization {
         }
         
         // Convert to real-world coordinates
-        // Assuming MQTT coordinate system is 0-800 for length, 0-400 for width
-        const realX = (clampedX / 800) * this.realDimensions.tableLength;
-        const realY = (clampedY / 400) * this.realDimensions.tableWidth;
+        // Backend uses 810x420 coordinate system, convert to 43x26cm real dimensions
+        const realX = (clampedX / 810) * this.realDimensions.tableLength;
+        const realY = (clampedY / 420) * this.realDimensions.tableWidth;
         
         // Ensure the resulting coordinates are within table bounds
         const boundedX = Math.max(0, Math.min(this.realDimensions.tableLength, realX));
