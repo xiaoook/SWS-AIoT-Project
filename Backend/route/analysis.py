@@ -19,6 +19,7 @@ def game_analysis():
             'message': 'Game analysis not found'
         }), 404
 
+    # logger.debug(f"Analysis: {analysis}")
     return jsonify({
         'status': 'success',
         'analysis': analysis
@@ -27,7 +28,7 @@ def game_analysis():
 @analysis_bp.route('/analysis/game/new', methods=['POST'])
 def new_game_analysis():
     data = request.get_json()
-    logger.debug(f"New game analysis request: {data}")
+    # logger.debug(f"New game analysis request: {data}")
     gid = data.get('gid')
     error_type_a = data.get('A_type')
     analysis_a = data.get('A_analysis')
@@ -60,6 +61,7 @@ def round_analysis(gid=None):
             'message': 'Game analysis not found'
         }), 404
 
+    # logger.debug(f"Round analysis: {analyses}")
     return jsonify({
         'status': 'success',
         'analyses': analyses
@@ -68,6 +70,7 @@ def round_analysis(gid=None):
 @analysis_bp.route('/analysis/round/new', methods=['POST'])
 def new_round_analysis(gid=None):
     data = request.get_json()
+    # logger.debug(f"New round analysis: {data}")
     gid = data.get('gid')
     rid = data.get('rid')
     error_type_a = data.get('A_type')

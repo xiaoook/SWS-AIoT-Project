@@ -296,7 +296,7 @@ def get_round_analysis(gid):
         cur = conn.cursor()
         cur.execute("SELECT * FROM RoundAnalysis WHERE gid = ?", (gid,))
         result = cur.fetchall()
-        # logger.debug(f"Analysis: {result}")
+        logger.debug(f"Analysis: {result}")
         if result is None:
             return None
     except sqlite3.OperationalError as e:
@@ -309,10 +309,10 @@ def get_round_analysis(gid):
     analyses = []
     for r in result:
         analysis = dict(r)
-        analysis["A_type"] = json.loads(analysis["A_type"])
-        analysis["B_type"] = json.loads(analysis["B_type"])
-        analysis["A_analysis"] = json.loads(analysis["A_analysis"])
-        analysis["B_analysis"] = json.loads(analysis["B_analysis"])
+        # analysis["A_type"] = json.loads(analysis["A_type"])
+        # analysis["B_type"] = json.loads(analysis["B_type"])
+        # analysis["A_analysis"] = json.loads(analysis["A_analysis"])
+        # analysis["B_analysis"] = json.loads(analysis["B_analysis"])
         analyses.append(analysis)
 
     return analyses

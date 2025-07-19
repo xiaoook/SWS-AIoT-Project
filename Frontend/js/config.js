@@ -6,7 +6,7 @@ const CONFIG = {
     
     // 服务器URL配置
     get BACKEND_URL() {
-        return `http://172.20.10.2:${this.BACKEND_PORT}`;
+        return `http://localhost:${this.BACKEND_PORT}`;
     },
     
     get FRONTEND_URL() {

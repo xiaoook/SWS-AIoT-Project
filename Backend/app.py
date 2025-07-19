@@ -63,12 +63,6 @@ def handle_connect_mqtt(client, userdata, flags, rc):
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
     global latest_position
-<<<<<<< HEAD
-    payload = message.payload.decode()
-    logger.debug(f'Received position: {payload}')
-    latest_position = json.loads(payload)
-    socketio.emit('position_update', latest_position)
-=======
     if message.topic == 'game/positions':
         payload = message.payload.decode()
         # logger.debug(f'Received position: {payload}')
@@ -79,7 +73,6 @@ def handle_mqtt_message(client, userdata, message):
         # logger.debug(f'Received prediction: {payload}')
         prediction = json.loads(payload)
         socketio.emit('win_rate_prediction', prediction)
->>>>>>> b8b3a5b4e04529081d970b6d9ac0fb6b00a0e44a
 
 # emit the current score when the new client connects
 @socketio.on('connect')
@@ -174,6 +167,7 @@ def new_game():
     current_score = {'A': 0, 'B': 0}
     current_round = 0
     mqtt.publish('game/status', 'in progress'.encode(), retain=True)
+    mqtt.publish('game/info', str(gid).encode(), retain=True)
 
     return jsonify({
         "status": "success",
@@ -325,7 +319,7 @@ def delete_game():
         current_round = 0
         current_game = 0
         socketio.emit('score_update', current_score)
-        mqtt.publish('game/score', )
+        mqtt.publish('game/score', json.dumps(current_score).encode())
 
     delete_selected_game(gid)
     return jsonify({
