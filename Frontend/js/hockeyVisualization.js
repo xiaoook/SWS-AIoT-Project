@@ -1,4 +1,4 @@
-// Real-time Hockey Game Visualization Module with Real Scale & Collision Detection
+// Real-time Hockey Game Visualization Module with Real Scale & MQTT Data Integration
 class HockeyVisualization {
     constructor() {
         this.isInitialized = false;
@@ -60,26 +60,27 @@ class HockeyVisualization {
             puck: { x: 21.5, y: 13 }     // Center of table
         };
         
-        // Velocity data (cm/s)
+        // Initialize velocities for display purposes (even though MQTT provides position data only)
         this.velocities = {
             pusherA: { x: 0, y: 0 },
             pusherB: { x: 0, y: 0 },
             puck: { x: 0, y: 0 }
         };
         
-        // Physics properties - Enhanced for realistic ice hockey
-        this.physics = {
+        // Previous positions for velocity calculation
+        this.previousPositions = {
+            pusherA: { x: 8, y: 13 },
+            pusherB: { x: 35, y: 13 },
+            puck: { x: 21.5, y: 13 }
+        };
+        
+        // Display properties - For boundary detection and visualization
+        this.display = {
             puckRadius: this.realDimensions.puckDiameter / 2,      // 2cm
             pusherRadius: this.realDimensions.pusherDiameter / 2,  // 2.5cm
-            friction: 0.995,          // High friction for ice surface
-            bounceDamping: 0.9,       // Less energy loss on collision
-            minVelocity: 0.05,        // Lower minimum velocity threshold
-            maxVelocity: 80,          // Higher maximum velocity for faster gameplay
-            wallBounce: 0.85,         // Wall bounce coefficient
-            puckPusherBounce: 0.95,   // Puck-pusher collision coefficient
-            pusherPusherBounce: 0.7,  // Pusher-pusher collision coefficient
-            speedMultiplier: 1.5,     // Global speed multiplier
-            impulseStrength: 15       // Stronger impulse for manual control
+            minVelocity: 0.05,        // Lower minimum velocity threshold for display
+            maxVelocity: 80,          // Higher maximum velocity for display
+            updateRate: 16            // Update rate in ms (60fps)
         };
         
         // Game state
@@ -87,6 +88,39 @@ class HockeyVisualization {
             score: { left: 0, right: 0 },
             lastGoal: null,
             goalCooldown: false
+        };
+        
+        // Goal processing state
+        this.goalProcessing = false;
+        
+        // Puck visibility state
+        this.puckState = {
+            isVisible: true,
+            isDetected: true,
+            lastDetectedTime: Date.now(),
+            disappearanceTimeout: null,
+            isInGoalSequence: false // New flag for goal sequence
+        };
+        
+        // Pusher visibility state for half-court control
+        this.pusherState = {
+            pusherA: {
+                isVisible: true,
+                isInCorrectHalf: true,
+                lastValidTime: Date.now()
+            },
+            pusherB: {
+                isVisible: true,
+                isInCorrectHalf: true,
+                lastValidTime: Date.now()
+            }
+        };
+        
+        // Half-court boundaries (in real coordinates)
+        this.halfCourt = {
+            centerX: this.realDimensions.tableLength / 2,  // 21.5cm - center line
+            leftSide: { min: 0, max: this.realDimensions.tableLength / 2 },     // 0-21.5cm
+            rightSide: { min: this.realDimensions.tableLength / 2, max: this.realDimensions.tableLength } // 21.5-43cm
         };
         
         // Position history (for trails)
@@ -101,26 +135,28 @@ class HockeyVisualization {
         this.lastUpdateTime = Date.now();
         this.updateRate = 0;
         
-        // Physics loop
-        this.lastPhysicsTime = Date.now();
-        this.physicsRunning = false;
+        // Visualization loop
+        this.lastVisualizationTime = Date.now();
+        this.visualizationRunning = false;
         
-        console.log('🏒 HockeyVisualization initialized with real-world scale:', this.realDimensions);
+        console.log('🏒 HockeyVisualization initialized with real-world scale (MQTT data driven):', this.realDimensions);
         console.log('📏 Aspect ratio:', this.aspectRatio.toFixed(2) + ':1');
         console.log('🥅 Goal size:', this.realDimensions.goalLength + 'cm');
+        console.log('📡 Data source: MQTT sensors (no physics simulation)');
     }
 
     // Initialize visualization system
     async initialize() {
         try {
-            console.log('🚀 Initializing hockey visualization...');
+            console.log('🚀 Initializing hockey visualization (MQTT data driven)...');
             
             // Log boundary information for debugging
             console.log(`📏 Real dimensions: ${this.realDimensions.tableLength}cm × ${this.realDimensions.tableWidth}cm`);
             console.log(`🎯 Physical boundaries: X(0 - ${this.realDimensions.tableLength}cm), Y(0 - ${this.realDimensions.tableWidth}cm)`);
-            console.log(`⚽ Puck radius: ${this.physics.puckRadius}cm, Pusher radius: ${this.physics.pusherRadius}cm`);
+            console.log(`⚽ Puck radius: ${this.display.puckRadius}cm, Pusher radius: ${this.display.pusherRadius}cm`);
             console.log(`🔄 Boundary system: NO BUFFER - exact real dimensions for perfect alignment`);
             console.log(`🎯 Coordinate system: Origin at RED BORDER inner edge (not outer container)`);
+            console.log(`📡 Data source: MQTT sensors (no collision simulation)`);
             
             // Initialize DOM elements
             this.initializeElements();
@@ -134,16 +170,14 @@ class HockeyVisualization {
             // Set initial positions
             this.setInitialPositions();
             
-            // Start physics simulation
-            this.startPhysicsLoop();
-            
-            // Start update loop
-            this.startUpdateLoop();
+            // Start visualization update loop
+            this.startVisualizationLoop();
             
             this.isInitialized = true;
-            console.log('✅ Hockey visualization initialized successfully');
+            console.log('✅ Hockey visualization initialized successfully (MQTT data driven)');
             console.log('🎯 Physical boundaries match visual boundaries exactly');
             console.log('🔴 Origin: Red border inner edge (43×26cm game area)');
+            console.log('📡 Ready to receive MQTT sensor data');
             
             return true;
         } catch (error) {
@@ -179,8 +213,8 @@ class HockeyVisualization {
             positionInfo.style.display = this.showTrails ? 'flex' : 'none';
         }
         
-        // Add physics enabled class to enable physics-specific CSS
-        this.tableSurface.classList.add('physics-enabled');
+        // Add MQTT enabled class to enable MQTT-specific CSS
+        this.tableSurface.classList.add('mqtt-enabled');
         
         // Update element sizes based on real dimensions
         this.updateElementSizes();
@@ -298,179 +332,30 @@ class HockeyVisualization {
         };
     }
 
-    // Physics-based collision detection
-    checkCollisions() {
-        // Check puck-pusher collisions
-        this.checkPuckPusherCollision('pusherA');
-        this.checkPuckPusherCollision('pusherB');
+    // Boundary detection for object position validation
+    validateObjectPositions() {
+        // Check boundary constraints (prevent objects from going out of bounds)
+        this.checkBoundaryConstraints();
         
-        // Check boundary collisions (including goals)
-        this.checkBoundaryCollisions();
+        // Collision detection removed - not needed for MQTT-based positioning
+        // this.checkObjectCollisions(); // Removed: no longer needed
         
-        // Check pusher-pusher collision
-        this.checkPusherPusherCollision();
-        
-        // Check goal scoring
-        this.checkGoalScoring();
+        // Goal scoring removed - now handled completely by backend WebSocket messages
+        // this.checkGoalScoring(); // Removed: no longer depend on frontend position detection
     }
 
-    // Check collision between puck and pusher
-    checkPuckPusherCollision(pusherName) {
-        const puckPos = this.currentPositions.puck;
-        const pusherPos = this.currentPositions[pusherName];
-        
-        // Calculate distance between centers
-        const dx = puckPos.x - pusherPos.x;
-        const dy = puckPos.y - pusherPos.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Check if collision occurred
-        const minDistance = this.physics.puckRadius + this.physics.pusherRadius;
-        
-        if (distance < minDistance && distance > 0) {
-            // Collision detected - resolve collision
-            this.resolvePuckPusherCollision(pusherName, dx, dy, distance);
-        }
-    }
+    // Collision simulation removed - Data comes from MQTT sensors only
 
-    // Resolve collision between puck and pusher - Enhanced for realistic ice hockey
-    resolvePuckPusherCollision(pusherName, dx, dy, distance) {
-        const puckPos = this.currentPositions.puck;
-        const pusherPos = this.currentPositions[pusherName];
-        const pusherVel = this.velocities[pusherName];
-        
-        // Normalize collision vector
-        const nx = dx / distance;
-        const ny = dy / distance;
-        
-        // Separate objects to prevent overlap
-        const overlap = (this.physics.puckRadius + this.physics.pusherRadius) - distance;
-        const separationX = nx * overlap * 0.6;
-        const separationY = ny * overlap * 0.6;
-        
-        // Move puck away from pusher
-        puckPos.x += separationX;
-        puckPos.y += separationY;
-        
-        // Move pusher away from puck (less movement)
-        pusherPos.x -= separationX * 0.1;
-        pusherPos.y -= separationY * 0.1;
-        
-        // Calculate relative velocity
-        const puckVel = this.velocities.puck;
-        const relativeVelX = puckVel.x - pusherVel.x;
-        const relativeVelY = puckVel.y - pusherVel.y;
-        
-        // Calculate relative velocity in collision normal direction
-        const relativeVelNormal = relativeVelX * nx + relativeVelY * ny;
-        
-        // Do not resolve if velocities are separating
-        if (relativeVelNormal > 0) return;
-        
-        // Calculate collision impulse with enhanced bounce coefficient
-        const impulse = -relativeVelNormal * this.physics.puckPusherBounce;
-        
-        // Apply impulse to puck (pusher is much heavier, so gets less effect)
-        puckVel.x += impulse * nx * 0.95;
-        puckVel.y += impulse * ny * 0.95;
-        
-        // Add pusher velocity to puck (pusher "hits" puck) - Enhanced transfer
-        const pusherSpeed = Math.sqrt(pusherVel.x * pusherVel.x + pusherVel.y * pusherVel.y);
-        const transferFactor = Math.min(0.8, 0.3 + pusherSpeed * 0.02);
-        
-        puckVel.x += pusherVel.x * transferFactor;
-        puckVel.y += pusherVel.y * transferFactor;
-        
-        // Limit velocity
-        this.limitVelocity('puck');
-        
-        // Add collision effect
-        this.addCollisionEffect('puck');
-        this.addCollisionEffect(pusherName);
-        
-        console.log(`💥 Collision: ${pusherName} hit puck (impulse: ${impulse.toFixed(2)})`);
-    }
-
-    // Check pusher-pusher collision
-    checkPusherPusherCollision() {
-        const pusherAPos = this.currentPositions.pusherA;
-        const pusherBPos = this.currentPositions.pusherB;
-        
-        // Calculate distance between centers
-        const dx = pusherAPos.x - pusherBPos.x;
-        const dy = pusherAPos.y - pusherBPos.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Check if collision occurred
-        const minDistance = this.physics.pusherRadius * 2;
-        
-        if (distance < minDistance && distance > 0) {
-            // Collision detected - separate pushers with enhanced physics
-            const nx = dx / distance;
-            const ny = dy / distance;
-            
-            const overlap = minDistance - distance;
-            const separationX = nx * overlap * 0.6;
-            const separationY = ny * overlap * 0.6;
-            
-            pusherAPos.x += separationX;
-            pusherAPos.y += separationY;
-            pusherBPos.x -= separationX;
-            pusherBPos.y -= separationY;
-            
-            // Apply bounce effect to velocities
-            const velA = this.velocities.pusherA;
-            const velB = this.velocities.pusherB;
-            
-            const relativeVelX = velA.x - velB.x;
-            const relativeVelY = velA.y - velB.y;
-            const relativeVelNormal = relativeVelX * nx + relativeVelY * ny;
-            
-            if (relativeVelNormal < 0) {
-                const impulse = -relativeVelNormal * this.physics.pusherPusherBounce;
-                
-                velA.x += impulse * nx * 0.5;
-                velA.y += impulse * ny * 0.5;
-                velB.x -= impulse * nx * 0.5;
-                velB.y -= impulse * ny * 0.5;
-            }
-            
-            console.log('💥 Pusher collision detected with enhanced physics');
-        }
-    }
-
-    // Check if puck scored in goals
-    checkGoalScoring() {
-        if (this.gameState.goalCooldown) return;
-        
-        const puckPos = this.currentPositions.puck;
-        const puckRadius = this.physics.puckRadius;
-        
-        // Use exact real dimensions without any buffer - consistent with boundary detection
-        const minX = 0;
-        const maxX = this.realDimensions.tableLength;
-        
-        // Check left goal
-        if (puckPos.x - puckRadius <= minX) {
-            if (puckPos.y >= this.goals.left.y && puckPos.y <= this.goals.left.y + this.goals.left.height) {
-                this.onGoalScored('right'); // Right player scored
-                console.log(`🥅 LEFT GOAL! Puck at (${puckPos.x.toFixed(2)}, ${puckPos.y.toFixed(2)})`);
-                return;
-            }
-        }
-        
-        // Check right goal
-        if (puckPos.x + puckRadius >= maxX) {
-            if (puckPos.y >= this.goals.right.y && puckPos.y <= this.goals.right.y + this.goals.right.height) {
-                this.onGoalScored('left'); // Left player scored
-                console.log(`🥅 RIGHT GOAL! Puck at (${puckPos.x.toFixed(2)}, ${puckPos.y.toFixed(2)})`);
-                return;
-            }
-        }
-    }
+    // Frontend goal detection completely removed - now handled by backend WebSocket only
 
     // Handle goal scoring
     onGoalScored(scoringSide) {
+        // Check if game is in progress before recording goal
+        if (window.smartCourtApp && window.smartCourtApp.gameState.status !== 'playing') {
+            console.log(`🚫 Goal not recorded - game is ${window.smartCourtApp.gameState.status}`);
+            return;
+        }
+        
         this.gameState.score[scoringSide]++;
         this.gameState.lastGoal = {
             side: scoringSide,
@@ -483,9 +368,7 @@ class HockeyVisualization {
             this.gameState.goalCooldown = false;
         }, 2000);
         
-        // Reset puck to center
-        this.currentPositions.puck = { x: 21.5, y: 13 };
-        this.velocities.puck = { x: 0, y: 0 };
+        // Puck reset handled by MQTT data - no manual position reset
         
         // Add goal effect
         this.addGoalEffect(scoringSide);
@@ -511,21 +394,486 @@ class HockeyVisualization {
         }, 1000);
     }
 
-    // Check boundary collisions
-    checkBoundaryCollisions() {
+    // Check boundary constraints (prevent objects from going out of bounds)
+    checkBoundaryConstraints() {
         // Check puck boundaries
-        this.checkObjectBoundaries('puck', this.physics.puckRadius);
+        this.checkObjectBoundaries('puck', this.display.puckRadius);
         
         // Check pusher boundaries
-        this.checkObjectBoundaries('pusherA', this.physics.pusherRadius);
-        this.checkObjectBoundaries('pusherB', this.physics.pusherRadius);
+        this.checkObjectBoundaries('pusherA', this.display.pusherRadius);
+        this.checkObjectBoundaries('pusherB', this.display.pusherRadius);
+    }
+    
+    // Collision detection removed - not needed for MQTT-based positioning
+    
+    // All collision detection functionality removed - not needed for MQTT-based positioning
+    
+    // Handle puck disappearance when not detected
+    handlePuckDisappearance() {
+        if (this.puckState.isDetected) {
+            this.puckState.isDetected = false;
+            this.puckState.lastDetectedTime = Date.now();
+            
+            // Use a shorter timeout to make disappearance more responsive
+            if (this.puckState.disappearanceTimeout) {
+                clearTimeout(this.puckState.disappearanceTimeout);
+            }
+            
+            this.puckState.disappearanceTimeout = setTimeout(() => {
+                this.puckState.isVisible = false;
+                this.updatePuckVisibility();
+                console.log('🫥 Puck hidden after timeout');
+            }, 200); // Shorter delay for more responsive hiding
+        }
     }
 
-    // Check object boundaries (updated with goal detection and real edge collision)
+    // Handle puck appearance when detected
+    handlePuckAppearance() {
+        if (!this.puckState.isDetected) {
+            this.puckState.isDetected = true;
+            this.puckState.lastDetectedTime = Date.now();
+            
+            // Clear any pending disappearance timeout
+            if (this.puckState.disappearanceTimeout) {
+                clearTimeout(this.puckState.disappearanceTimeout);
+                this.puckState.disappearanceTimeout = null;
+            }
+            
+            // Show puck immediately
+            this.puckState.isVisible = true;
+            this.updatePuckVisibility();
+            
+            console.log('👁️ Puck detected - showing immediately');
+        } else if (!this.puckState.isVisible) {
+            // Puck was detected but hidden - show it immediately
+            this.puckState.isVisible = true;
+            this.updatePuckVisibility();
+            
+            console.log('👁️ Puck was hidden but detected - showing immediately');
+        }
+    }
+
+    // Update puck visibility
+    updatePuckVisibility() {
+        if (this.puck) {
+            this.puck.style.opacity = this.puckState.isVisible ? '1' : '0';
+            this.puck.style.pointerEvents = this.puckState.isVisible ? 'auto' : 'none';
+        }
+    }
+    
+    // Check if pusher is in correct half-court (matching backend logic)
+    checkPusherHalfCourt(pusherName, position) {
+        const isInCorrectHalf = this.isPusherInCorrectHalf(pusherName, position);
+        const currentState = this.pusherState[pusherName];
+        
+        if (isInCorrectHalf !== currentState.isInCorrectHalf) {
+            currentState.isInCorrectHalf = isInCorrectHalf;
+            
+            if (isInCorrectHalf) {
+                // Pusher returned to correct half - make visible
+                currentState.isVisible = true;
+                currentState.lastValidTime = Date.now();
+                console.log(`✅ ${pusherName} returned to correct half-court`);
+            } else {
+                // Pusher crossed to wrong half - hide it
+                currentState.isVisible = false;
+                console.log(`❌ ${pusherName} crossed to wrong half-court - hiding pusher`);
+            }
+            
+            this.updatePusherVisibility(pusherName);
+        }
+    }
+    
+    // Check if pusher is in correct half based on backend logic
+    isPusherInCorrectHalf(pusherName, position) {
+        const centerX = this.halfCourt.centerX;
+        
+        // After 180-degree rotation, the half-court logic needs to be reversed
+        // because the coordinate system is rotated but the pusher assignments remain the same
+        if (pusherName === 'pusherA') {
+            // PusherA (paddle 0) should be in RIGHT half after rotation
+            // Due to 180-degree rotation, pusherA now corresponds to right side
+            return position.x >= centerX;
+        } else if (pusherName === 'pusherB') {
+            // PusherB (paddle 1) should be in LEFT half after rotation  
+            // Due to 180-degree rotation, pusherB now corresponds to left side
+            return position.x < centerX;
+        }
+        
+        return true; // Default to visible for unknown pushers
+    }
+    
+    // Update pusher visibility
+    updatePusherVisibility(pusherName) {
+        const element = this[pusherName];
+        const state = this.pusherState[pusherName];
+        
+        if (element && state) {
+            if (state.isVisible) {
+                element.style.opacity = '1';
+                element.style.pointerEvents = 'auto';
+                element.style.transform = 'scale(1)';
+            } else {
+                element.style.opacity = '0.2';
+                element.style.pointerEvents = 'none';
+                element.style.transform = 'scale(0.8)';
+            }
+        }
+    }
+    
+    // Initialize pusher visibility states
+    initializePusherStates() {
+        Object.keys(this.pusherState).forEach(pusherName => {
+            this.updatePusherVisibility(pusherName);
+        });
+    }
+    
+    // Test half-court control functionality
+    testHalfCourtControl() {
+        console.log('🧪 Testing half-court control functionality...');
+        
+        // Test pusherA crossing to right side (should become invisible)
+        console.log('📍 Testing pusherA crossing to right side...');
+        this.currentPositions.pusherA = { x: 30, y: 13 }; // Right side
+        this.checkPusherHalfCourt('pusherA', this.currentPositions.pusherA);
+        
+        // Test pusherB crossing to left side (should become invisible)
+        console.log('📍 Testing pusherB crossing to left side...');
+        this.currentPositions.pusherB = { x: 10, y: 13 }; // Left side
+        this.checkPusherHalfCourt('pusherB', this.currentPositions.pusherB);
+        
+        // Wait 2 seconds then restore to correct sides
+        setTimeout(() => {
+            console.log('📍 Restoring pushers to correct sides...');
+            this.currentPositions.pusherA = { x: 8, y: 13 }; // Left side
+            this.currentPositions.pusherB = { x: 35, y: 13 }; // Right side
+            this.checkPusherHalfCourt('pusherA', this.currentPositions.pusherA);
+            this.checkPusherHalfCourt('pusherB', this.currentPositions.pusherB);
+            this.updateVisualPositions();
+        }, 2000);
+        
+        this.updateVisualPositions();
+    }
+    
+    // Get current half-court status
+    getHalfCourtStatus() {
+        return {
+            pusherA: {
+                position: this.currentPositions.pusherA,
+                isVisible: this.pusherState.pusherA.isVisible,
+                isInCorrectHalf: this.pusherState.pusherA.isInCorrectHalf,
+                correctHalf: 'left'
+            },
+            pusherB: {
+                position: this.currentPositions.pusherB,
+                isVisible: this.pusherState.pusherB.isVisible,
+                isInCorrectHalf: this.pusherState.pusherB.isInCorrectHalf,
+                correctHalf: 'right'
+            },
+            halfCourtCenter: this.halfCourt.centerX
+        };
+    }
+    
+    // Test enhanced goal effects
+    testGoalEffects() {
+        console.log('🧪 Testing enhanced goal effects...');
+        
+        // Test left goal
+        setTimeout(() => {
+            console.log('⚽ Testing left goal effect...');
+            this.handleGoalScored('left', this.currentPositions.puck);
+        }, 1000);
+        
+        // Test right goal
+        setTimeout(() => {
+            console.log('⚽ Testing right goal effect...');
+            this.handleGoalScored('right', this.currentPositions.puck);
+        }, 5000);
+    }
+    
+    // Test puck immediate position updates
+    testPuckPositionUpdates() {
+        console.log('🧪 Testing puck immediate position updates...');
+        
+        // Test immediate position update
+        const testPositions = [
+            { x: 10, y: 10 },
+            { x: 30, y: 15 },
+            { x: 21.5, y: 13 },
+            { x: 15, y: 20 }
+        ];
+        
+        testPositions.forEach((pos, index) => {
+            setTimeout(() => {
+                console.log(`📍 Testing position ${index + 1}: (${pos.x}, ${pos.y})`);
+                this.updatePuckPositionImmediate(pos);
+            }, index * 1000);
+        });
+    }
+    
+    // Test puck visibility control
+    testPuckVisibility() {
+        console.log('🧪 Testing puck visibility control...');
+        
+        // Test disappearance
+        setTimeout(() => {
+            console.log('🫥 Testing puck disappearance...');
+            this.handlePuckDisappearance();
+        }, 1000);
+        
+        // Test reappearance
+        setTimeout(() => {
+            console.log('👁️ Testing puck reappearance...');
+            this.handlePuckAppearance();
+        }, 3000);
+    }
+    
+    // Comprehensive test of all new features
+    testAllNewFeatures() {
+        console.log('🧪 Starting comprehensive test of all new features...');
+        
+        // Test half-court control
+        this.testHalfCourtControl();
+        
+        // Test goal effects after half-court test
+        setTimeout(() => {
+            this.testGoalEffects();
+        }, 8000);
+        
+        // Test puck position updates
+        setTimeout(() => {
+            this.testPuckPositionUpdates();
+        }, 15000);
+        
+        // Test puck visibility
+        setTimeout(() => {
+            this.testPuckVisibility();
+        }, 20000);
+        
+        console.log('✅ All tests scheduled - check console for results');
+    }
+    
+    // Get current system status
+    getSystemStatus() {
+        return {
+            puckState: this.puckState,
+            pusherState: this.pusherState,
+            currentPositions: this.currentPositions,
+            gameState: this.gameState,
+            halfCourtStatus: this.getHalfCourtStatus(),
+            isWebSocketConnected: this.isWebSocketConnected,
+            isInitialized: this.isInitialized,
+            isPaused: this.isPaused
+        };
+    }
+
+    // Handle goal scored with realistic animation
+    handleGoalScored(goalSide, goalPosition) {
+        // Prevent duplicate goal processing
+        if (this.goalProcessing) {
+            console.log('🚫 Goal already being processed, ignoring duplicate');
+            return;
+        }
+        
+        this.goalProcessing = true;
+        console.log(`🥅 Goal scored! Side: ${goalSide}, Position:`, goalPosition);
+        
+        // Create enhanced goal effect animation
+        this.createEnhancedGoalEffect(goalSide, goalPosition);
+        
+        // Set puck to special "goal sequence" mode to avoid MQTT interference
+        this.puckState.isInGoalSequence = true;
+        
+        // Hide puck after goal effect completes
+        setTimeout(() => {
+            this.puckState.isVisible = false;
+            this.updatePuckVisibility();
+            console.log('🏒 Puck hidden after goal effect');
+            
+            // Show puck again after 5 seconds at center position
+            setTimeout(() => {
+                // Reset puck to center position
+                this.resetPuckToCenter();
+                
+                // Make puck visible again and exit goal sequence mode
+                this.puckState.isVisible = true;
+                this.puckState.isDetected = true;
+                this.puckState.lastDetectedTime = Date.now();
+                this.puckState.isInGoalSequence = false;
+                this.updatePuckVisibility();
+                
+                // Update visual position to center
+                this.updateVisualPositions();
+                
+                // Reset goal processing flag
+                this.goalProcessing = false;
+                
+                console.log('🏒 Puck reappeared at center position - goal sequence complete');
+            }, 5000); // 5 seconds delay
+            
+        }, 1500); // Hide after 1.5 seconds to let the effect complete
+    }
+    
+    // Create enhanced visual goal effect
+    createEnhancedGoalEffect(goalSide, goalPosition) {
+        if (!this.puck) return;
+        
+        console.log(`✨ Creating enhanced goal effect for ${goalSide} side`);
+        
+        // Add enhanced goal effect class for animation
+        this.puck.classList.add('puck-goal', 'goal-effect');
+        
+        // Create goal celebration container
+        const celebrationContainer = document.createElement('div');
+        celebrationContainer.className = 'goal-celebration';
+        celebrationContainer.style.position = 'absolute';
+        celebrationContainer.style.left = '50%';
+        celebrationContainer.style.top = '50%';
+        celebrationContainer.style.transform = 'translate(-50%, -50%)';
+        celebrationContainer.style.pointerEvents = 'none';
+        celebrationContainer.style.zIndex = '30';
+        celebrationContainer.style.fontSize = '24px';
+        celebrationContainer.style.fontWeight = 'bold';
+        celebrationContainer.style.color = 'gold';
+        celebrationContainer.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
+        celebrationContainer.style.animation = 'goalText 2s ease-out forwards';
+        celebrationContainer.textContent = 'GOAL!';
+        
+        // Add celebration to table surface
+        if (this.tableSurface) {
+            this.tableSurface.appendChild(celebrationContainer);
+        }
+        
+        // Animate puck towards goal with enhanced effect
+        const goalElement = goalSide === 'left' ? this.goalLeft : this.goalRight;
+        if (goalElement) {
+            const goalRect = goalElement.getBoundingClientRect();
+            const tableRect = this.tableSurface.getBoundingClientRect();
+            
+            // Calculate goal position relative to table
+            const goalX = goalRect.left - tableRect.left + goalRect.width / 2;
+            const goalY = goalRect.top - tableRect.top + goalRect.height / 2;
+            
+            // Enhanced puck animation to goal
+            this.puck.style.transition = 'all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            this.puck.style.left = goalX + 'px';
+            this.puck.style.top = goalY + 'px';
+            this.puck.style.transform = 'scale(1.2)';
+            this.puck.style.filter = 'brightness(1.8) drop-shadow(0 0 15px gold)';
+        }
+        
+        // Create enhanced spark effect
+        this.createEnhancedSparkEffect(goalSide);
+        
+        // Create screen flash effect
+        this.createScreenFlashEffect();
+        
+        // Remove effects after animation
+        setTimeout(() => {
+            if (this.puck) {
+                this.puck.classList.remove('puck-goal', 'goal-effect');
+                this.puck.style.transition = '';
+                this.puck.style.transform = '';
+                this.puck.style.filter = '';
+            }
+            
+            // Remove celebration text
+            if (celebrationContainer && celebrationContainer.parentNode) {
+                celebrationContainer.parentNode.removeChild(celebrationContainer);
+            }
+        }, 2000);
+    }
+    
+    // Create enhanced spark effect for goal
+    createEnhancedSparkEffect(goalSide) {
+        const goalElement = goalSide === 'left' ? this.goalLeft : this.goalRight;
+        if (!goalElement) return;
+        
+        // Create multiple spark containers for layered effect
+        for (let layer = 0; layer < 3; layer++) {
+            const sparkContainer = document.createElement('div');
+            sparkContainer.className = 'goal-sparks';
+            sparkContainer.style.position = 'absolute';
+            sparkContainer.style.left = '50%';
+            sparkContainer.style.top = '50%';
+            sparkContainer.style.transform = 'translate(-50%, -50%)';
+            sparkContainer.style.pointerEvents = 'none';
+            sparkContainer.style.zIndex = '25';
+            
+            // Add more sparks for enhanced effect
+            for (let i = 0; i < 12; i++) {
+                const spark = document.createElement('div');
+                spark.className = 'goal-spark';
+                spark.style.position = 'absolute';
+                spark.style.width = '4px';
+                spark.style.height = '4px';
+                spark.style.backgroundColor = layer === 0 ? 'gold' : layer === 1 ? 'orange' : 'yellow';
+                spark.style.borderRadius = '50%';
+                spark.style.boxShadow = `0 0 10px ${spark.style.backgroundColor}`;
+                
+                // Random direction and distance
+                const angle = (i * 30 + layer * 10) * Math.PI / 180;
+                const distance = 50 + Math.random() * 30;
+                const endX = Math.cos(angle) * distance;
+                const endY = Math.sin(angle) * distance;
+                
+                spark.style.animation = `sparkFly${layer} 1.5s ease-out forwards`;
+                spark.style.setProperty('--endX', `${endX}px`);
+                spark.style.setProperty('--endY', `${endY}px`);
+                
+                sparkContainer.appendChild(spark);
+            }
+            
+            goalElement.appendChild(sparkContainer);
+            
+            // Remove spark container after animation
+            setTimeout(() => {
+                if (sparkContainer && sparkContainer.parentNode) {
+                    sparkContainer.parentNode.removeChild(sparkContainer);
+                }
+            }, 1500);
+        }
+    }
+    
+    // Create screen flash effect
+    createScreenFlashEffect() {
+        const flashOverlay = document.createElement('div');
+        flashOverlay.className = 'goal-flash';
+        flashOverlay.style.position = 'fixed';
+        flashOverlay.style.top = '0';
+        flashOverlay.style.left = '0';
+        flashOverlay.style.width = '100vw';
+        flashOverlay.style.height = '100vh';
+        flashOverlay.style.backgroundColor = 'rgba(255, 215, 0, 0.3)';
+        flashOverlay.style.pointerEvents = 'none';
+        flashOverlay.style.zIndex = '9999';
+        flashOverlay.style.animation = 'goalFlash 0.5s ease-out forwards';
+        
+        document.body.appendChild(flashOverlay);
+        
+        // Remove flash after animation
+        setTimeout(() => {
+            if (flashOverlay && flashOverlay.parentNode) {
+                flashOverlay.parentNode.removeChild(flashOverlay);
+            }
+        }, 500);
+    }
+    
+    // Reset puck to center position
+    resetPuckToCenter() {
+        this.currentPositions.puck = { 
+            x: this.realDimensions.tableLength / 2, 
+            y: this.realDimensions.tableWidth / 2 
+        };
+        this.previousPositions.puck = { ...this.currentPositions.puck };
+        this.velocities.puck = { x: 0, y: 0 };
+        
+        console.log('🎯 Puck position reset to center');
+    }
+
+    // Check object boundaries (prevent objects from going out of bounds)
     checkObjectBoundaries(objectName, radius) {
         const pos = this.currentPositions[objectName];
-        const vel = this.velocities[objectName];
-        let bounced = false;
         
         // Use exact real dimensions without any buffer - this ensures perfect alignment
         const minX = 0;
@@ -533,19 +881,23 @@ class HockeyVisualization {
         const minY = 0;
         const maxY = this.realDimensions.tableWidth;
         
+        // Store original position for logging
+        const originalPos = { x: pos.x, y: pos.y };
+        let positionClamped = false;
+        
+        // Constrain position to boundaries (no bouncing physics)
         // Special handling for puck near goals
         if (objectName === 'puck') {
             // Check left boundary with goal
             if (pos.x - radius <= minX) {
                 // Check if in goal area
                 if (pos.y >= this.goals.left.y && pos.y <= this.goals.left.y + this.goals.left.height) {
-                    // Puck is in goal - don't bounce, let goal detection handle it
+                    // Puck is in goal - allow it through for goal detection
                     return;
                 } else {
-                    // Bounce off wall - place puck exactly at boundary
+                    // Constrain to boundary
                     pos.x = minX + radius;
-                    vel.x = Math.abs(vel.x) * this.physics.wallBounce;
-                    bounced = true;
+                    positionClamped = true;
                 }
             }
             
@@ -553,13 +905,12 @@ class HockeyVisualization {
             if (pos.x + radius >= maxX) {
                 // Check if in goal area
                 if (pos.y >= this.goals.right.y && pos.y <= this.goals.right.y + this.goals.right.height) {
-                    // Puck is in goal - don't bounce, let goal detection handle it
+                    // Puck is in goal - allow it through for goal detection
                     return;
                 } else {
-                    // Bounce off wall - place puck exactly at boundary
+                    // Constrain to boundary
                     pos.x = maxX - radius;
-                    vel.x = -Math.abs(vel.x) * this.physics.wallBounce;
-                    bounced = true;
+                    positionClamped = true;
                 }
             }
         } else {
@@ -567,172 +918,81 @@ class HockeyVisualization {
             // Check left boundary
             if (pos.x - radius <= minX) {
                 pos.x = minX + radius;
-                vel.x = Math.abs(vel.x) * this.physics.pusherPusherBounce;
-                bounced = true;
+                positionClamped = true;
             }
             
             // Check right boundary
             if (pos.x + radius >= maxX) {
                 pos.x = maxX - radius;
-                vel.x = -Math.abs(vel.x) * this.physics.pusherPusherBounce;
-                bounced = true;
+                positionClamped = true;
             }
         }
         
-        // Check top boundary (all objects) - exact boundary alignment
+        // Check top boundary (all objects)
         if (pos.y - radius <= minY) {
             pos.y = minY + radius;
-            vel.y = Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
-            bounced = true;
+            positionClamped = true;
         }
         
-        // Check bottom boundary (all objects) - enhanced detection with stricter checking
+        // Check bottom boundary (all objects)
         if (pos.y + radius >= maxY) {
-            // Force position to be exactly at the boundary to prevent any sinking
             pos.y = maxY - radius;
-            vel.y = -Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
-            bounced = true;
-            
-            // Additional safety check - if object is still somehow beyond boundary, force it back
-            if (pos.y + radius > maxY) {
-                pos.y = maxY - radius - 0.01; // Add tiny buffer to ensure it's inside
-                console.warn(`⚠️ Force corrected ${objectName} position at bottom boundary: y=${pos.y.toFixed(3)}`);
-            }
+            positionClamped = true;
         }
         
-        // Additional safety check for bottom boundary - early detection
-        if (pos.y + radius > maxY - 0.05) {
-            pos.y = maxY - radius;
-            if (vel.y > 0) { // Only reverse if moving towards boundary
-                vel.y = -Math.abs(vel.y) * (objectName === 'puck' ? this.physics.wallBounce : this.physics.pusherPusherBounce);
-                bounced = true;
-            }
-        }
-        
-        // Add boundary collision effect
-        if (bounced) {
-            this.addBoundaryCollisionEffect(objectName);
-            
-            // Enhanced logging for boundary collisions, especially bottom boundary
-            const boundaryType = pos.y + radius >= maxY ? 'BOTTOM' : 
-                                pos.y - radius <= minY ? 'TOP' : 
-                                pos.x - radius <= minX ? 'LEFT' : 'RIGHT';
-            
-            console.log(`🏒 ${boundaryType} boundary collision: ${objectName} at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}) - Table bounds: (0,0) to (${maxX},${maxY})`);
-            
-            // Special logging for bottom boundary issues
-            if (boundaryType === 'BOTTOM') {
-                console.log(`🔍 Bottom boundary details: pos.y=${pos.y.toFixed(3)}, radius=${radius.toFixed(3)}, maxY=${maxY}, pos.y+radius=${(pos.y + radius).toFixed(3)}`);
-            }
+        // Log position clamping for debugging
+        if (positionClamped) {
+            console.log(`🔒 ${objectName} position clamped: (${originalPos.x.toFixed(2)}, ${originalPos.y.toFixed(2)}) → (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)})`);
         }
     }
 
-    // Add collision effect
-    addCollisionEffect(objectName) {
-        const element = this[objectName];
-        if (element) {
-            element.classList.add('collision');
-            setTimeout(() => {
-                element.classList.remove('collision');
-            }, 300);
-        }
+    // Collision effects removed - Data comes from MQTT sensors only
+
+    // Update visualization based on MQTT data (no physics simulation)
+    updateVisualization() {
+        // Only validate positions and check goals
+        // No physics simulation - positions come from MQTT sensors
+        
+        // Validate object positions to prevent out-of-bounds
+        this.validateObjectPositions();
+        
+        // Update visual elements on display
+        this.updateVisualPositions();
     }
 
-    // Add boundary collision effect
-    addBoundaryCollisionEffect(objectName) {
-        const element = this[objectName];
-        if (element) {
-            element.classList.add('boundary-collision');
-            setTimeout(() => {
-                element.classList.remove('boundary-collision');
-            }, 200);
-        }
-    }
+    // Velocity limiting removed - Data comes from MQTT sensors
 
-    // Apply physics simulation - Enhanced for realistic ice hockey
-    updatePhysics(deltaTime) {
-        // Apply speed multiplier for faster gameplay
-        const effectiveDeltaTime = deltaTime * this.physics.speedMultiplier;
+    // Start visualization loop
+    startVisualizationLoop() {
+        this.visualizationRunning = true;
+        this.lastVisualizationTime = Date.now();
         
-        // Update positions based on velocities
-        Object.keys(this.currentPositions).forEach(objectName => {
-            const pos = this.currentPositions[objectName];
-            const vel = this.velocities[objectName];
-            
-            // Update position with enhanced delta time
-            pos.x += vel.x * effectiveDeltaTime;
-            pos.y += vel.y * effectiveDeltaTime;
-            
-            // Apply friction (different for puck and pushers)
-            if (objectName === 'puck') {
-                // High friction for ice surface
-                vel.x *= this.physics.friction;
-                vel.y *= this.physics.friction;
-                
-                // Stop very slow movement
-                if (Math.abs(vel.x) < this.physics.minVelocity) vel.x = 0;
-                if (Math.abs(vel.y) < this.physics.minVelocity) vel.y = 0;
-            } else {
-                // Pushers have more friction when not being controlled
-                vel.x *= 0.9;
-                vel.y *= 0.9;
-                
-                // Stop pusher movement faster
-                if (Math.abs(vel.x) < 0.1) vel.x = 0;
-                if (Math.abs(vel.y) < 0.1) vel.y = 0;
-            }
-        });
-        
-        // Check collisions
-        this.checkCollisions();
-    }
-
-    // Limit velocity to maximum
-    limitVelocity(objectName) {
-        const vel = this.velocities[objectName];
-        const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
-        
-        if (speed > this.physics.maxVelocity) {
-            const factor = this.physics.maxVelocity / speed;
-            vel.x *= factor;
-            vel.y *= factor;
-        }
-    }
-
-    // Start physics loop
-    startPhysicsLoop() {
-        this.physicsRunning = true;
-        this.lastPhysicsTime = Date.now();
-        
-        const physicsLoop = () => {
-            if (!this.physicsRunning || this.isPaused) {
-                if (this.physicsRunning) {
-                    requestAnimationFrame(physicsLoop);
+        const visualizationLoop = () => {
+            if (!this.visualizationRunning || this.isPaused) {
+                if (this.visualizationRunning) {
+                    requestAnimationFrame(visualizationLoop);
                 }
                 return;
             }
             
             const currentTime = Date.now();
-            const deltaTime = (currentTime - this.lastPhysicsTime) / 1000; // Convert to seconds
-            this.lastPhysicsTime = currentTime;
+            const deltaTime = (currentTime - this.lastVisualizationTime) / 1000; // Convert to seconds
+            this.lastVisualizationTime = currentTime;
             
-            // Update physics
-            this.updatePhysics(deltaTime);
-        
-        // Update visual positions
-        this.updateVisualPositions();
-        
-            requestAnimationFrame(physicsLoop);
+            // Update visualization (no physics)
+            this.updateVisualization();
+            
+            requestAnimationFrame(visualizationLoop);
         };
         
-        requestAnimationFrame(physicsLoop);
-        console.log('⚡ Physics loop started');
+        requestAnimationFrame(visualizationLoop);
+        console.log('🎨 Visualization loop started (MQTT data driven)');
     }
 
-    // Stop physics loop
-    stopPhysicsLoop() {
-        this.physicsRunning = false;
-        console.log('⏸️ Physics loop stopped');
+    // Stop visualization loop
+    stopVisualizationLoop() {
+        this.visualizationRunning = false;
+        console.log('⏸️ Visualization loop stopped');
     }
 
     // Set initial positions based on real dimensions
@@ -744,11 +1004,17 @@ class HockeyVisualization {
             puck: { x: 21.5, y: 13 }       // Center of table
         };
         
-        // Reset velocities
+        // Reset velocities and previous positions
         this.velocities = {
             pusherA: { x: 0, y: 0 },
             pusherB: { x: 0, y: 0 },
             puck: { x: 0, y: 0 }
+        };
+        
+        this.previousPositions = {
+            pusherA: { x: 8, y: 13 },
+            pusherB: { x: 35, y: 13 },
+            puck: { x: 21.5, y: 13 }
         };
         
         // Reset game state
@@ -765,6 +1031,17 @@ class HockeyVisualization {
         
         Object.keys(this.currentPositions).forEach(objectName => {
             const realPos = this.currentPositions[objectName];
+            
+            // Skip updating puck position if it's not visible
+            if (objectName === 'puck' && !this.puckState.isVisible) {
+                return;
+            }
+            
+            // Skip updating pusher position if it's not visible due to half-court control
+            if ((objectName === 'pusherA' || objectName === 'pusherB') && !this.pusherState[objectName].isVisible) {
+                return;
+            }
+            
             const displayPos = this.realToDisplayCoordinates(realPos.x, realPos.y);
             
             const element = this[objectName];
@@ -777,7 +1054,7 @@ class HockeyVisualization {
                 element.style.top = (displayPos.y - elementHeight / 2) + 'px';
             }
             
-            // Update position display
+            // Update position display (always update, even when object is hidden)
             this.updatePositionDisplay(objectName, realPos.x, realPos.y);
         });
     }
@@ -786,8 +1063,22 @@ class HockeyVisualization {
     handlePositionUpdate(data) {
         if (!this.isInitialized || this.isPaused) return;
         
+        // Validate data structure
+        if (!data || typeof data !== 'object') {
+            console.warn('⚠️ Invalid position data received:', data);
+            return;
+        }
+        
+        // Log data reception for debugging (less verbose)
+        if (this.updateCount % 30 === 0) { // Log every 30 updates to reduce spam
+            console.log('📡 Position data received:', data);
+        }
+        
+        // Track update success
+        let updateSuccess = false;
+        
         // Convert MQTT data to real-world coordinates
-        // Assuming MQTT sends data in the format: { pusher1: {x, y}, pusher2: {x, y}, puck: {x, y} }
+        // Backend sends data in format: { pusher1: {x, y}, pusher2: {x, y}, puck: {x, y} }
         
         if (data.pusher1) {
             // Check if pusher1 data is valid before processing
@@ -796,17 +1087,28 @@ class HockeyVisualization {
                 
                 // Double-check that conversion was successful
                 if (realPos) {
+                    // Calculate velocity based on position change
+                    this.calculateVelocity('pusherA', realPos);
+                    
+                    // Update previous position for next calculation
+                    this.previousPositions.pusherA = { ...this.currentPositions.pusherA };
+                    
+                    // Update current position
                     this.currentPositions.pusherA = realPos;
                     
-                    // Calculate velocity based on position change
-                    this.updateVelocity('pusherA', realPos);
+                    // Check half-court control for pusherA
+                    this.checkPusherHalfCourt('pusherA', realPos);
                     
-                    console.log(`📍 Pusher A updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                    updateSuccess = true;
+                    
+                    if (this.updateCount % 60 === 0) { // Log every 60 updates
+                        console.log(`📍 Pusher A updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)}) [MQTT: ${data.pusher1.x}, ${data.pusher1.y}]`);
+                    }
                 } else {
-                    console.log(`⚠️ Failed to convert pusher1 coordinates, keeping current position: (${this.currentPositions.pusherA.x.toFixed(2)}, ${this.currentPositions.pusherA.y.toFixed(2)})`);
+                    console.warn(`⚠️ Failed to convert pusher1 coordinates: (${data.pusher1.x}, ${data.pusher1.y})`);
                 }
             } else {
-                console.log(`⚠️ Invalid pusher1 data received, keeping current position: (${this.currentPositions.pusherA.x.toFixed(2)}, ${this.currentPositions.pusherA.y.toFixed(2)})`);
+                console.warn(`⚠️ Invalid pusher1 data: x=${data.pusher1.x}, y=${data.pusher1.y}`);
             }
         }
         
@@ -817,39 +1119,109 @@ class HockeyVisualization {
                 
                 // Double-check that conversion was successful
                 if (realPos) {
-                    this.currentPositions.pusherB = realPos;
-                    this.updateVelocity('pusherB', realPos);
+                    // Calculate velocity based on position change
+                    this.calculateVelocity('pusherB', realPos);
                     
-                    console.log(`📍 Pusher B updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                    // Update previous position for next calculation
+                    this.previousPositions.pusherB = { ...this.currentPositions.pusherB };
+                    
+                    // Update current position
+                    this.currentPositions.pusherB = realPos;
+                    
+                    // Check half-court control for pusherB
+                    this.checkPusherHalfCourt('pusherB', realPos);
+                    
+                    updateSuccess = true;
+                    
+                    if (this.updateCount % 60 === 0) { // Log every 60 updates
+                        console.log(`📍 Pusher B updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)}) [MQTT: ${data.pusher2.x}, ${data.pusher2.y}]`);
+                    }
                 } else {
-                    console.log(`⚠️ Failed to convert pusher2 coordinates, keeping current position: (${this.currentPositions.pusherB.x.toFixed(2)}, ${this.currentPositions.pusherB.y.toFixed(2)})`);
+                    console.warn(`⚠️ Failed to convert pusher2 coordinates: (${data.pusher2.x}, ${data.pusher2.y})`);
                 }
             } else {
-                console.log(`⚠️ Invalid pusher2 data received, keeping current position: (${this.currentPositions.pusherB.x.toFixed(2)}, ${this.currentPositions.pusherB.y.toFixed(2)})`);
+                console.warn(`⚠️ Invalid pusher2 data: x=${data.pusher2.x}, y=${data.pusher2.y}`);
             }
         }
         
-        if (data.puck) {
-            // Check if puck data is valid before processing
-            if (this.isValidPositionData(data.puck)) {
+        // Handle puck data - including null/missing detection
+        if (data.puck !== undefined) {
+            if (data.puck === null) {
+                // Puck not detected - handle disappearance only if not in goal sequence
+                if (!this.puckState.isInGoalSequence) {
+                    this.handlePuckDisappearance();
+                }
+            } else if (this.isValidPositionData(data.puck)) {
                 const realPos = this.mqttToRealCoordinates(data.puck.x, data.puck.y);
                 
                 // Double-check that conversion was successful
                 if (realPos) {
-                    this.currentPositions.puck = realPos;
-                    this.updateVelocity('puck', realPos);
-                    
-                    console.log(`📍 Puck updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                    // Only update puck position if not in goal sequence
+                    if (!this.puckState.isInGoalSequence) {
+                        // Puck is detected and valid - show it immediately
+                        this.handlePuckAppearance();
+                        
+                        // Update position immediately without any delay
+                        this.updatePuckPositionImmediate(realPos);
+                        
+                        updateSuccess = true;
+                        
+                        if (this.updateCount % 60 === 0) { // Log every 60 updates
+                            console.log(`📍 Puck updated to: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)}) [MQTT: ${data.puck.x}, ${data.puck.y}]`);
+                        }
+                    } else {
+                        // During goal sequence, ignore MQTT puck data but log it
+                        if (this.updateCount % 60 === 0) {
+                            console.log(`🚫 Ignoring MQTT puck data during goal sequence: (${realPos.x.toFixed(2)}, ${realPos.y.toFixed(2)})`);
+                        }
+                    }
                 } else {
-                    console.log(`⚠️ Failed to convert puck coordinates, keeping current position: (${this.currentPositions.puck.x.toFixed(2)}, ${this.currentPositions.puck.y.toFixed(2)})`);
+                    console.warn(`⚠️ Failed to convert puck coordinates: (${data.puck.x}, ${data.puck.y})`);
                 }
             } else {
-                console.log(`⚠️ Invalid puck data received, keeping current position: (${this.currentPositions.puck.x.toFixed(2)}, ${this.currentPositions.puck.y.toFixed(2)})`);
+                console.warn(`⚠️ Invalid puck data: x=${data.puck.x}, y=${data.puck.y}`);
             }
         }
         
         // Update performance metrics
         this.updatePerformanceMetrics();
+        
+        // Log successful update rate
+        if (updateSuccess && this.updateCount % 120 === 0) {
+            console.log(`✅ Position update successful (${this.updateCount} updates processed)`);
+        }
+    }
+
+    // Calculate velocity based on position change
+    calculateVelocity(objectName, newPosition) {
+        if (!this.velocities || !this.previousPositions || !this.currentPositions) {
+            return;
+        }
+        
+        const previousPos = this.previousPositions[objectName];
+        const currentPos = this.currentPositions[objectName];
+        
+        if (!previousPos || !currentPos) {
+            // Initialize velocity to zero if no previous position
+            this.velocities[objectName] = { x: 0, y: 0 };
+            return;
+        }
+        
+        // Calculate time difference (assuming 60fps update rate)
+        const deltaTime = 1/60; // seconds
+        
+        // Calculate velocity (cm/s)
+        const velX = (newPosition.x - currentPos.x) / deltaTime;
+        const velY = (newPosition.y - currentPos.y) / deltaTime;
+        
+        // Update velocity with some smoothing to avoid jittery display
+        if (this.velocities[objectName]) {
+            const smoothingFactor = 0.7; // Smooth velocity changes
+            this.velocities[objectName].x = this.velocities[objectName].x * smoothingFactor + velX * (1 - smoothingFactor);
+            this.velocities[objectName].y = this.velocities[objectName].y * smoothingFactor + velY * (1 - smoothingFactor);
+        } else {
+            this.velocities[objectName] = { x: velX, y: velY };
+        }
     }
 
     // Check if position data is valid (not null, undefined, or NaN)
@@ -869,9 +1241,10 @@ class HockeyVisualization {
             return false;
         }
         
-        // Check if values are within reasonable bounds (0-800 for x, 0-400 for y in MQTT coordinates)
-        if (x < 0 || x > 800 || y < 0 || y > 400) {
-            console.warn(`⚠️ Position data out of bounds: x=${x}, y=${y}`);
+        // Check if values are within reasonable bounds (0-810 for x, 0-420 for y in MQTT coordinates)
+        // Updated to match backend coordinate system (810x420)
+        if (x < 0 || x > 810 || y < 0 || y > 420) {
+            console.warn(`⚠️ Position data out of bounds: x=${x}, y=${y} (expected 0-810, 0-420)`);
             return false;
         }
         
@@ -887,18 +1260,27 @@ class HockeyVisualization {
         }
         
         // Clamp values to expected MQTT range to prevent out-of-bounds positions
-        const clampedX = Math.max(0, Math.min(800, mqttX));
-        const clampedY = Math.max(0, Math.min(400, mqttY));
+        // Updated to match backend coordinate system (810x420)
+        const clampedX = Math.max(0, Math.min(810, mqttX));
+        const clampedY = Math.max(0, Math.min(420, mqttY));
         
         // Log if values were clamped
         if (clampedX !== mqttX || clampedY !== mqttY) {
             console.warn(`⚠️ MQTT coordinates clamped: (${mqttX}, ${mqttY}) → (${clampedX}, ${clampedY})`);
         }
         
-        // Convert to real-world coordinates
-        // Assuming MQTT coordinate system is 0-800 for length, 0-400 for width
-        const realX = (clampedX / 800) * this.realDimensions.tableLength;
-        const realY = (clampedY / 400) * this.realDimensions.tableWidth;
+        // Convert to real-world coordinates with 180-degree rotation
+        // Backend uses 810x420 coordinate system, convert to 43x26cm real dimensions
+        // Apply 180-degree rotation: x' = max_x - x, y' = max_y - y
+        const normalizedX = clampedX / 810;
+        const normalizedY = clampedY / 420;
+        
+        // 180-degree rotation: flip both x and y coordinates
+        const rotatedX = 1 - normalizedX;
+        const rotatedY = 1 - normalizedY;
+        
+        const realX = rotatedX * this.realDimensions.tableLength;
+        const realY = rotatedY * this.realDimensions.tableWidth;
         
         // Ensure the resulting coordinates are within table bounds
         const boundedX = Math.max(0, Math.min(this.realDimensions.tableLength, realX));
@@ -907,24 +1289,7 @@ class HockeyVisualization {
         return { x: boundedX, y: boundedY };
     }
 
-    // Update velocity based on position change
-    updateVelocity(objectName, newPos) {
-        const currentTime = Date.now();
-        const lastPos = this.currentPositions[objectName];
-        
-        if (this.lastUpdateTime) {
-            const deltaTime = (currentTime - this.lastUpdateTime) / 1000;
-            
-            if (deltaTime > 0) {
-                const vel = this.velocities[objectName];
-                vel.x = (newPos.x - lastPos.x) / deltaTime;
-                vel.y = (newPos.y - lastPos.y) / deltaTime;
-                
-                // Limit velocity
-                this.limitVelocity(objectName);
-            }
-        }
-    }
+    // Velocity calculation removed - MQTT provides position data only
 
     // Update performance metrics
     updatePerformanceMetrics() {
@@ -953,10 +1318,13 @@ class HockeyVisualization {
         
         // Display velocity
         if (velElement) {
-            const vel = this.velocities[object];
-            if (vel) {
+            // Check if velocities object exists and has the object key
+            if (this.velocities && this.velocities[object]) {
+                const vel = this.velocities[object];
                 const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
                 velElement.textContent = `V: ${speed.toFixed(1)} cm/s`;
+            } else {
+                velElement.textContent = `V: 0.0 cm/s`;
             }
         }
     }
@@ -1115,6 +1483,16 @@ class HockeyVisualization {
                 this.handlePositionUpdate(data);
             });
             
+            // Listen for goal events
+            window.websocketManager.on('goal_scored', (goalData) => {
+                this.handleGoalEvent(goalData);
+            });
+            
+            // Listen for game reset events
+            window.websocketManager.on('game_reset', () => {
+                this.handleGameReset();
+            });
+            
             // Listen for connection status changes
             window.websocketManager.on('connect', () => {
                 this.updateConnectionStatus(true);
@@ -1124,14 +1502,49 @@ class HockeyVisualization {
                 this.updateConnectionStatus(false);
             });
             
-            console.log('🔌 WebSocket connection listeners set up');
+            console.log('🔌 WebSocket connection listeners set up for positions, goals, and game events');
         } else {
             console.warn('⚠️ WebSocket manager not available');
         }
     }
+    
+    // Handle goal event from WebSocket
+    handleGoalEvent(goalData) {
+        console.log('🥅 Goal event received:', goalData);
+        
+        if (goalData && goalData.side) {
+            // Trigger goal animation with current puck position
+            this.handleGoalScored(goalData.side, this.currentPositions.puck);
+        }
+    }
+    
+    // Handle game reset
+    handleGameReset() {
+        console.log('🔄 Game reset received');
+        
+        // Reset puck state
+        this.puckState.isVisible = true;
+        this.puckState.isDetected = true;
+        this.puckState.lastDetectedTime = Date.now();
+        
+        if (this.puckState.disappearanceTimeout) {
+            clearTimeout(this.puckState.disappearanceTimeout);
+            this.puckState.disappearanceTimeout = null;
+        }
+        
+        // Reset positions
+        this.setInitialPositions();
+        
+        // Show puck and initialize pusher states
+        this.puckState.isVisible = true;
+        this.updatePuckVisibility();
+        this.initializePusherStates();
+    }
 
     // Update connection status
     updateConnectionStatus(isConnected) {
+        this.isWebSocketConnected = isConnected;
+        
         const statusElement = document.getElementById('mqttStatus');
         if (statusElement) {
             statusElement.textContent = isConnected ? 'Connected - Real Data' : 'Disconnected';
@@ -1139,6 +1552,11 @@ class HockeyVisualization {
         }
         
         console.log(`🔗 Connection status: ${isConnected ? 'connected' : 'disconnected'}`);
+        
+        // If disconnected, maintain last known positions
+        if (!isConnected) {
+            console.log('📡 WebSocket disconnected, keeping last known positions');
+        }
     }
 
     // Start update loop
@@ -1157,9 +1575,21 @@ class HockeyVisualization {
 
     // Clean up
     destroy() {
-        this.stopPhysicsLoop();
+        this.stopVisualizationLoop();
         this.isInitialized = false;
         console.log('🧹 HockeyVisualization destroyed');
+    }
+    
+    // Test function to simulate position data
+    testPositionUpdate() {
+        const testData = {
+            pusher1: { x: 100 + Math.random() * 600, y: 50 + Math.random() * 300 },
+            pusher2: { x: 200 + Math.random() * 600, y: 50 + Math.random() * 300 },
+            puck: { x: 300 + Math.random() * 200, y: 100 + Math.random() * 200 }
+        };
+        
+        console.log('🧪 Testing position update with:', testData);
+        this.handlePositionUpdate(testData);
     }
 
     // Update mouse position display
@@ -1176,6 +1606,251 @@ class HockeyVisualization {
             mouseDisplayElement.textContent = `Display: (${displayX.toFixed(0)}px, ${displayY.toFixed(0)}px)`;
         }
     }
+
+    // Update puck position immediately
+    updatePuckPositionImmediate(realPos) {
+        this.currentPositions.puck = realPos;
+        this.previousPositions.puck = { ...this.currentPositions.puck };
+        this.velocities.puck = { x: 0, y: 0 }; // Reset velocity when puck is updated
+        this.updateVisualPositions(); // Update visual position immediately
+    }
+     // Test 180-degree rotation
+     test180DegreeRotation() {
+         console.log('🧪 Testing 180-degree rotation...');
+         
+         // Test corner positions to verify rotation
+         const testMQTTPositions = [
+             { mqtt: { x: 0, y: 0 }, expected: { x: 43, y: 26 }, description: 'Top-left corner' },
+             { mqtt: { x: 810, y: 0 }, expected: { x: 0, y: 26 }, description: 'Top-right corner' },
+             { mqtt: { x: 0, y: 420 }, expected: { x: 43, y: 0 }, description: 'Bottom-left corner' },
+             { mqtt: { x: 810, y: 420 }, expected: { x: 0, y: 0 }, description: 'Bottom-right corner' },
+             { mqtt: { x: 405, y: 210 }, expected: { x: 21.5, y: 13 }, description: 'Center' }
+         ];
+         
+         testMQTTPositions.forEach(test => {
+             const result = this.mqttToRealCoordinates(test.mqtt.x, test.mqtt.y);
+             console.log(`📍 ${test.description}: MQTT(${test.mqtt.x}, ${test.mqtt.y}) → Real(${result.x.toFixed(1)}, ${result.y.toFixed(1)}) [Expected: (${test.expected.x}, ${test.expected.y})]`);
+         });
+     }
+     
+     // Test backend-based goal events
+     testBackendGoalEvents() {
+         console.log('🧪 Testing backend-based goal events...');
+         
+         // Test left goal
+         setTimeout(() => {
+             console.log('⚽ Simulating left goal from backend...');
+             this.handleGoalEvent({ side: 'left' });
+         }, 1000);
+         
+         // Test right goal
+         setTimeout(() => {
+             console.log('⚽ Simulating right goal from backend...');
+             this.handleGoalEvent({ side: 'right' });
+         }, 4000);
+     }
+     
+     // Test goal sequence with puck reappearance
+     testGoalSequenceWithPuckReappearance() {
+         console.log('🧪 Testing goal sequence with puck reappearance...');
+         
+         // Set puck to a visible position first
+         this.currentPositions.puck = { x: 20, y: 13 };
+         this.puckState.isVisible = true;
+         this.updatePuckVisibility();
+         this.updateVisualPositions();
+         
+         console.log('📍 Puck positioned at (20, 13) and visible');
+         
+         // Simulate goal after 2 seconds
+         setTimeout(() => {
+             console.log('⚽ Simulating goal - puck should disappear and reappear at center in 5 seconds...');
+             this.handleGoalEvent({ side: 'left' });
+             
+             // Log status at different intervals
+             setTimeout(() => {
+                 console.log('⏰ 3 seconds: Puck should still be hidden');
+                 console.log('Puck visible:', this.puckState.isVisible);
+             }, 3000);
+             
+             setTimeout(() => {
+                 console.log('⏰ 7 seconds: Puck should now be visible at center');
+                 console.log('Puck visible:', this.puckState.isVisible);
+                 console.log('Puck position:', this.currentPositions.puck);
+             }, 7000);
+             
+         }, 2000);
+     }
+     
+     // Test multiple goal sequence
+     testMultipleGoalsSequence() {
+         console.log('🧪 Testing multiple goals sequence...');
+         
+         // First goal
+         setTimeout(() => {
+             console.log('⚽ First goal (left)');
+             this.handleGoalEvent({ side: 'left' });
+         }, 1000);
+         
+         // Second goal (should happen after first puck reappears)
+         setTimeout(() => {
+             console.log('⚽ Second goal (right)');
+             this.handleGoalEvent({ side: 'right' });
+         }, 8000);
+         
+         // Third goal
+         setTimeout(() => {
+             console.log('⚽ Third goal (left)');
+             this.handleGoalEvent({ side: 'left' });
+         }, 15000);
+         
+         console.log('📅 Goals scheduled at 1s, 8s, and 15s intervals');
+     }
+     
+     // Test coordinate system consistency
+     testCoordinateSystemConsistency() {
+         console.log('🧪 Testing coordinate system consistency...');
+         
+         // Test pusher positions after rotation
+         const testPusherPositions = [
+             { mqtt: { x: 200, y: 210 }, pusher: 'pusherA', description: 'PusherA test position' },
+             { mqtt: { x: 600, y: 210 }, pusher: 'pusherB', description: 'PusherB test position' }
+         ];
+         
+         testPusherPositions.forEach(test => {
+             const realPos = this.mqttToRealCoordinates(test.mqtt.x, test.mqtt.y);
+             const isInCorrectHalf = this.isPusherInCorrectHalf(test.pusher, realPos);
+             console.log(`📍 ${test.description}: MQTT(${test.mqtt.x}, ${test.mqtt.y}) → Real(${realPos.x.toFixed(1)}, ${realPos.y.toFixed(1)}) - In correct half: ${isInCorrectHalf}`);
+         });
+     }
+     
+     // Comprehensive test of rotation and backend integration
+     testRotationAndBackendIntegration() {
+         console.log('🧪 Starting comprehensive test of rotation and backend integration...');
+         
+         // Test 180-degree rotation
+         this.test180DegreeRotation();
+         
+         // Test coordinate system consistency
+         setTimeout(() => {
+             this.testCoordinateSystemConsistency();
+         }, 2000);
+         
+         // Test backend goal events with puck reappearance
+         setTimeout(() => {
+             this.testGoalSequenceWithPuckReappearance();
+         }, 4000);
+         
+         // Test multiple goals sequence
+         setTimeout(() => {
+             this.testMultipleGoalsSequence();
+         }, 12000);
+         
+         // Test all other features
+         setTimeout(() => {
+             this.testAllNewFeatures();
+         }, 25000);
+         
+         console.log('✅ All rotation and backend integration tests scheduled (including goal reappearance)');
+     }
+     
+     // Collision testing functionality removed
+     
+     // Quick test for goal and puck reappearance
+     testQuickGoalReappearance() {
+         console.log('🧪 Quick test: Goal → Puck disappears → Puck reappears at center');
+         
+         // Ensure puck is visible first
+         this.puckState.isVisible = true;
+         this.updatePuckVisibility();
+         console.log('📍 Puck made visible');
+         
+         // Trigger goal immediately
+         setTimeout(() => {
+             console.log('⚽ Goal triggered!');
+             this.handleGoalEvent({ side: 'left' });
+             console.log('⏰ Timeline: Goal effect (1.5s) → Hide puck (5s) → Show at center');
+         }, 500);
+     }
+     
+     // Get current puck status
+     getPuckStatus() {
+         return {
+             isVisible: this.puckState.isVisible,
+             isDetected: this.puckState.isDetected,
+             position: this.currentPositions.puck,
+             lastDetectedTime: this.puckState.lastDetectedTime,
+             isInGoalSequence: this.puckState.isInGoalSequence,
+             goalProcessing: this.goalProcessing,
+             centerPosition: {
+                 x: this.realDimensions.tableLength / 2,
+                 y: this.realDimensions.tableWidth / 2
+             }
+         };
+     }
+     
+     // Test fixed goal puck logic
+     testFixedGoalPuckLogic() {
+         console.log('🧪 Testing fixed goal puck logic...');
+         
+         // Ensure puck is visible and not in goal sequence
+         this.puckState.isVisible = true;
+         this.puckState.isInGoalSequence = false;
+         this.goalProcessing = false;
+         this.updatePuckVisibility();
+         
+         console.log('📍 Initial puck status:', this.getPuckStatus());
+         
+         // Simulate a goal event
+         setTimeout(() => {
+             console.log('⚽ Triggering goal event...');
+             this.handleGoalEvent({ side: 'left' });
+             
+             // Check status during goal sequence
+             setTimeout(() => {
+                 console.log('⏰ Status after 2s (during goal sequence):', this.getPuckStatus());
+             }, 2000);
+             
+             // Check status when puck should be hidden
+             setTimeout(() => {
+                 console.log('⏰ Status after 3s (puck should be hidden):', this.getPuckStatus());
+             }, 3000);
+             
+             // Check status when puck should reappear
+             setTimeout(() => {
+                 console.log('⏰ Status after 8s (puck should reappear at center):', this.getPuckStatus());
+             }, 8000);
+             
+         }, 1000);
+     }
+     
+     // Test MQTT interference protection
+     testMQTTInterferenceProtection() {
+         console.log('🧪 Testing MQTT interference protection...');
+         
+         // Start a goal sequence
+         this.goalProcessing = true;
+         this.puckState.isInGoalSequence = true;
+         
+         console.log('🎯 Goal sequence started - testing MQTT interference...');
+         
+         // Simulate MQTT data during goal sequence
+         const testMQTTData = {
+             puck: { x: 400, y: 200 } // Some random position
+         };
+         
+                   console.log('📡 Simulating MQTT puck data during goal sequence...');
+          this.updatePositions(testMQTTData);
+         
+         setTimeout(() => {
+             console.log('📊 Puck status after MQTT simulation:', this.getPuckStatus());
+             
+             // Reset states
+             this.goalProcessing = false;
+             this.puckState.isInGoalSequence = false;
+             console.log('✅ Test completed - states reset');
+         }, 1000);
+     }
 }
 
         // Initialize when DOM is loaded

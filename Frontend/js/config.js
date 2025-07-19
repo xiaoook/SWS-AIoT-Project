@@ -6,7 +6,7 @@ const CONFIG = {
     
     // 服务器URL配置
     get BACKEND_URL() {
-        return `http://localhost:${this.BACKEND_PORT}`;
+        return `http://172.20.10.2:${this.BACKEND_PORT}`;
     },
     
     get FRONTEND_URL() {
@@ -24,9 +24,18 @@ const CONFIG = {
         GAMES_SELECT: '/games/select',
         GOAL: '/goal',
         
+        // 轮次相关
+        ROUNDS: '/games/{gid}/rounds',
+        
         // 玩家相关
         PLAYER_ALL: '/player/all',
         PLAYER_CREATE: '/player/create',
+        
+        // 分析相关
+        ANALYSIS_GAME: '/analysis/game',
+        ANALYSIS_GAME_NEW: '/analysis/game/new',
+        ANALYSIS_ROUND: '/analysis/round/{gid}',
+        ANALYSIS_ROUND_NEW: '/analysis/round/new',
         
         // 其他
         ROOT: '/'
@@ -35,6 +44,16 @@ const CONFIG = {
     // 完整的API URL生成器
     getApiUrl(endpoint) {
         return this.BACKEND_URL + endpoint;
+    },
+    
+    // 获取轮次数据的URL生成器
+    getRoundsUrl(gid) {
+        return this.getApiUrl(this.API_ENDPOINTS.ROUNDS.replace('{gid}', gid));
+    },
+    
+    // 获取轮次分析的URL生成器
+    getRoundAnalysisUrl(gid) {
+        return this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_ROUND.replace('{gid}', gid));
     },
     
     // 常用的完整URL
@@ -49,6 +68,9 @@ const CONFIG = {
             GOAL: this.getApiUrl(this.API_ENDPOINTS.GOAL),
             PLAYER_ALL: this.getApiUrl(this.API_ENDPOINTS.PLAYER_ALL),
             PLAYER_CREATE: this.getApiUrl(this.API_ENDPOINTS.PLAYER_CREATE),
+            ANALYSIS_GAME: this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_GAME),
+            ANALYSIS_GAME_NEW: this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_GAME_NEW),
+            ANALYSIS_ROUND_NEW: this.getApiUrl(this.API_ENDPOINTS.ANALYSIS_ROUND_NEW),
             ROOT: this.getApiUrl(this.API_ENDPOINTS.ROOT)
         };
     }

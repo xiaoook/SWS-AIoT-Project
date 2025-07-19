@@ -141,6 +141,12 @@ class WebSocketManager {
             this.handlePositionUpdate(position_data);
         });
         
+        // Receive win rate predictions - From CV model
+        this.socket.on('win_rate_prediction', (prediction_data) => {
+            console.log('Win rate prediction received:', prediction_data);
+            this.handleWinRatePrediction(prediction_data);
+        });
+        
         // Connection error
         this.socket.on('connect_error', (error) => {
             console.error('WebSocket connection error:', error);
@@ -200,6 +206,12 @@ class WebSocketManager {
     
     // Handle score update - Adapt backend {A: 0, B: 0} format
     handleScoreUpdate(scoreData) {
+        // Check if game is in progress before updating score
+        if (window.smartCourtApp && window.smartCourtApp.gameState.status !== 'playing') {
+            console.log(`🚫 Score update from backend ignored - game is ${window.smartCourtApp.gameState.status}`);
+            return;
+        }
+        
         // Backend sends format {A: 0, B: 0}, need to convert to frontend format
         const convertedScore = {
             playerA: scoreData.A || 0,
@@ -227,6 +239,35 @@ class WebSocketManager {
         // Call position update callback (compatible with old API)
         if (this.callbacks.onPositionUpdate) {
             this.callbacks.onPositionUpdate(positionData);
+        }
+    }
+    
+    // Handle win rate prediction - From CV model
+    handleWinRatePrediction(predictionData) {
+        console.log('🎯 WebSocket received win rate prediction:', predictionData);
+        
+        // Validate data format before processing
+        if (!predictionData) {
+            console.warn('🎯 WebSocket received null win rate prediction data');
+            return;
+        }
+        
+        if (typeof predictionData !== 'object') {
+            console.warn('🎯 WebSocket received invalid win rate prediction data type:', typeof predictionData);
+            return;
+        }
+        
+        // Trigger win rate prediction event
+        this.emit('win_rate_prediction', predictionData);
+        
+        // Call win rate prediction callback (compatible with old API)
+        if (this.callbacks.onWinRatePrediction) {
+            this.callbacks.onWinRatePrediction(predictionData);
+        }
+        
+        // Update win rate predictor if available
+        if (window.winRatePredictor) {
+            window.winRatePredictor.handleWinRatePrediction(predictionData);
         }
     }
     
@@ -497,6 +538,28 @@ class WebSocketManager {
             reconnectAttempts: this.reconnectAttempts,
             serverUrl: this.serverUrl
         };
+    }
+    
+    // Test win rate prediction flow
+    testWinRatePredictionFlow() {
+        console.log('🧪 Testing WebSocket win rate prediction flow...');
+        
+        // Test with valid data
+        this.handleWinRatePrediction({
+            playerA: 70,
+            playerB: 30,
+            confidence: 0.9
+        });
+        
+        // Test with invalid data after 3 seconds
+        setTimeout(() => {
+            this.handleWinRatePrediction(null);
+        }, 3000);
+        
+        // Test with string data
+        setTimeout(() => {
+            this.handleWinRatePrediction("invalid data");
+        }, 5000);
     }
 }
 

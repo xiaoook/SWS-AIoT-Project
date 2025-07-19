@@ -393,6 +393,11 @@ class SmartCourtApp {
         // 已禁用自动模拟 - 等待真实传感器输入
         // this.simulateGameplay(); // 自动模拟已禁用
         
+        // Reset win rate display for new game
+        if (window.winRatePredictor) {
+            window.winRatePredictor.resetWinRateDisplay();
+        }
+        
         // Trigger game state change event to update button states
         document.dispatchEvent(new CustomEvent('gameStateChange', {
             detail: { 
@@ -419,6 +424,63 @@ class SmartCourtApp {
         }));
         
         this.showMessage('Match paused', 'info');
+    }
+    
+    // Test method to verify pause functionality
+    testPauseGameFunctionality() {
+        console.log('🧪 Testing pause game functionality...');
+        
+        if (this.gameState.status !== 'playing') {
+            console.log('⚠️ Game is not in playing state, starting game first...');
+            this.startGame();
+            
+            // Wait for game to start
+            setTimeout(() => {
+                this.performPauseTest();
+            }, 1000);
+        } else {
+            this.performPauseTest();
+        }
+    }
+    
+    performPauseTest() {
+        console.log('🎮 Current game status:', this.gameState.status);
+        console.log('📊 Current score:', this.gameState.scores);
+        
+        // Pause the game
+        console.log('⏸️ Pausing game...');
+        this.pauseGame();
+        
+        // Try to add score while paused
+        console.log('🧪 Attempting to add score while paused...');
+        this.addScore('playerA');
+        
+        // Check if score was added
+        console.log('📊 Score after pause attempt:', this.gameState.scores);
+        
+        // Resume the game
+        setTimeout(() => {
+            console.log('▶️ Resuming game...');
+            this.resumeGame();
+            
+            // Try to add score after resume
+            setTimeout(() => {
+                console.log('🧪 Attempting to add score after resume...');
+                const originalScoreA = this.gameState.scores.playerA;
+                this.addScore('playerA');
+                
+                setTimeout(() => {
+                    console.log('📊 Score after resume attempt:', this.gameState.scores);
+                    const newScoreA = this.gameState.scores.playerA;
+                    
+                    if (newScoreA > originalScoreA) {
+                        console.log('✅ Pause functionality working correctly - score added after resume');
+                    } else {
+                        console.log('❌ Issue with pause functionality - score not added after resume');
+                    }
+                }, 500);
+            }, 500);
+        }, 2000);
     }
     
     resumeGame() {
@@ -748,6 +810,12 @@ class SmartCourtApp {
     
     // Update score from backend response
     updateScoreFromBackend(backendScore) {
+        // Check if game is in progress before updating score
+        if (this.gameState.status !== 'playing') {
+            console.log(`🚫 Score update ignored - game is ${this.gameState.status}`);
+            return;
+        }
+        
         // Backend returns score as { A: number, B: number }
         // Convert to our frontend format
         this.gameState.scores.playerA = backendScore.A || 0;
@@ -978,6 +1046,11 @@ class SmartCourtApp {
         if (feedContainer) {
             feedContainer.innerHTML = '';
             this.addLiveFeedItem('System ready. Waiting for game to start...', 'info');
+        }
+        
+        // Reset win rate display
+        if (window.winRatePredictor) {
+            window.winRatePredictor.resetWinRateDisplay();
         }
         
         // Trigger game state change event

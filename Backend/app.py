@@ -1,4 +1,5 @@
 import json
+import time
 import eventlet
 eventlet.monkey_patch()
 
@@ -10,8 +11,11 @@ from flask_cors import CORS
 from flask_mqtt import Mqtt
 from Backend.config import *
 
+from Backend.route.analysis import analysis_bp
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'hockey!'
+app.register_blueprint(analysis_bp)
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
@@ -47,20 +51,35 @@ current_score = {
 }
 current_round = 0
 current_game = 0
+last_goal = 0.0
 latest_position = {}
 
 @mqtt.on_connect()
 def handle_connect_mqtt(client, userdata, flags, rc):
     logger.info('Connected to MQTT Broker')
     mqtt.subscribe('game/positions')
+    mqtt.subscribe("game/predictions")
 
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
     global latest_position
+<<<<<<< HEAD
     payload = message.payload.decode()
     logger.debug(f'Received position: {payload}')
     latest_position = json.loads(payload)
     socketio.emit('position_update', latest_position)
+=======
+    if message.topic == 'game/positions':
+        payload = message.payload.decode()
+        # logger.debug(f'Received position: {payload}')
+        latest_position = json.loads(payload)
+        socketio.emit('position_update', latest_position)
+    elif message.topic == 'game/predictions':
+        payload = message.payload.decode()
+        # logger.debug(f'Received prediction: {payload}')
+        prediction = json.loads(payload)
+        socketio.emit('win_rate_prediction', prediction)
+>>>>>>> b8b3a5b4e04529081d970b6d9ac0fb6b00a0e44a
 
 # emit the current score when the new client connects
 @socketio.on('connect')
@@ -166,8 +185,20 @@ def goal():
     global current_score
     global current_round
     global current_game
+    global last_goal
     team = request.args.get('team')
     gid = current_game
+
+    # current_time = time.time()
+    # if current_time - last_goal < 8.0:
+    #     logger.error(f'Goal time interval is too short: {current_time - last_goal}')
+    #     return jsonify({
+    #         "status": "error",
+    #         "message": "Timed out"
+    #     }), 400
+    # else:
+    #     last_goal = current_time
+
 
     if gid == 0:
         logger.error(f'A game should be selected, the gid now is {gid}')
@@ -294,6 +325,7 @@ def delete_game():
         current_round = 0
         current_game = 0
         socketio.emit('score_update', current_score)
+        mqtt.publish('game/score', )
 
     delete_selected_game(gid)
     return jsonify({
@@ -318,6 +350,7 @@ def reset_game():
     current_game = 0
     socketio.emit('score_update', current_score)
     mqtt.publish('game/status', "ended".encode(), retain=True)
+    mqtt.publish('game/score', json.dumps(current_score).encode(), retain=True)
     logger.info(f'current game is reset')
 
 @app.route('/player/create', methods=['POST'])
