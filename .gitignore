@@ -435,5 +435,7 @@ FodyWeavers.xsd
 *.csv
 
 .venv/
+venv/
+ai_venv/
 
 com.chrome.devtools.json

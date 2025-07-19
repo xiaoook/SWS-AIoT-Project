@@ -1,0 +1,265 @@
+[
+  {
+    "start_time": 1752659707.0289266,
+    "end_time": 1752659712.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "slow_reaction",
+        "low_activity",
+        "coverage_gap"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays.",
+        "Move more actively to stay engaged in the game.",
+        "Increase your coverage area to better influence the game."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [
+        "slow_reaction",
+        "low_activity",
+        "coverage_gap"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays.",
+        "Move more actively to stay engaged in the game.",
+        "Increase your coverage area to better influence the game."
+      ],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659712.0289266,
+    "end_time": 1752659717.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [],
+      "advices": [],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [
+        "low_activity"
+      ],
+      "advices": [
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659717.0289266,
+    "end_time": 1752659722.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "slow_reaction"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [
+        "slow_reaction",
+        "low_activity"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays.",
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659722.0289266,
+    "end_time": 1752659727.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "slow_reaction"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [
+        "slow_reaction",
+        "low_activity"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays.",
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659727.0289266,
+    "end_time": 1752659732.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "slow_reaction",
+        "low_activity"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays.",
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [],
+      "advices": [],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659732.0289266,
+    "end_time": 1752659737.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "slow_reaction"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [
+        "slow_reaction"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays."
+      ],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659737.0289266,
+    "end_time": 1752659742.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "slow_reaction",
+        "low_activity"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays.",
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [
+        "low_activity"
+      ],
+      "advices": [
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659742.0289266,
+    "end_time": 1752659747.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "slow_reaction",
+        "low_activity"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays.",
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [],
+      "advices": [],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659747.0289266,
+    "end_time": 1752659752.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "slow_reaction",
+        "low_activity"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays.",
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [
+        "slow_reaction"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays."
+      ],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659752.0289266,
+    "end_time": 1752659757.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "slow_reaction",
+        "low_activity"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays.",
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [
+        "slow_reaction"
+      ],
+      "advices": [
+        "Try to react more quickly to incoming plays."
+      ],
+      "status": "Neutral"
+    }
+  },
+  {
+    "start_time": 1752659757.0289266,
+    "end_time": 1752659762.0289266,
+    "game_id": 0,
+    "paddle1": {
+      "problems": [
+        "low_activity"
+      ],
+      "advices": [
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    },
+    "paddle2": {
+      "problems": [
+        "low_activity"
+      ],
+      "advices": [
+        "Move more actively to stay engaged in the game."
+      ],
+      "status": "Neutral"
+    }
+  }
+]

@@ -7,16 +7,13 @@ import torch.optim as optim
 from model import LSTMClassifier
 
 class ScoreSequenceDataset(Dataset):
-    def __init__(self, csv_path, window_sec=1.0):
+    def __init__(self, csv_path, window_sec=2.0):
         self.df = pd.read_csv(csv_path)
         self.window_sec = window_sec
         self.feature_cols = [
-            "ball_u","ball_v","ball_speed","ball_acc","ball_dir",
-            "paddle1_u","paddle1_v","paddle1_speed","paddle1_acc","paddle1_dir",
-            "paddle2_u","paddle2_v","paddle2_speed","paddle2_acc","paddle2_dir",
-            "dist_ball_paddle1","dist_ball_paddle2",
-            "dist_paddle1_paddle2",
-            "dist_ball_goal"
+            "ball_u", "ball_v", "ball_speed", "ball_angle",
+            "paddle1_u", "paddle1_v", "paddle1_speed", "paddle1_angle",
+            "paddle2_u", "paddle2_v", "paddle2_speed", "paddle2_angle",
         ]
         self.samples = []
         self.labels = []
@@ -32,7 +29,7 @@ class ScoreSequenceDataset(Dataset):
             scorer = int(df.loc[idx, 'scorer']) - 1  # 标签0或1
 
             window_start_time = score_time - 2
-            window_end_time = score_time - 0.5
+            window_end_time = score_time -0.2
             window_df = df[(df['timestamp'] >= window_start_time) & (df['timestamp'] < window_end_time)]
             window_df = window_df.dropna(subset=self.feature_cols)
 
@@ -98,10 +95,10 @@ def evaluate(model, test_loader, device):
     return accuracy
 
 if __name__ == "__main__":
-    csv_path = "tracking_data_clean.csv"
+    csv_path = "train_data.csv"
     window_sec = 2
     batch_size = 4
-    epochs = 20
+    epochs = 50
 
     dataset = ScoreSequenceDataset(csv_path, window_sec=window_sec)
     scorer_counts = [0, 0]
@@ -109,24 +106,30 @@ if __name__ == "__main__":
         scorer_counts[label] += 1
     print(f"Player 1 得分次数: {scorer_counts[0]}")
     print(f"Player 2 得分次数: {scorer_counts[1]}")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = LSTMClassifier(input_size=len(dataset.feature_cols)).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+    # ✅ 固定划分训练集和验证集
+    total_len = len(dataset)
+    train_len = int(total_len * 0.8)
+    val_len = total_len - train_len
+    train_set, val_set = random_split(dataset, [train_len, val_len])
+
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+
     for epoch in range(epochs):
-        total_len = len(dataset)
-        train_len = int(total_len * 0.8)
-        test_len = total_len - train_len
-        train_set, test_set = torch.utils.data.random_split(dataset, [train_len, test_len])
-
-        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-        test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
-        test_acc = evaluate(model, test_loader, device)
+        val_acc = evaluate(model, val_loader, device)
 
-        print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.4f} - Test Accuracy: {test_acc:.4f}")
+        print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.4f} - Val Accuracy: {val_acc:.4f}")
+
+    # ✅ 最终验证结果
+    final_acc = evaluate(model, val_loader, device)
+    print(f"最终验证集准确率: {final_acc:.4f}")
 
     torch.save(model.state_dict(), "lstm_model.pt")
     print("模型已保存到: lstm_model.pt")
